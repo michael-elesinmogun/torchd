@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { supabase } from '../../supabase';
 import styles from './profile.module.css';
 
@@ -23,10 +24,19 @@ const SUGGESTED_TOPICS = {
 
 export default function Profile({ params }) {
   const { username } = React.use(params);
+  const router = useRouter();
   const fileInputRef = useRef(null);
 
+  const [user, setUser] = useState(null);
   const [displayName, setDisplayName] = useState('');
   const [initials, setInitials] = useState('?');
+
+  // Handle/username editing
+  const [editingHandle, setEditingHandle] = useState(false);
+  const [handleInput, setHandleInput] = useState(username);
+  const [handleError, setHandleError] = useState('');
+  const [savingHandle, setSavingHandle] = useState(false);
+
   const [activeTab, setActiveTab] = useState('history');
   const [following, setFollowing] = useState(false);
   const [followCount, setFollowCount] = useState(0);
@@ -45,28 +55,27 @@ export default function Profile({ params }) {
     firstBattle: false,
   });
 
-  // Fetch real user data from Supabase
   useEffect(() => {
     async function fetchUser() {
       const { data: { session } } = await supabase.auth.getSession();
-      const user = session?.user;
-      if (user) {
-        const fullName = user.user_metadata?.full_name || '';
+      const currentUser = session?.user;
+      setUser(currentUser);
+
+      if (currentUser) {
+        const fullName = currentUser.user_metadata?.full_name || '';
         setDisplayName(fullName || username);
         setInitials(
           fullName
             ? fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
             : username.slice(0, 2).toUpperCase()
         );
-        // Set sport from signup
-        const sport = user.user_metadata?.sport;
+        const sport = currentUser.user_metadata?.sport;
         if (sport && sport !== 'all') {
           const sportMap = { nba: 'NBA', nfl: 'NFL', soccer: 'Soccer', mlb: 'MLB', nhl: 'NHL' };
-          const mappedSport = sportMap[sport];
-          if (mappedSport) setFavSports([mappedSport]);
+          const mapped = sportMap[sport];
+          if (mapped) setFavSports([mapped]);
         }
       } else {
-        // Not logged in — derive name from URL
         setDisplayName(
           username.split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
         );
@@ -75,6 +84,40 @@ export default function Profile({ params }) {
     }
     fetchUser();
   }, [username]);
+
+  async function saveHandle() {
+    if (handleInput.length < 3) { setHandleError('Min 3 characters'); return; }
+    if (!/^[a-z0-9_]+$/.test(handleInput)) { setHandleError('Only letters, numbers and underscores'); return; }
+    setSavingHandle(true);
+    setHandleError('');
+
+    const { data: existing } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('username', handleInput)
+      .single();
+
+    if (existing) {
+      setHandleError('That username is already taken');
+      setSavingHandle(false);
+      return;
+    }
+
+    const { error } = await supabase
+      .from('profiles')
+      .update({ username: handleInput })
+      .eq('id', user.id);
+
+    setSavingHandle(false);
+
+    if (error) {
+      setHandleError('Something went wrong');
+      return;
+    }
+
+    setEditingHandle(false);
+    router.push(`/profile/${handleInput}`);
+  }
 
   function toggleFollow() {
     setFollowing(!following);
@@ -118,7 +161,6 @@ export default function Profile({ params }) {
   const totalCount = Object.keys(checklist).length;
   const progressPct = Math.round((completedCount / totalCount) * 100);
   const suggestedTopics = favSports.length > 0 ? SUGGESTED_TOPICS[favSports[0]] || [] : SUGGESTED_TOPICS['NBA'];
-  const isNewUser = checklist.firstBattle === false;
 
   return (
     <main className={styles.main}>
@@ -127,8 +169,9 @@ export default function Profile({ params }) {
 
           {/* LEFT SIDEBAR */}
           <div className={styles.sidebar}>
-
             <div className={styles.profileCard}>
+
+              {/* Avatar */}
               <div className={styles.avatarWrap}>
                 <div className={styles.avatarContainer} onClick={() => fileInputRef.current?.click()}>
                   {photoUrl
@@ -141,10 +184,38 @@ export default function Profile({ params }) {
                 <div className={styles.avatarHint}>Click to upload photo</div>
               </div>
 
+              {/* Name */}
               <div className={styles.profileName}>{displayName}</div>
-              <div className={styles.profileHandle}>@{username}</div>
+
+              {/* Handle with edit */}
+              {editingHandle ? (
+                <div className={styles.handleEditWrap}>
+                  <span className={styles.handleAt}>@</span>
+                  <input
+                    className={styles.handleInput}
+                    value={handleInput}
+                    onChange={e => setHandleInput(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+                    maxLength={20}
+                    autoFocus
+                    onKeyDown={e => e.key === 'Enter' && saveHandle()}
+                  />
+                  <button className={styles.handleSaveBtn} onClick={saveHandle} disabled={savingHandle}>
+                    {savingHandle ? '...' : 'Save'}
+                  </button>
+                  <button className={styles.handleCancelBtn} onClick={() => { setEditingHandle(false); setHandleInput(username); setHandleError(''); }}>✕</button>
+                </div>
+              ) : (
+                <div className={styles.profileHandleRow}>
+                  <span className={styles.profileHandle}>@{username}</span>
+                  {user && <button className={styles.editHandleBtn} onClick={() => setEditingHandle(true)}>Edit</button>}
+                </div>
+              )}
+
+              {handleError && <div className={styles.handleError}>{handleError}</div>}
+
               <div className={styles.profileLocation}>📍 Boston, MA</div>
 
+              {/* Bio */}
               {editingBio ? (
                 <div className={styles.bioEditWrap}>
                   <textarea className={styles.bioTextarea} value={bioInput} onChange={e => setBioInput(e.target.value)} maxLength={160} rows={3} placeholder="Your take in one line..." autoFocus />
@@ -161,16 +232,11 @@ export default function Profile({ params }) {
                 </div>
               )}
 
+              {/* Follow stats */}
               <div className={styles.followRow}>
-                <div className={styles.followStat}>
-                  <span className={styles.followNum}>{followCount}</span>
-                  <span className={styles.followLabel}>Followers</span>
-                </div>
+                <div className={styles.followStat}><span className={styles.followNum}>{followCount}</span><span className={styles.followLabel}>Followers</span></div>
                 <div className={styles.followDivider}></div>
-                <div className={styles.followStat}>
-                  <span className={styles.followNum}>0</span>
-                  <span className={styles.followLabel}>Following</span>
-                </div>
+                <div className={styles.followStat}><span className={styles.followNum}>0</span><span className={styles.followLabel}>Following</span></div>
               </div>
 
               <button className={`${styles.followBtn} ${following ? styles.followingBtn : ''}`} onClick={toggleFollow}>
@@ -182,44 +248,36 @@ export default function Profile({ params }) {
               </button>
             </div>
 
+            {/* Sports & Teams */}
             <div className={styles.sideCard}>
               <div className={styles.sideCardHeader}>
                 <div className={styles.sideCardTitle}>Favorite Sports & Teams</div>
-                <button className={styles.editBtn} onClick={() => setEditingSports(!editingSports)}>
-                  {editingSports ? 'Done' : 'Edit'}
-                </button>
+                <button className={styles.editBtn} onClick={() => setEditingSports(!editingSports)}>{editingSports ? 'Done' : 'Edit'}</button>
               </div>
               {editingSports ? (
                 <div className={styles.editSection}>
                   <div className={styles.editLabel}>Sports</div>
                   <div className={styles.sportsEditGrid}>
-                    {SPORTS.map(sport => (
-                      <button key={sport} className={`${styles.sportEditBtn} ${favSports.includes(sport) ? styles.sportEditSelected : ''}`} onClick={() => toggleSport(sport)}>{sport}</button>
-                    ))}
+                    {SPORTS.map(sport => <button key={sport} className={`${styles.sportEditBtn} ${favSports.includes(sport) ? styles.sportEditSelected : ''}`} onClick={() => toggleSport(sport)}>{sport}</button>)}
                   </div>
                   {favSports.map(sport => (
                     <div key={sport}>
                       <div className={styles.editLabel}>{sport} Teams</div>
                       <div className={styles.teamsEditGrid}>
-                        {TEAMS[sport]?.map(team => (
-                          <button key={team} className={`${styles.teamEditBtn} ${favTeams.includes(team) ? styles.teamEditSelected : ''}`} onClick={() => toggleTeam(team)}>{team}</button>
-                        ))}
+                        {TEAMS[sport]?.map(team => <button key={team} className={`${styles.teamEditBtn} ${favTeams.includes(team) ? styles.teamEditSelected : ''}`} onClick={() => toggleTeam(team)}>{team}</button>)}
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
                 <div>
-                  <div className={styles.sportBadges}>
-                    {favSports.map(sport => <div key={sport} className={styles.sportBadge}>{sport}</div>)}
-                  </div>
-                  <div className={styles.teamBadges}>
-                    {favTeams.map(team => <div key={team} className={styles.teamBadge}>🏆 {team}</div>)}
-                  </div>
+                  <div className={styles.sportBadges}>{favSports.map(sport => <div key={sport} className={styles.sportBadge}>{sport}</div>)}</div>
+                  <div className={styles.teamBadges}>{favTeams.map(team => <div key={team} className={styles.teamBadge}>🏆 {team}</div>)}</div>
                 </div>
               )}
             </div>
 
+            {/* Stats */}
             <div className={styles.sideCard}>
               <div className={styles.sideCardTitle}>Stats</div>
               <div className={styles.statsGrid}>
@@ -229,63 +287,54 @@ export default function Profile({ params }) {
                 <div className={styles.statItem}><div className={styles.statNum} style={{color:'#3D4A66'}}>—</div><div className={styles.statLabel}>Streak</div></div>
               </div>
             </div>
-
           </div>
 
           {/* MAIN CONTENT */}
           <div className={styles.mainContent}>
-
-            {isNewUser && (
-              <div className={styles.onboardingSection}>
-                <div className={styles.checklistCard}>
-                  <div className={styles.checklistHeader}>
-                    <div>
-                      <div className={styles.checklistTitle}>Complete your profile</div>
-                      <div className={styles.checklistSub}>{completedCount} of {totalCount} done</div>
-                    </div>
-                    <div className={styles.checklistPct}>{progressPct}%</div>
-                  </div>
-                  <div className={styles.progressTrack}>
-                    <div className={styles.progressFill} style={{width: `${progressPct}%`}}></div>
-                  </div>
-                  <div className={styles.checklistItems}>
-                    {[
-                      { key: 'addBio', title: 'Add a bio', sub: 'Tell the world your take' },
-                      { key: 'pickTeams', title: 'Pick your favorite teams', sub: 'So we can match you with the right opponents' },
-                      { key: 'firstBattle', title: 'Start your first battle', sub: 'Prove your takes are built different' },
-                    ].map(item => (
-                      <div key={item.key} className={`${styles.checklistItem} ${checklist[item.key] ? styles.checklistDone : ''}`}>
-                        <div className={`${styles.checkmark} ${checklist[item.key] ? styles.checkmarkDone : ''}`}>{checklist[item.key] ? '✓' : ''}</div>
-                        <div className={styles.checklistItemText}>
-                          <div className={styles.checklistItemTitle}>{item.title}</div>
-                          <div className={styles.checklistItemSub}>{item.sub}</div>
-                        </div>
+            <div className={styles.onboardingSection}>
+              <div className={styles.checklistCard}>
+                <div className={styles.checklistHeader}>
+                  <div><div className={styles.checklistTitle}>Complete your profile</div><div className={styles.checklistSub}>{completedCount} of {totalCount} done</div></div>
+                  <div className={styles.checklistPct}>{progressPct}%</div>
+                </div>
+                <div className={styles.progressTrack}><div className={styles.progressFill} style={{width:`${progressPct}%`}}></div></div>
+                <div className={styles.checklistItems}>
+                  {[
+                    { key: 'addBio', title: 'Add a bio', sub: 'Tell the world your take' },
+                    { key: 'pickTeams', title: 'Pick your favorite teams', sub: 'So we can match you with the right opponents' },
+                    { key: 'firstBattle', title: 'Start your first battle', sub: 'Prove your takes are built different' },
+                  ].map(item => (
+                    <div key={item.key} className={`${styles.checklistItem} ${checklist[item.key] ? styles.checklistDone : ''}`}>
+                      <div className={`${styles.checkmark} ${checklist[item.key] ? styles.checkmarkDone : ''}`}>{checklist[item.key] ? '✓' : ''}</div>
+                      <div className={styles.checklistItemText}>
+                        <div className={styles.checklistItemTitle}>{item.title}</div>
+                        <div className={styles.checklistItemSub}>{item.sub}</div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className={styles.firstBattleCard}>
-                  <div className={styles.firstBattleIcon}>⚔️</div>
-                  <div className={styles.firstBattleTitle}>Start your first battle</div>
-                  <p className={styles.firstBattleBody}>You haven't debated yet. Pick a topic, get matched with someone who disagrees, and let the crowd decide who wins.</p>
-                  <Link href="/battle" className={styles.firstBattleBtn}>Find me an opponent →</Link>
-                </div>
-
-                <div className={styles.suggestedCard}>
-                  <div className={styles.suggestedTitle}>🔥 Suggested topics for you</div>
-                  <p className={styles.suggestedSub}>Based on your interest in {favSports.join(' & ')}</p>
-                  <div className={styles.topicsList}>
-                    {suggestedTopics.map((topic, i) => (
-                      <Link href="/battle" key={i} className={styles.topicRow}>
-                        <div className={styles.topicText}>"{topic}"</div>
-                        <div className={styles.topicDebateBtn}>Debate this →</div>
-                      </Link>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            )}
+
+              <div className={styles.firstBattleCard}>
+                <div className={styles.firstBattleIcon}>⚔️</div>
+                <div className={styles.firstBattleTitle}>Start your first battle</div>
+                <p className={styles.firstBattleBody}>You haven't debated yet. Pick a topic, get matched with someone who disagrees, and let the crowd decide who wins.</p>
+                <Link href="/battle" className={styles.firstBattleBtn}>Find me an opponent →</Link>
+              </div>
+
+              <div className={styles.suggestedCard}>
+                <div className={styles.suggestedTitle}>🔥 Suggested topics for you</div>
+                <p className={styles.suggestedSub}>Based on your interest in {favSports.join(' & ')}</p>
+                <div className={styles.topicsList}>
+                  {suggestedTopics.map((topic, i) => (
+                    <Link href="/battle" key={i} className={styles.topicRow}>
+                      <div className={styles.topicText}>"{topic}"</div>
+                      <div className={styles.topicDebateBtn}>Debate this →</div>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            </div>
 
             <div className={styles.tabs}>
               {['history', 'topics', 'followers', 'following'].map(tab => (
@@ -299,7 +348,6 @@ export default function Profile({ params }) {
             {activeTab === 'topics' && <div className={styles.emptyState}><div className={styles.emptyIcon}>🔥</div><div className={styles.emptyTitle}>No favorite topics yet</div><p className={styles.emptyBody}>Topics you debate most will appear here automatically.</p><Link href="/battle" className={styles.emptyBtn}>Start debating →</Link></div>}
             {activeTab === 'followers' && <div className={styles.emptyState}><div className={styles.emptyIcon}>👥</div><div className={styles.emptyTitle}>No followers yet</div><p className={styles.emptyBody}>Win some battles and people will start following you.</p><Link href="/battle" className={styles.emptyBtn}>Start building your rep →</Link></div>}
             {activeTab === 'following' && <div className={styles.emptyState}><div className={styles.emptyIcon}>👀</div><div className={styles.emptyTitle}>Not following anyone yet</div><p className={styles.emptyBody}>Follow other debaters to see their battles and takes.</p><Link href="/leaderboard" className={styles.emptyBtn}>Find debaters to follow →</Link></div>}
-
           </div>
         </div>
       </div>
