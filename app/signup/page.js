@@ -8,14 +8,38 @@ export default function Signup() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [form, setForm] = useState({ name: '', email: '', password: '', sport: '' });
+  const [form, setForm] = useState({ name: '', username: '', email: '', password: '', sport: '' });
 
   function handleChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    // Auto-clean username as they type
+    if (e.target.name === 'username') {
+      setForm({ ...form, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') });
+    } else {
+      setForm({ ...form, [e.target.name]: e.target.value });
+    }
   }
 
-  function handleNext(e) {
+  async function handleNext(e) {
     e.preventDefault();
+    setError(null);
+
+    if (form.username.length < 3) {
+      setError('Username must be at least 3 characters');
+      return;
+    }
+
+    // Check username availability
+    const { data: existing } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('username', form.username)
+      .single();
+
+    if (existing) {
+      setError('That username is taken — try another');
+      return;
+    }
+
     setStep(2);
   }
 
@@ -24,24 +48,36 @@ export default function Signup() {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signUp({
+    // Create auth account
+    const { data, error: signUpError } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
       options: {
         data: {
           full_name: form.name,
+          username: form.username,
           sport: form.sport,
         }
       }
     });
 
-    setLoading(false);
-
-    if (error) {
-      setError(error.message);
+    if (signUpError) {
+      setError(signUpError.message);
+      setLoading(false);
       return;
     }
 
+    // Save profile with username
+    if (data.user) {
+      await supabase.from('profiles').upsert({
+        id: data.user.id,
+        username: form.username,
+        full_name: form.name,
+        sport: form.sport,
+      });
+    }
+
+    setLoading(false);
     setStep(3);
   }
 
@@ -53,6 +89,7 @@ export default function Signup() {
 
       <div className={styles.card}>
 
+        {/* Step 1 — Account details */}
         {step === 1 && (
           <div className={styles.stepWrap}>
             <div className={styles.stepIndicator}>
@@ -70,17 +107,72 @@ export default function Signup() {
             <form onSubmit={handleNext} className={styles.form}>
               <div className={styles.formGroup}>
                 <label className={styles.label}>Full name</label>
-                <input className={styles.input} type="text" name="name" placeholder="Jordan Kim" value={form.name} onChange={handleChange} required />
+                <input
+                  className={styles.input}
+                  type="text"
+                  name="name"
+                  placeholder="John Smith"
+                  value={form.name}
+                  onChange={handleChange}
+                  required
+                />
               </div>
+
+              <div className={styles.formGroup}>
+                <label className={styles.label}>Username</label>
+                <div className={styles.usernameWrap}>
+                  <span className={styles.usernamePrefix}>@</span>
+                  <input
+                    className={styles.usernameInput}
+                    type="text"
+                    name="username"
+                    placeholder="yourusername"
+                    value={form.username}
+                    onChange={handleChange}
+                    required
+                    minLength={3}
+                    maxLength={20}
+                  />
+                </div>
+                {form.username && (
+                  <div className={styles.usernamePreview}>
+                    torchd.vercel.app/profile/{form.username}
+                  </div>
+                )}
+              </div>
+
               <div className={styles.formGroup}>
                 <label className={styles.label}>Email address</label>
-                <input className={styles.input} type="email" name="email" placeholder="jordan@example.com" value={form.email} onChange={handleChange} required />
+                <input
+                  className={styles.input}
+                  type="email"
+                  name="email"
+                  placeholder="you@example.com"
+                  value={form.email}
+                  onChange={handleChange}
+                  required
+                />
               </div>
+
               <div className={styles.formGroup}>
                 <label className={styles.label}>Password</label>
-                <input className={styles.input} type="password" name="password" placeholder="At least 8 characters" value={form.password} onChange={handleChange} required minLength={8} />
+                <input
+                  className={styles.input}
+                  type="password"
+                  name="password"
+                  placeholder="At least 8 characters"
+                  value={form.password}
+                  onChange={handleChange}
+                  required
+                  minLength={8}
+                />
               </div>
-              <button type="submit" className={styles.btnPrimary}>Continue →</button>
+
+              {error && <div className={styles.errorMsg}>{error}</div>}
+
+              <button type="submit" className={styles.btnPrimary}>
+                Continue →
+              </button>
             </form>
 
             <p className={styles.terms}>
@@ -92,6 +184,7 @@ export default function Signup() {
           </div>
         )}
 
+        {/* Step 2 — Pick your sports */}
         {step === 2 && (
           <div className={styles.stepWrap}>
             <div className={styles.stepIndicator}>
@@ -116,9 +209,12 @@ export default function Signup() {
                   {key:'nhl', icon:'🏒', label:'NHL'},
                   {key:'all', icon:'🔥', label:'All Sports'},
                 ].map(s => (
-                  <button key={s.key} type="button"
+                  <button
+                    key={s.key}
+                    type="button"
                     className={`${styles.sportBtn} ${form.sport === s.key ? styles.sportSelected : ''}`}
-                    onClick={() => setForm({...form, sport: s.key})}>
+                    onClick={() => setForm({...form, sport: s.key})}
+                  >
                     <span className={styles.sportIcon}>{s.icon}</span>
                     <span className={styles.sportLabel}>{s.label}</span>
                   </button>
@@ -135,22 +231,22 @@ export default function Signup() {
           </div>
         )}
 
+        {/* Step 3 — Success */}
         {step === 3 && (
           <div className={styles.stepWrap}>
             <div className={styles.successWrap}>
               <div className={styles.successIcon}>🔥</div>
-              <h1 className={styles.cardTitle}>You're in!</h1>
+              <h1 className={styles.cardTitle}>You're in, @{form.username}!</h1>
               <p className={styles.cardSub}>Welcome to Torchd, {form.name.split(' ')[0]}. Check your email to confirm your account, then start debating.</p>
               <div className={styles.successActions}>
-                <Link href="/battle" className={styles.btnPrimary}>⚔️ Start a Battle</Link>
-                <Link href="/lobby" className={styles.btnSecondary}>🏟️ Join a Lobby</Link>
+                <Link href={`/profile/${form.username}`} className={styles.btnPrimary}>View my profile →</Link>
+                <Link href="/battle" className={styles.btnSecondary}>⚔️ Start a Battle</Link>
               </div>
             </div>
           </div>
         )}
 
       </div>
-
     </main>
   );
 }

@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { supabase } from '../../supabase';
 import styles from './profile.module.css';
@@ -21,39 +21,60 @@ const SUGGESTED_TOPICS = {
   NHL: ['Gretzky is untouchable as the greatest of all time', 'The salary cap has killed dynasty teams', 'Sidney Crosby is the best player of his generation', 'The Bruins have been the model franchise of the last decade'],
 };
 
-const PROFILE = {
-  name: 'Jordan Kim',
-  location: 'Boston, MA',
-  bio: 'LeBron is the GOAT and I will debate anyone, anywhere, anytime. Come find me.',
-  favoriteSports: ['NBA', 'NFL'],
-  favoriteTeams: ['Celtics', 'Patriots'],
-  stats: { battles: 0, winRate: 0, rank: null, streak: 0 },
-  followers: 0,
-  following: 0,
-  isNewUser: true,
-};
-
 export default function Profile({ params }) {
   const { username } = React.use(params);
   const fileInputRef = useRef(null);
 
+  const [displayName, setDisplayName] = useState('');
+  const [initials, setInitials] = useState('?');
   const [activeTab, setActiveTab] = useState('history');
   const [following, setFollowing] = useState(false);
-  const [followCount, setFollowCount] = useState(PROFILE.followers);
+  const [followCount, setFollowCount] = useState(0);
   const [editingSports, setEditingSports] = useState(false);
-  const [favSports, setFavSports] = useState(PROFILE.favoriteSports);
-  const [favTeams, setFavTeams] = useState(PROFILE.favoriteTeams);
-  const [bio, setBio] = useState(PROFILE.bio);
+  const [favSports, setFavSports] = useState(['NBA', 'NFL']);
+  const [favTeams, setFavTeams] = useState(['Celtics', 'Patriots']);
+  const [bio, setBio] = useState('LeBron is the GOAT and I will debate anyone, anywhere, anytime. Come find me.');
   const [editingBio, setEditingBio] = useState(false);
-  const [bioInput, setBioInput] = useState(PROFILE.bio);
+  const [bioInput, setBioInput] = useState(bio);
   const [photoUrl, setPhotoUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [checklist, setChecklist] = useState({
     addBio: true,
-    pickTeams: PROFILE.favoriteTeams.length > 0,
+    pickTeams: true,
     firstBattle: false,
   });
+
+  // Fetch real user data from Supabase
+  useEffect(() => {
+    async function fetchUser() {
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
+      if (user) {
+        const fullName = user.user_metadata?.full_name || '';
+        setDisplayName(fullName || username);
+        setInitials(
+          fullName
+            ? fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+            : username.slice(0, 2).toUpperCase()
+        );
+        // Set sport from signup
+        const sport = user.user_metadata?.sport;
+        if (sport && sport !== 'all') {
+          const sportMap = { nba: 'NBA', nfl: 'NFL', soccer: 'Soccer', mlb: 'MLB', nhl: 'NHL' };
+          const mappedSport = sportMap[sport];
+          if (mappedSport) setFavSports([mappedSport]);
+        }
+      } else {
+        // Not logged in — derive name from URL
+        setDisplayName(
+          username.split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+        );
+        setInitials(username.slice(0, 2).toUpperCase());
+      }
+    }
+    fetchUser();
+  }, [username]);
 
   function toggleFollow() {
     setFollowing(!following);
@@ -71,12 +92,10 @@ export default function Profile({ params }) {
   function saveBio() {
     setBio(bioInput);
     setEditingBio(false);
-    setChecklist(prev => ({ ...prev, addBio: true }));
   }
 
   function shareProfile() {
-    const url = window.location.href;
-    navigator.clipboard.writeText(url).then(() => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -99,15 +118,10 @@ export default function Profile({ params }) {
   const totalCount = Object.keys(checklist).length;
   const progressPct = Math.round((completedCount / totalCount) * 100);
   const suggestedTopics = favSports.length > 0 ? SUGGESTED_TOPICS[favSports[0]] || [] : SUGGESTED_TOPICS['NBA'];
-
-  const displayName = username
-    .split(/[-_]/)
-    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-    .join(' ');
+  const isNewUser = checklist.firstBattle === false;
 
   return (
     <main className={styles.main}>
-
       <div className={styles.page}>
         <div className={styles.layout}>
 
@@ -119,7 +133,7 @@ export default function Profile({ params }) {
                 <div className={styles.avatarContainer} onClick={() => fileInputRef.current?.click()}>
                   {photoUrl
                     ? <img src={photoUrl} alt="Profile" className={styles.avatarImg} />
-                    : <div className={styles.avatar}>{PROFILE.name.split(' ').map(n => n[0]).join('')}</div>
+                    : <div className={styles.avatar}>{initials}</div>
                   }
                   <div className={styles.avatarOverlay}>{uploading ? '⏳' : '📷'}</div>
                 </div>
@@ -129,7 +143,7 @@ export default function Profile({ params }) {
 
               <div className={styles.profileName}>{displayName}</div>
               <div className={styles.profileHandle}>@{username}</div>
-              <div className={styles.profileLocation}>📍 {PROFILE.location}</div>
+              <div className={styles.profileLocation}>📍 Boston, MA</div>
 
               {editingBio ? (
                 <div className={styles.bioEditWrap}>
@@ -154,7 +168,7 @@ export default function Profile({ params }) {
                 </div>
                 <div className={styles.followDivider}></div>
                 <div className={styles.followStat}>
-                  <span className={styles.followNum}>{PROFILE.following}</span>
+                  <span className={styles.followNum}>0</span>
                   <span className={styles.followLabel}>Following</span>
                 </div>
               </div>
@@ -209,10 +223,10 @@ export default function Profile({ params }) {
             <div className={styles.sideCard}>
               <div className={styles.sideCardTitle}>Stats</div>
               <div className={styles.statsGrid}>
-                <div className={styles.statItem}><div className={styles.statNum} style={{color: PROFILE.stats.battles === 0 ? '#3D4A66' : '#3B82F6'}}>{PROFILE.stats.battles}</div><div className={styles.statLabel}>Battles</div></div>
-                <div className={styles.statItem}><div className={styles.statNum} style={{color: PROFILE.stats.winRate === 0 ? '#3D4A66' : '#10B981'}}>{PROFILE.stats.winRate === 0 ? '—' : `${PROFILE.stats.winRate}%`}</div><div className={styles.statLabel}>Win Rate</div></div>
-                <div className={styles.statItem}><div className={styles.statNum} style={{color: !PROFILE.stats.rank ? '#3D4A66' : '#F59E0B'}}>{PROFILE.stats.rank ? `#${PROFILE.stats.rank}` : '—'}</div><div className={styles.statLabel}>Rank</div></div>
-                <div className={styles.statItem}><div className={styles.statNum} style={{color: PROFILE.stats.streak === 0 ? '#3D4A66' : '#EF4444'}}>{PROFILE.stats.streak === 0 ? '—' : `${PROFILE.stats.streak}🔥`}</div><div className={styles.statLabel}>Streak</div></div>
+                <div className={styles.statItem}><div className={styles.statNum} style={{color:'#3D4A66'}}>0</div><div className={styles.statLabel}>Battles</div></div>
+                <div className={styles.statItem}><div className={styles.statNum} style={{color:'#3D4A66'}}>—</div><div className={styles.statLabel}>Win Rate</div></div>
+                <div className={styles.statItem}><div className={styles.statNum} style={{color:'#3D4A66'}}>—</div><div className={styles.statLabel}>Rank</div></div>
+                <div className={styles.statItem}><div className={styles.statNum} style={{color:'#3D4A66'}}>—</div><div className={styles.statLabel}>Streak</div></div>
               </div>
             </div>
 
@@ -221,9 +235,8 @@ export default function Profile({ params }) {
           {/* MAIN CONTENT */}
           <div className={styles.mainContent}>
 
-            {PROFILE.isNewUser && (
+            {isNewUser && (
               <div className={styles.onboardingSection}>
-
                 <div className={styles.checklistCard}>
                   <div className={styles.checklistHeader}>
                     <div>
@@ -271,7 +284,6 @@ export default function Profile({ params }) {
                     ))}
                   </div>
                 </div>
-
               </div>
             )}
 
@@ -283,43 +295,14 @@ export default function Profile({ params }) {
               ))}
             </div>
 
-            {activeTab === 'history' && (
-              <div className={styles.emptyState}>
-                <div className={styles.emptyIcon}>⚔️</div>
-                <div className={styles.emptyTitle}>No battles yet</div>
-                <p className={styles.emptyBody}>Once you start debating your battle history will show up here.</p>
-                <Link href="/battle" className={styles.emptyBtn}>Start your first battle →</Link>
-              </div>
-            )}
-            {activeTab === 'topics' && (
-              <div className={styles.emptyState}>
-                <div className={styles.emptyIcon}>🔥</div>
-                <div className={styles.emptyTitle}>No favorite topics yet</div>
-                <p className={styles.emptyBody}>Topics you debate most will appear here automatically.</p>
-                <Link href="/battle" className={styles.emptyBtn}>Start debating →</Link>
-              </div>
-            )}
-            {activeTab === 'followers' && (
-              <div className={styles.emptyState}>
-                <div className={styles.emptyIcon}>👥</div>
-                <div className={styles.emptyTitle}>No followers yet</div>
-                <p className={styles.emptyBody}>Win some battles and people will start following you.</p>
-                <Link href="/battle" className={styles.emptyBtn}>Start building your rep →</Link>
-              </div>
-            )}
-            {activeTab === 'following' && (
-              <div className={styles.emptyState}>
-                <div className={styles.emptyIcon}>👀</div>
-                <div className={styles.emptyTitle}>Not following anyone yet</div>
-                <p className={styles.emptyBody}>Follow other debaters to see their battles and takes.</p>
-                <Link href="/leaderboard" className={styles.emptyBtn}>Find debaters to follow →</Link>
-              </div>
-            )}
+            {activeTab === 'history' && <div className={styles.emptyState}><div className={styles.emptyIcon}>⚔️</div><div className={styles.emptyTitle}>No battles yet</div><p className={styles.emptyBody}>Once you start debating your battle history will show up here.</p><Link href="/battle" className={styles.emptyBtn}>Start your first battle →</Link></div>}
+            {activeTab === 'topics' && <div className={styles.emptyState}><div className={styles.emptyIcon}>🔥</div><div className={styles.emptyTitle}>No favorite topics yet</div><p className={styles.emptyBody}>Topics you debate most will appear here automatically.</p><Link href="/battle" className={styles.emptyBtn}>Start debating →</Link></div>}
+            {activeTab === 'followers' && <div className={styles.emptyState}><div className={styles.emptyIcon}>👥</div><div className={styles.emptyTitle}>No followers yet</div><p className={styles.emptyBody}>Win some battles and people will start following you.</p><Link href="/battle" className={styles.emptyBtn}>Start building your rep →</Link></div>}
+            {activeTab === 'following' && <div className={styles.emptyState}><div className={styles.emptyIcon}>👀</div><div className={styles.emptyTitle}>Not following anyone yet</div><p className={styles.emptyBody}>Follow other debaters to see their battles and takes.</p><Link href="/leaderboard" className={styles.emptyBtn}>Find debaters to follow →</Link></div>}
 
           </div>
         </div>
       </div>
-
     </main>
   );
 }

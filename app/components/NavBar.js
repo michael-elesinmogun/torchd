@@ -8,13 +8,11 @@ export default function NavBar() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Get current session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
@@ -27,15 +25,22 @@ export default function NavBar() {
     window.location.href = '/';
   }
 
-  const username = user?.user_metadata?.full_name
-    ?.toLowerCase()
-    .replace(/\s+/g, '') || user?.email?.split('@')[0] || 'profile';
+  // Use full name to build profile slug — "Michael Elesinmogun" → "michaelelesinmogun"
+  const fullName = user?.user_metadata?.full_name || '';
+  const profileSlug = fullName
+    ? fullName.toLowerCase().replace(/\s+/g, '')
+    : user?.email?.split('@')[0] || 'profile';
 
-  const initials = user?.user_metadata?.full_name
-    ?.split(' ')
-    .map(n => n[0])
-    .join('')
-    .toUpperCase() || '?';
+  // Display name — truncate if too long
+  const displayName = fullName || user?.email?.split('@')[0] || '';
+  const truncatedName = displayName.length > 18
+    ? displayName.slice(0, 18) + '…'
+    : displayName;
+
+  // Initials from full name
+  const initials = fullName
+    ? fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : (user?.email?.[0] || '?').toUpperCase();
 
   return (
     <nav style={{
@@ -46,40 +51,100 @@ export default function NavBar() {
       borderBottom: '1px solid rgba(255,255,255,0.065)',
       fontFamily: 'DM Sans, sans-serif',
     }}>
-      <Link href="/" style={{ fontFamily: 'Syne, sans-serif', fontSize: '22px', fontWeight: 800, color: '#3B82F6', textDecoration: 'none', letterSpacing: '-0.5px' }}>
+
+      {/* Logo */}
+      <Link href="/" style={{
+        fontFamily: 'Syne, sans-serif', fontSize: '22px', fontWeight: 800,
+        color: '#3B82F6', textDecoration: 'none', letterSpacing: '-0.5px',
+        display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0,
+      }}>
         🔥 Torchd
       </Link>
 
-      <ul style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', listStyle: 'none', margin: 0, padding: 0 }}>
-        <li><Link href="/battle" style={{ fontSize: '14px', color: '#6B7A9E', textDecoration: 'none', padding: '6px 12px', borderRadius: '8px' }}>Battle Mode</Link></li>
-        <li><Link href="/lobby" style={{ fontSize: '14px', color: '#6B7A9E', textDecoration: 'none', padding: '6px 12px', borderRadius: '8px' }}>Game Lobby</Link></li>
-        <li><Link href="/leaderboard" style={{ fontSize: '14px', color: '#6B7A9E', textDecoration: 'none', padding: '6px 12px', borderRadius: '8px' }}>Leaderboard</Link></li>
+      {/* Nav links */}
+      <ul style={{
+        display: 'flex', alignItems: 'center', gap: '0.25rem',
+        listStyle: 'none', margin: 0, padding: 0,
+      }}>
+        {[
+          { href: '/battle', label: 'Battle Mode' },
+          { href: '/lobby', label: 'Game Lobby' },
+          { href: '/leaderboard', label: 'Leaderboard' },
+        ].map(link => (
+          <li key={link.href}>
+            <Link href={link.href} style={{
+              fontSize: '14px', color: '#6B7A9E', textDecoration: 'none',
+              padding: '6px 12px', borderRadius: '8px', transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => { e.target.style.color = '#EEF2FF'; e.target.style.background = '#151e2e'; }}
+            onMouseLeave={e => { e.target.style.color = '#6B7A9E'; e.target.style.background = 'transparent'; }}
+            >
+              {link.label}
+            </Link>
+          </li>
+        ))}
       </ul>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-        {loading ? null : user ? (
+      {/* Right side — auth state */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+        {loading ? (
+          <div style={{ width: '80px', height: '32px' }}></div>
+        ) : user ? (
           <>
-            <Link href={`/profile/${username}`} style={{ display: 'flex', alignItems: 'center', gap: '8px', textDecoration: 'none', padding: '6px 12px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.065)', color: '#EEF2FF', fontSize: '14px' }}>
-              <div style={{ width: '26px', height: '26px', borderRadius: '50%', background: '#3B82F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: 700, color: 'white', fontFamily: 'Syne, sans-serif' }}>
+            {/* Profile link with avatar */}
+            <Link href={`/profile/${profileSlug}`} style={{
+              display: 'flex', alignItems: 'center', gap: '8px',
+              textDecoration: 'none', padding: '6px 12px', borderRadius: '8px',
+              border: '1px solid rgba(255,255,255,0.065)', color: '#EEF2FF',
+              fontSize: '14px', transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.3)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.065)'; }}
+            >
+              <div style={{
+                width: '26px', height: '26px', borderRadius: '50%',
+                background: '#3B82F6', display: 'flex', alignItems: 'center',
+                justifyContent: 'center', fontSize: '10px', fontWeight: 700,
+                color: 'white', fontFamily: 'Syne, sans-serif', flexShrink: 0,
+              }}>
                 {initials}
               </div>
-              {user?.user_metadata?.full_name || user?.email?.split('@')[0]}
+              {truncatedName}
             </Link>
-            <button onClick={handleSignOut} style={{ fontSize: '14px', color: '#6B7A9E', background: 'none', border: '1px solid rgba(255,255,255,0.065)', borderRadius: '8px', padding: '7px 16px', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif' }}>
+
+            {/* Sign out */}
+            <button onClick={handleSignOut} style={{
+              fontSize: '14px', color: '#6B7A9E', background: 'none',
+              border: '1px solid rgba(255,255,255,0.065)', borderRadius: '8px',
+              padding: '7px 16px', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={e => { e.target.style.color = '#EEF2FF'; }}
+            onMouseLeave={e => { e.target.style.color = '#6B7A9E'; }}
+            >
               Sign out
             </button>
           </>
         ) : (
           <>
-            <Link href="/login" style={{ fontSize: '14px', color: '#6B7A9E', background: 'none', border: '1px solid rgba(255,255,255,0.065)', borderRadius: '8px', padding: '7px 16px', textDecoration: 'none' }}>
+            <Link href="/login" style={{
+              fontSize: '14px', color: '#6B7A9E', background: 'none',
+              border: '1px solid rgba(255,255,255,0.065)', borderRadius: '8px',
+              padding: '7px 16px', textDecoration: 'none', transition: 'all 0.2s',
+            }}>
               Sign in
             </Link>
-            <Link href="/signup" style={{ fontSize: '14px', fontWeight: 700, fontFamily: 'Syne, sans-serif', color: '#EEF2FF', background: '#3B82F6', borderRadius: '8px', padding: '8px 18px', textDecoration: 'none' }}>
+            <Link href="/signup" style={{
+              fontSize: '14px', fontWeight: 700, fontFamily: 'Syne, sans-serif',
+              color: '#EEF2FF', background: '#3B82F6', borderRadius: '8px',
+              padding: '8px 18px', textDecoration: 'none', transition: 'all 0.2s',
+            }}>
               Create Account →
             </Link>
           </>
         )}
       </div>
+
     </nav>
   );
 }

@@ -11,7 +11,7 @@
   position: relative;
   overflow: hidden;
 }
- 
+
 .bgGlow {
   position: fixed;
   top: 20%; left: 50%;
@@ -20,7 +20,7 @@
   background: radial-gradient(ellipse, rgba(59,130,246,0.1) 0%, transparent 65%);
   pointer-events: none;
 }
- 
+
 .bgGrid {
   position: fixed;
   inset: 0;
@@ -30,7 +30,7 @@
   background-size: 56px 56px;
   pointer-events: none;
 }
- 
+
 /* NAV */
 .nav {
   position: fixed;
@@ -45,17 +45,17 @@
   backdrop-filter: blur(20px);
   border-bottom: 1px solid rgba(255,255,255,0.065);
 }
- 
+
 .logo {
   font-family: 'Syne', sans-serif;
   font-size: 20px; font-weight: 800;
   color: #3B82F6; text-decoration: none;
 }
- 
+
 .navNote { font-size: 13px; color: #6B7A9E; }
 .navLink { color: #60A5FA; text-decoration: none; font-weight: 500; }
 .navLink:hover { text-decoration: underline; }
- 
+
 /* CARD */
 .card {
   background: #0f1623;
@@ -67,9 +67,9 @@
   position: relative;
   z-index: 2;
 }
- 
+
 .stepWrap { display: flex; flex-direction: column; }
- 
+
 /* Step indicator */
 .stepIndicator {
   display: flex;
@@ -78,7 +78,7 @@
   gap: 0;
   margin-bottom: 2rem;
 }
- 
+
 .stepDot {
   width: 28px; height: 28px;
   border-radius: 50%;
@@ -88,46 +88,46 @@
   font-size: 11px; font-weight: 700; color: #6B7A9E;
   flex-shrink: 0;
 }
- 
+
 .stepDot.active {
   border-color: #3B82F6;
   background: rgba(59,130,246,0.15);
   color: #60A5FA;
 }
- 
+
 .stepDot.done {
   border-color: #10B981;
   background: rgba(16,185,129,0.15);
   color: #34D399;
 }
- 
+
 .stepLine {
   height: 2px; width: 60px;
   background: rgba(255,255,255,0.065);
 }
- 
+
 .stepLine.lineDone { background: #10B981; }
- 
+
 /* Card header */
 .cardHeader { text-align: center; margin-bottom: 2rem; }
- 
+
 .cardIcon { font-size: 36px; margin-bottom: 0.75rem; display: block; }
- 
+
 .cardTitle {
   font-family: 'Syne', sans-serif;
   font-size: 26px; font-weight: 800;
   color: #EEF2FF; margin-bottom: 0.5rem;
 }
- 
+
 .cardSub { font-size: 14px; color: #6B7A9E; font-weight: 300; }
- 
+
 /* Form */
 .form { display: flex; flex-direction: column; gap: 1.25rem; }
- 
+
 .formGroup { display: flex; flex-direction: column; gap: 6px; }
- 
+
 .label { font-size: 13px; font-weight: 500; color: #6B7A9E; }
- 
+
 .input {
   background: #151e2e;
   border: 1px solid rgba(59,130,246,0.22);
@@ -141,10 +141,10 @@
   transition: border-color 0.2s, box-shadow 0.2s;
   width: 100%;
 }
- 
+
 .input::placeholder { color: #3D4A66; }
 .input:focus { border-color: #3B82F6; box-shadow: 0 0 0 3px rgba(59,130,246,0.1); }
- 
+
 .btnPrimary {
   background: #3B82F6;
   border: none;
@@ -160,10 +160,10 @@
   display: block;
   margin-top: 0.5rem;
 }
- 
+
 .btnPrimary:hover { background: #60A5FA; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(59,130,246,0.3); }
 .btnPrimary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
- 
+
 .btnSecondary {
   background: #151e2e;
   border: 1px solid rgba(255,255,255,0.065);
@@ -177,9 +177,9 @@
   text-decoration: none;
   display: block;
 }
- 
+
 .btnSecondary:hover { border-color: rgba(59,130,246,0.22); }
- 
+
 .btnBack {
   background: none;
   border: none;
@@ -191,9 +191,9 @@
   transition: color 0.2s;
   font-family: 'DM Sans', sans-serif;
 }
- 
+
 .btnBack:hover { color: #EEF2FF; }
- 
+
 .terms {
   font-size: 12px;
   color: #3D4A66;
@@ -201,17 +201,17 @@
   margin-top: 1rem;
   line-height: 1.6;
 }
- 
+
 .termLink { color: #6B7A9E; text-decoration: none; }
 .termLink:hover { color: #EEF2FF; }
- 
+
 /* Sports grid */
 .sportsGrid {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 0.75rem;
 }
- 
+
 .sportBtn {
   background: #151e2e;
   border: 1px solid rgba(255,255,255,0.065);
@@ -223,42 +223,101 @@
   transition: all 0.2s;
   font-family: 'DM Sans', sans-serif;
 }
- 
+
 .sportBtn:hover { border-color: rgba(59,130,246,0.22); transform: translateY(-2px); }
- 
+
 .sportBtn.sportSelected {
   border-color: #3B82F6;
   background: rgba(59,130,246,0.12);
   box-shadow: 0 0 0 1px #3B82F6;
 }
- 
+
 .sportIcon { font-size: 24px; }
 .sportLabel { font-size: 12px; font-weight: 700; color: #EEF2FF; }
- 
+
 /* Success */
 .successWrap { text-align: center; padding: 1rem 0; }
- 
+
 .successIcon {
   font-size: 56px;
   display: block;
   margin-bottom: 1.25rem;
   animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) both;
 }
- 
+
 @keyframes popIn {
   from { transform: scale(0); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
- 
+
 .successActions {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   margin-top: 2rem;
 }
- 
+
 @media (max-width: 480px) {
   .card { padding: 1.75rem 1.25rem; }
   .sportsGrid { grid-template-columns: 1fr 1fr; }
 }
- 
+
+.usernameWrap {
+  display: flex;
+  align-items: center;
+  background: #151e2e;
+  border: 1px solid rgba(59,130,246,0.22);
+  border-radius: 10px;
+  overflow: hidden;
+  height: 48px;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.usernameWrap:focus-within {
+  border-color: #3B82F6;
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+}
+
+.usernamePrefix {
+  padding: 0 14px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #3B82F6;
+  font-family: 'Syne', sans-serif;
+  border-right: 1px solid rgba(59,130,246,0.22);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  background: #151e2e;
+}
+
+.usernameInput {
+  flex: 1;
+  background: #151e2e;
+  border: none;
+  outline: none;
+  padding: 0 1rem;
+  height: 100%;
+  font-size: 15px;
+  color: #EEF2FF;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.usernameInput::placeholder { color: #3D4A66; }
+
+.usernamePreview {
+  font-size: 11px;
+  color: #3D4A66;
+  margin-top: 5px;
+  padding-left: 2px;
+}
+
+.errorMsg {
+  background: rgba(239,68,68,0.1);
+  border: 1px solid rgba(239,68,68,0.25);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: #F87171;
+}
