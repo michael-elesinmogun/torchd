@@ -2,21 +2,21 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import styles from './lobby.module.css';
- 
+
 const GAMES = [
   { id: 1, sport: 'NBA', homeTeam: 'BOS', awayTeam: 'LAL', homeColor: '#4ade80', awayColor: '#f87171', homeScore: 108, awayScore: 102, period: 'Q3 · 4:22', status: 'live', viewers: 312 },
   { id: 2, sport: 'NBA', homeTeam: 'DAL', awayTeam: 'GSW', homeColor: '#60a5fa', awayColor: '#fbbf24', homeScore: 88, awayScore: 91, period: 'Q2 · 1:45', status: 'live', viewers: 198 },
   { id: 3, sport: 'NBA', homeTeam: 'MIL', awayTeam: 'PHX', homeColor: '#a78bfa', awayColor: '#f97316', homeScore: null, awayScore: null, period: 'Tonight 8:30 PM', status: 'upcoming', viewers: 47 },
   { id: 4, sport: 'NBA', homeTeam: 'OKC', awayTeam: 'MEM', homeColor: '#38bdf8', awayColor: '#4ade80', homeScore: null, awayScore: null, period: 'Tonight 10:00 PM', status: 'upcoming', viewers: 21 },
 ];
- 
+
 const INITIAL_TAKES = [
   { id: 1, av: '#3B82F6', init: 'JK', name: 'Jordan K.', team: 'Celtics fan', text: '"Celtics defense is on another level tonight. LeBron has no answer for Jaylen Brown — this is over."', votes: 142 },
   { id: 2, av: '#F59E0B', init: 'TW', name: 'Tyler W.', team: 'Celtics fan', text: '"AD is carrying this team again. Lakers live and die with Anthony Davis and everyone knows it."', votes: 89 },
   { id: 3, av: '#EF4444', init: 'DW', name: 'Darius W.', team: 'Lakers fan', text: '"LeBron at 39 doing this is actually insane. We are watching history and people are sleeping on it."', votes: 74 },
   { id: 4, av: '#10B981', init: 'SR', name: 'Simone R.', team: 'NBA fan', text: '"This Celtics team reminds me of the 2016 Warriors. Stacked. Motivated. Playing with something to prove."', votes: 61 },
 ];
- 
+
 const AUTO_CHAT = [
   { name: 'NickNight', text: 'Austin Reaves is a problem, give him his credit' },
   { name: 'ZMoney', text: 'Tatum is going for 40 tonight, watch 👀' },
@@ -25,7 +25,7 @@ const AUTO_CHAT = [
   { name: 'DakotaL', text: 'The officiating has been terrible this 3rd quarter' },
   { name: 'BriB', text: 'Jayson Tatum is going off and nobody is stopping him' },
 ];
- 
+
 export default function Lobby() {
   const [activeFilter, setActiveFilter] = useState('all');
   const [activeGame, setActiveGame] = useState(GAMES[0]);
@@ -40,8 +40,7 @@ export default function Lobby() {
   const [chatInput, setChatInput] = useState('');
   const [viewers, setViewers] = useState(3842);
   const [onCam, setOnCam] = useState(false);
- 
-  // Auto chat
+
   useEffect(() => {
     let idx = 0;
     const interval = setInterval(() => {
@@ -50,50 +49,34 @@ export default function Lobby() {
     }, 4000);
     return () => clearInterval(interval);
   }, []);
- 
-  // Viewer drift
+
   useEffect(() => {
-    const interval = setInterval(() => {
-      setViewers(v => Math.max(3000, v + Math.floor(Math.random() * 15) - 5));
-    }, 5000);
+    const interval = setInterval(() => setViewers(v => Math.max(3000, v + Math.floor(Math.random() * 15) - 5)), 5000);
     return () => clearInterval(interval);
   }, []);
- 
+
   function sendChat() {
     if (!chatInput.trim()) return;
     setChatMessages(prev => [...prev, { name: 'You', text: chatInput, isMe: true }]);
     setChatInput('');
   }
- 
+
   function voteOnTake(id) {
     if (votedTakes.includes(id)) return;
     setVotedTakes(prev => [...prev, id]);
     setTakes(prev => prev.map(t => t.id === id ? { ...t, votes: t.votes + 1 } : t));
   }
- 
+
   const filters = ['all', 'NBA', 'NFL', 'Soccer'];
- 
+
   return (
     <main className={styles.main}>
- 
-      {/* NAV */}
-      <nav className={styles.nav}>
-        <div className={styles.navLeft}>
-          <Link href="/" className={styles.logo}>🔥 Torchd</Link>
-          <Link href="/" className={styles.navBack}>← Back</Link>
-        </div>
-        <div className={styles.navRight}>
-          <div className={styles.livePill}><div className={styles.liveDot}></div> LIVE</div>
-          <div className={styles.viewerCount}>👁 {viewers.toLocaleString()} watching</div>
-        </div>
-      </nav>
- 
+
       <div className={styles.layout}>
- 
+
         {/* MAIN */}
         <div className={styles.lobbyMain}>
- 
-          {/* Header */}
+
           <div className={styles.lobbyHeader}>
             <div>
               <div className={styles.eyebrow}><span className={styles.liveDotSmall}></span> Game Night</div>
@@ -107,8 +90,7 @@ export default function Lobby() {
               ))}
             </div>
           </div>
- 
-          {/* Games grid */}
+
           <div className={styles.gamesGrid}>
             {GAMES.map(game => (
               <div key={game.id} className={`${styles.gameCard} ${game.status === 'live' ? styles.gameCardLive : styles.gameCardUpcoming} ${activeGame.id === game.id ? styles.gameCardActive : ''}`} onClick={() => game.status === 'live' && setActiveGame(game)}>
@@ -140,8 +122,7 @@ export default function Lobby() {
               </div>
             ))}
           </div>
- 
-          {/* Active lobby video room */}
+
           <div className={styles.activeLobby}>
             <div className={styles.activeLobbyHeader}>
               <div>
@@ -173,17 +154,12 @@ export default function Lobby() {
                     <div className={styles.videoName}>You</div>
                     <div className={styles.videoTeam}>Just joined</div>
                   </div>
-                : <div className={styles.videoTileEmpty} onClick={() => setOnCam(true)}>
-                    <span>+ Join</span>
-                  </div>
+                : <div className={styles.videoTileEmpty} onClick={() => setOnCam(true)}><span>+ Join</span></div>
               }
-              <div className={styles.videoTileEmpty} onClick={() => setOnCam(true)}>
-                <span>+ Join</span>
-              </div>
+              <div className={styles.videoTileEmpty} onClick={() => setOnCam(true)}><span>+ Join</span></div>
             </div>
           </div>
- 
-          {/* Hot takes */}
+
           <div className={styles.takesSection}>
             <div className={styles.takesSectionHeader}>
               <div className={styles.eyebrow}><span className={styles.liveDotSmall}></span> Hot takes — {activeGame.homeTeam} vs {activeGame.awayTeam}</div>
@@ -206,9 +182,9 @@ export default function Lobby() {
               ))}
             </div>
           </div>
- 
+
         </div>
- 
+
         {/* SIDEBAR */}
         <div className={styles.sidebar}>
           <div className={styles.scoreboardSection}>
@@ -225,8 +201,8 @@ export default function Lobby() {
               </div>
             ))}
           </div>
- 
-          <div className={styles.chatMessages} id="lobby-chat">
+
+          <div className={styles.chatMessages}>
             {chatMessages.map((m, i) => (
               <div key={i} className={styles.chatMsg}>
                 <div className={styles.chatMsgName} style={{ color: m.isMe ? '#60A5FA' : '#6B7A9E' }}>{m.name}</div>
@@ -234,21 +210,14 @@ export default function Lobby() {
               </div>
             ))}
           </div>
- 
+
           <div className={styles.chatInputRow}>
-            <input
-              className={styles.chatInput}
-              placeholder="Drop a take…"
-              value={chatInput}
-              onChange={e => setChatInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && sendChat()}
-            />
+            <input className={styles.chatInput} placeholder="Drop a take…" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChat()} />
             <button className={styles.chatSend} onClick={sendChat}>↑</button>
           </div>
         </div>
- 
+
       </div>
     </main>
   );
 }
- 

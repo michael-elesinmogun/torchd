@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import styles from './battle.module.css';
- 
+
 export default function Battle() {
   const [seconds, setSeconds] = useState(105);
   const [votes, setVotes] = useState({ jordan: 524, darius: 323 });
@@ -17,7 +17,7 @@ export default function Battle() {
     { av: '#F59E0B', init: 'DL', name: 'DakotaLive', badge: null, text: 'Darius needs to bring up the 1-9 in playoff series stats' },
     { av: '#EF4444', init: 'KR', name: 'KingRick', badge: 'FOR', text: 'LeBron played in a harder era tho, East was stacked' },
   ]);
- 
+
   const autoMessages = [
     { av: '#3B82F6', init: 'JB', name: 'JaBari', badge: null, text: 'Bron carrying teams MJ never would have survived on 😭' },
     { av: '#10B981', init: 'NN', name: 'NickNight', badge: 'AGAINST', text: 'Pippen was just as important as Scottie was to LeBron. Same thing.' },
@@ -25,16 +25,12 @@ export default function Battle() {
     { av: '#8B5CF6', init: 'RP', name: 'RealPundit', badge: 'FOR', text: 'The stats don\'t lie. Points, assists, rebounds — nobody has done all three at his level' },
     { av: '#EC4899', init: 'VB', name: 'Vibe_B', badge: 'FOR', text: 'I came here as a MJ fan and Jordan is actually changing my mind...' },
   ];
- 
-  // Timer countdown
+
   useEffect(() => {
-    const interval = setInterval(() => {
-      setSeconds(s => s > 0 ? s - 1 : 0);
-    }, 1000);
+    const interval = setInterval(() => setSeconds(s => s > 0 ? s - 1 : 0), 1000);
     return () => clearInterval(interval);
   }, []);
- 
-  // Live vote drift
+
   useEffect(() => {
     const interval = setInterval(() => {
       if (!voted) {
@@ -46,16 +42,12 @@ export default function Battle() {
     }, 2800);
     return () => clearInterval(interval);
   }, [voted]);
- 
-  // Viewer drift
+
   useEffect(() => {
-    const interval = setInterval(() => {
-      setViewers(v => Math.max(1000, v + Math.floor(Math.random() * 10) - 3));
-    }, 4000);
+    const interval = setInterval(() => setViewers(v => Math.max(1000, v + Math.floor(Math.random() * 10) - 3)), 4000);
     return () => clearInterval(interval);
   }, []);
- 
-  // Auto chat messages
+
   useEffect(() => {
     let idx = 0;
     const interval = setInterval(() => {
@@ -64,58 +56,43 @@ export default function Battle() {
     }, 3500);
     return () => clearInterval(interval);
   }, []);
- 
+
   function formatTime(s) {
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   }
- 
+
   function castVote(side) {
     if (voted) return;
     setVoted(side);
     setVotes(v => ({ ...v, [side]: v[side] + 1 }));
   }
- 
+
   function sendChat() {
     if (!chatInput.trim()) return;
     setMessages(prev => [...prev, { av: '#3B82F6', init: 'Me', name: 'You', badge: null, text: chatInput, isMe: true }]);
     setChatInput('');
   }
- 
+
   const total = votes.jordan + votes.darius;
   const jordanPct = Math.round((votes.jordan / total) * 100);
   const dariusPct = 100 - jordanPct;
   const timerClass = seconds <= 15 ? styles.timerCritical : seconds <= 30 ? styles.timerWarning : styles.timerNormal;
   const progressPct = (seconds / 120) * 100;
- 
+
   return (
     <main className={styles.main}>
- 
-      {/* NAV */}
-      <nav className={styles.nav}>
-        <div className={styles.navLeft}>
-          <Link href="/" className={styles.logo}>🔥 Torchd</Link>
-          <Link href="/" className={styles.navBack}>← Back</Link>
-        </div>
-        <div className={styles.navRight}>
-          <div className={styles.livePill}><div className={styles.liveDot}></div> LIVE</div>
-          <div className={styles.viewerCount}>👁 {viewers.toLocaleString()} watching</div>
-        </div>
-      </nav>
- 
-      {/* LAYOUT */}
+
       <div className={styles.layout}>
- 
+
         {/* MAIN STAGE */}
         <div className={styles.stage}>
- 
-          {/* Topic */}
+
           <div className={styles.topicBar}>
             <div className={styles.topicTag}>NBA · Tonight</div>
             <div className={styles.topicText}>"LeBron James is the greatest basketball player of all time"</div>
             <div className={styles.roundBadge}>Round <strong>2</strong> of 3</div>
           </div>
- 
-          {/* Video tiles */}
+
           <div className={styles.videoStage}>
             <div className={`${styles.playerTile} ${styles.leftTile}`}>
               <div className={styles.playerAvatarWrap}>
@@ -135,11 +112,11 @@ export default function Battle() {
                 </div>
               </div>
             </div>
- 
+
             <div className={styles.vsDivider}>
               <div className={styles.vsCircle}>VS</div>
             </div>
- 
+
             <div className={`${styles.playerTile} ${styles.rightTile}`}>
               <div className={styles.playerAvatarWrap}>
                 <div className={`${styles.playerAvatar} ${styles.avatarRed}`}>DW</div>
@@ -155,8 +132,7 @@ export default function Battle() {
               </div>
             </div>
           </div>
- 
-          {/* Timer */}
+
           <div className={styles.timerBar}>
             <div className={styles.timerDisplay}>
               <span className={timerClass}>{formatTime(seconds)}</span>
@@ -177,32 +153,24 @@ export default function Battle() {
               <div className={`${styles.pip} ${styles.pipPending}`}></div>
             </div>
           </div>
- 
-          {/* Vote buttons */}
+
           <div className={styles.voteArea}>
-            <button
-              className={`${styles.voteBtn} ${styles.voteBtnBlue} ${voted === 'jordan' ? styles.voteSelected : ''} ${voted && voted !== 'jordan' ? styles.voteDimmed : ''}`}
-              onClick={() => castVote('jordan')}
-            >
+            <button className={`${styles.voteBtn} ${styles.voteBtnBlue} ${voted === 'jordan' ? styles.voteSelected : ''} ${voted && voted !== 'jordan' ? styles.voteDimmed : ''}`} onClick={() => castVote('jordan')}>
               <span className={styles.voteBtnLabel}>Vote for Jordan</span>
               <span className={styles.votePct}>{jordanPct}%</span>
             </button>
             <div className={styles.voteDivider}>{voted ? 'Vote cast ✓' : 'Cast your vote'}</div>
-            <button
-              className={`${styles.voteBtn} ${styles.voteBtnRed} ${voted === 'darius' ? styles.voteSelected : ''} ${voted && voted !== 'darius' ? styles.voteDimmed : ''}`}
-              onClick={() => castVote('darius')}
-            >
+            <button className={`${styles.voteBtn} ${styles.voteBtnRed} ${voted === 'darius' ? styles.voteSelected : ''} ${voted && voted !== 'darius' ? styles.voteDimmed : ''}`} onClick={() => castVote('darius')}>
               <span className={styles.votePct}>{dariusPct}%</span>
               <span className={styles.voteBtnLabel}>Vote for Darius</span>
             </button>
           </div>
- 
+
         </div>
- 
+
         {/* SIDEBAR */}
         <div className={styles.sidebar}>
- 
-          {/* Live vote tracker */}
+
           <div className={styles.voteTracker}>
             <div className={styles.trackerTitle}>Live vote count</div>
             <div className={styles.trackerRow}>
@@ -217,14 +185,12 @@ export default function Battle() {
             </div>
             <div className={styles.trackerTotal}>{total.toLocaleString()} votes cast</div>
           </div>
- 
-          {/* Tabs */}
+
           <div className={styles.sidebarTabs}>
             <button className={`${styles.sidebarTab} ${activeTab === 'chat' ? styles.tabActive : ''}`} onClick={() => setActiveTab('chat')}>Chat</button>
             <button className={`${styles.sidebarTab} ${activeTab === 'audience' ? styles.tabActive : ''}`} onClick={() => setActiveTab('audience')}>Audience</button>
           </div>
- 
-          {/* Chat */}
+
           {activeTab === 'chat' && (
             <div className={styles.chatMessages}>
               {messages.map((m, i) => (
@@ -241,8 +207,7 @@ export default function Battle() {
               ))}
             </div>
           )}
- 
-          {/* Audience */}
+
           {activeTab === 'audience' && (
             <div className={styles.chatMessages}>
               <div className={styles.audienceTitle}>{viewers.toLocaleString()} watching now</div>
@@ -264,31 +229,24 @@ export default function Battle() {
               ))}
             </div>
           )}
- 
-          {/* Reactions */}
+
           <div className={styles.reactionsBar}>
             {['🔥', '💀', '👑', '😤', '🐐'].map(emoji => (
-              <button key={emoji} className={styles.reactionBtn} onClick={() => {}}>
-                {emoji}
-              </button>
+              <button key={emoji} className={styles.reactionBtn}>{emoji}</button>
             ))}
           </div>
- 
-          {/* Chat input */}
+
           <div className={styles.chatInputRow}>
-            <input
-              className={styles.chatInput}
-              placeholder="Say something…"
-              value={chatInput}
-              onChange={e => setChatInput(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && sendChat()}
-            />
+            <input className={styles.chatInput} placeholder="Say something…" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChat()} />
             <button className={styles.chatSend} onClick={sendChat}>↑</button>
           </div>
- 
+
+          <div style={{padding:'0.75rem',borderTop:'1px solid rgba(255,255,255,0.065)',display:'flex',alignItems:'center',gap:'8px'}}>
+            <div style={{fontSize:'13px',color:'#6B7A9E'}}>👁 {viewers.toLocaleString()} watching</div>
+          </div>
+
         </div>
       </div>
     </main>
   );
 }
- 

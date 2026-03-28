@@ -1,50 +1,36 @@
 'use client';
 import Link from 'next/link';
 import styles from './page.module.css';
- 
+
 export default function Home() {
   return (
     <main className={styles.main}>
- 
-      {/* NAV */}
-      <nav className={styles.nav}>
-        <Link href="/" className={styles.logo}>🔥 Torchd</Link>
-        <ul className={styles.navLinks}>
-          <li><Link href="/battle">Battle Mode</Link></li>
-          <li><Link href="/lobby">Game Lobby</Link></li>
-          <li><Link href="/leaderboard">Leaderboard</Link></li>
-        </ul>
-        <div className={styles.navActions}>
-          <Link href="/login" className={styles.btnGhost}>Sign in</Link>
-          <Link href="/signup" className={styles.btnPrimary}>Create Account →</Link>
-        </div>
-      </nav>
- 
+
       {/* HERO */}
       <section className={styles.hero}>
         <div className={styles.heroGrid}></div>
         <div className={styles.heroBgGlow}></div>
- 
+
         <div className={styles.heroEyebrow}>
           <span className={styles.eyebrowDot}></span>
           Now open for early access
         </div>
- 
+
         <h1 className={styles.heroH1}>
           Stop tweeting.<br />
           Start <span className={styles.blue}>debating</span>.<br />
           <span className={styles.stroke}>On camera.</span>
         </h1>
- 
+
         <p className={styles.heroSub}>
           <strong>Torchd</strong> is the live video debate platform for sports fans. Go head-to-head with real people, in real time — with a crowd deciding who wins.
         </p>
- 
+
         <div className={styles.heroActions}>
           <Link href="/signup" className={styles.heroBtnPrimary}>Create Free Account →</Link>
           <Link href="/battle" className={styles.heroBtnSecondary}>▶ Watch a live battle</Link>
         </div>
- 
+
         <div className={styles.socialProof}>
           <div className={styles.proofAvatars}>
             <div className={styles.proofAv} style={{background:'#3B82F6'}}>JK</div>
@@ -56,7 +42,7 @@ export default function Home() {
           <span className={styles.proofText}><strong>2,400+ fans</strong> already on Torchd</span>
         </div>
       </section>
- 
+
       {/* TICKER */}
       <div className={styles.tickerWrap}>
         <div className={styles.tickerLabel}>Hot debates right now</div>
@@ -86,7 +72,7 @@ export default function Home() {
           ))}
         </div>
       </div>
- 
+
       {/* MODES */}
       <section className={styles.modesSection}>
         <div className={styles.container}>
@@ -108,7 +94,7 @@ export default function Home() {
           </div>
         </div>
       </section>
- 
+
       {/* STATS */}
       <div className={styles.statsBand}>
         <div className={styles.statsGrid}>
@@ -118,7 +104,7 @@ export default function Home() {
           <div className={styles.statBlock}><span className={styles.statNum}>0</span><div className={styles.statLabel}>Other platforms doing what we do. Until now.</div></div>
         </div>
       </div>
- 
+
       {/* FEATURES */}
       <section className={styles.featuresSection}>
         <div className={styles.container}>
@@ -142,7 +128,7 @@ export default function Home() {
           </div>
         </div>
       </section>
- 
+
       {/* LIVE BATTLES */}
       <section className={styles.liveSection}>
         <div className={styles.container}>
@@ -179,7 +165,7 @@ export default function Home() {
           </div>
         </div>
       </section>
- 
+
       {/* CTA */}
       <section className={styles.ctaSection}>
         <div className={styles.ctaGlow}></div>
@@ -191,12 +177,12 @@ export default function Home() {
           <p className={styles.ctaNote}>Free forever · No spam · Cancel anytime</p>
         </div>
       </section>
- 
+
       {/* FOOTER */}
       <footer className={styles.footer}>
         <div className={styles.footerInner}>
           <div>
-            <div className={styles.logo}>🔥 Torchd</div>
+            <div style={{fontFamily:'Syne,sans-serif',fontSize:'20px',fontWeight:800,color:'#3B82F6'}}>🔥 Torchd</div>
             <p className={styles.footerDesc}>Sports debate, reimagined. Go head-to-head with fans worldwide on live video.</p>
           </div>
           <div className={styles.footerCol}>
@@ -231,7 +217,7 @@ export default function Home() {
           <div>hello@torchd.app · torchd.app</div>
         </div>
       </footer>
- 
+
     </main>
   );
 }

@@ -2,13 +2,13 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import styles from './leaderboard.module.css';
- 
+
 const TOP3 = [
   { rank: 2, init: 'SR', name: 'Simone R.', handle: '@simone_debateking', pts: 4210, wins: 38, winRate: 71, bg: '#10B981' },
   { rank: 1, init: 'MJ', name: 'Mike J.', handle: '@mikej_takes', pts: 4820, wins: 52, winRate: 84, bg: '#3B82F6' },
   { rank: 3, init: 'TW', name: 'Tyler W.', handle: '@tylertakes', pts: 3980, wins: 31, winRate: 67, bg: '#F59E0B' },
 ];
- 
+
 const ROWS = [
   { rank: 4, init: 'KR', name: 'King Rick', sport: 'NBA · NFL', pts: 3720, winRate: 79, battles: 47, trend: '+2', trendUp: true, bg: '#8B5CF6' },
   { rank: 5, init: 'AL', name: 'Ashley L.', sport: 'NBA', pts: 3510, winRate: 74, battles: 43, trend: '+1', trendUp: true, bg: '#EF4444' },
@@ -23,31 +23,17 @@ const ROWS = [
   { rank: 14, init: 'JK', name: 'Jordan K.', sport: 'NBA · NFL', pts: 1640, winRate: 71, battles: 42, trend: '+2', trendUp: true, bg: '#3B82F6', isMe: true },
   { rank: 15, init: 'RD', name: 'Real Deal', sport: 'NBA', pts: 1580, winRate: 58, battles: 23, trend: '-3', trendUp: false, bg: '#0EA5E9' },
 ];
- 
+
 const FILTERS = ['All Sports', 'NBA', 'NFL', 'This Week', 'This Month', 'All Time'];
- 
+
 export default function Leaderboard() {
   const [activeFilter, setActiveFilter] = useState('All Sports');
- 
+
   return (
     <main className={styles.main}>
- 
-      {/* NAV */}
-      <nav className={styles.nav}>
-        <Link href="/" className={styles.logo}>🔥 Torchd</Link>
-        <ul className={styles.navLinks}>
-          <li><Link href="/battle">Battle Mode</Link></li>
-          <li><Link href="/lobby">Game Lobby</Link></li>
-          <li><Link href="/leaderboard" className={styles.navActive}>Leaderboard</Link></li>
-        </ul>
-        <div className={styles.navActions}>
-          <Link href="/login" className={styles.btnGhost}>Sign in</Link>
-          <Link href="/signup" className={styles.btnPrimary}>Create Account →</Link>
-        </div>
-      </nav>
- 
+
       <div className={styles.page}>
- 
+
         {/* Hero */}
         <div className={styles.hero}>
           <div className={styles.heroBg}></div>
@@ -62,11 +48,10 @@ export default function Leaderboard() {
             </div>
           </div>
         </div>
- 
+
         {/* Podium */}
         <div className={styles.podiumWrap}>
           <div className={styles.podium}>
-            {/* 2nd */}
             <div className={`${styles.podiumCard} ${styles.podiumSecond}`}>
               <div className={styles.podiumRank}>🥈 2nd Place</div>
               <div className={styles.podiumAv} style={{ background: TOP3[0].bg }}>{TOP3[0].init}</div>
@@ -75,8 +60,7 @@ export default function Leaderboard() {
               <div className={styles.podiumPts}>{TOP3[0].pts.toLocaleString()} pts</div>
               <div className={styles.podiumWins}>{TOP3[0].wins} wins · {TOP3[0].winRate}% win rate</div>
             </div>
- 
-            {/* 1st */}
+
             <div className={`${styles.podiumCard} ${styles.podiumFirst}`}>
               <div className={styles.podiumRank}>🏆 Champion</div>
               <div className={styles.podiumCrown}>👑</div>
@@ -86,8 +70,7 @@ export default function Leaderboard() {
               <div className={`${styles.podiumPts} ${styles.podiumPtsGold}`}>{TOP3[1].pts.toLocaleString()} pts</div>
               <div className={styles.podiumWins}>{TOP3[1].wins} wins · {TOP3[1].winRate}% win rate</div>
             </div>
- 
-            {/* 3rd */}
+
             <div className={`${styles.podiumCard} ${styles.podiumThird}`}>
               <div className={styles.podiumRank}>🥉 3rd Place</div>
               <div className={styles.podiumAv} style={{ background: TOP3[2].bg }}>{TOP3[2].init}</div>
@@ -98,11 +81,10 @@ export default function Leaderboard() {
             </div>
           </div>
         </div>
- 
+
         {/* Table + sidebar */}
         <div className={styles.bodyLayout}>
- 
-          {/* Table */}
+
           <div className={styles.tableWrap}>
             <div className={styles.tableHeader}>
               <div>Rank</div>
@@ -112,9 +94,9 @@ export default function Leaderboard() {
               <div>Battles</div>
               <div>Trend</div>
             </div>
- 
+
             {ROWS.map(row => (
-              <Link href="/profile" key={row.rank} className={`${styles.tableRow} ${row.isMe ? styles.tableRowMe : ''}`}>
+              <Link href={`/profile/${row.name.toLowerCase().replace(/\s+/g, '')}`} key={row.rank} className={`${styles.tableRow} ${row.isMe ? styles.tableRowMe : ''}`}>
                 <div className={`${styles.rankNum} ${row.rank <= 5 ? styles.rankTop : ''}`}>{row.rank}</div>
                 <div className={styles.userCell}>
                   <div className={styles.userAv} style={{ background: row.bg }}>{row.init}</div>
@@ -133,10 +115,9 @@ export default function Leaderboard() {
               </Link>
             ))}
           </div>
- 
-          {/* Sidebar */}
+
           <div className={styles.lbSidebar}>
- 
+
             <div className={styles.sideCard}>
               <div className={styles.sideCardTitle}>🔥 Hot streaks</div>
               {[
@@ -153,7 +134,7 @@ export default function Leaderboard() {
                 </div>
               ))}
             </div>
- 
+
             <div className={styles.sideCard}>
               <div className={styles.sideCardTitle}>📊 Most battles this week</div>
               {[
@@ -169,7 +150,7 @@ export default function Leaderboard() {
                 </div>
               ))}
             </div>
- 
+
             <div className={styles.sideCard}>
               <div className={styles.sideCardTitle}>⚡ Rising fast</div>
               {[
@@ -184,17 +165,17 @@ export default function Leaderboard() {
                 </div>
               ))}
             </div>
- 
+
             <div className={`${styles.sideCard} ${styles.sideCardCta}`}>
               <div className={styles.myRankTitle}>Your rank: <span style={{ color: '#3B82F6' }}>#14</span></div>
               <div className={styles.myRankSub}>Win 2 more battles to reach #12</div>
               <Link href="/battle" className={styles.startBattleBtn}>Start a Battle →</Link>
             </div>
- 
+
           </div>
         </div>
       </div>
- 
+
     </main>
   );
 }
