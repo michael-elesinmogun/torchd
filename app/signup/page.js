@@ -1,10 +1,13 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
+import { supabase } from '../supabase';
 import styles from './signup.module.css';
  
 export default function Signup() {
   const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [form, setForm] = useState({ name: '', email: '', password: '', sport: '' });
  
   function handleChange(e) {
@@ -16,8 +19,29 @@ export default function Signup() {
     setStep(2);
   }
  
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
+    setLoading(true);
+    setError(null);
+ 
+    const { error } = await supabase.auth.signUp({
+      email: form.email,
+      password: form.password,
+      options: {
+        data: {
+          full_name: form.name,
+          sport: form.sport,
+        }
+      }
+    });
+ 
+    setLoading(false);
+ 
+    if (error) {
+      setError(error.message);
+      return;
+    }
+ 
     setStep(3);
   }
  
@@ -141,8 +165,12 @@ export default function Signup() {
                 ))}
               </div>
  
-              <button type="submit" className={styles.btnPrimary} disabled={!form.sport}>
-                Create Account →
+              {error && (
+                <div className={styles.errorMsg}>{error}</div>
+              )}
+ 
+              <button type="submit" className={styles.btnPrimary} disabled={!form.sport || loading}>
+                {loading ? 'Creating account...' : 'Create Account →'}
               </button>
  
               <button type="button" className={styles.btnBack} onClick={() => setStep(1)}>
@@ -158,7 +186,7 @@ export default function Signup() {
             <div className={styles.successWrap}>
               <div className={styles.successIcon}>🔥</div>
               <h1 className={styles.cardTitle}>You're in!</h1>
-              <p className={styles.cardSub}>Welcome to Torchd, {form.name.split(' ')[0]}. Time to run your mouth.</p>
+              <p className={styles.cardSub}>Welcome to Torchd, {form.name.split(' ')[0]}. Check your email to confirm your account, then start debating.</p>
  
               <div className={styles.successActions}>
                 <Link href="/battle" className={styles.btnPrimary}>
@@ -177,4 +205,3 @@ export default function Signup() {
     </main>
   );
 }
- 
