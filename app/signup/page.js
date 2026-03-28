@@ -1,17 +1,18 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '../supabase';
 import styles from './signup.module.css';
 
 export default function Signup() {
+  const router = useRouter();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [form, setForm] = useState({ name: '', username: '', email: '', password: '', sport: '' });
 
   function handleChange(e) {
-    // Auto-clean username as they type
     if (e.target.name === 'username') {
       setForm({ ...form, username: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '') });
     } else {
@@ -28,7 +29,6 @@ export default function Signup() {
       return;
     }
 
-    // Check username availability
     const { data: existing } = await supabase
       .from('profiles')
       .select('username')
@@ -48,7 +48,7 @@ export default function Signup() {
     setLoading(true);
     setError(null);
 
-    // Create auth account
+    // Step 1: Create auth account
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
@@ -67,18 +67,52 @@ export default function Signup() {
       return;
     }
 
-    // Save profile with username
+    console.log('Auth user created:', data.user?.id);
+
+    // Step 2: Insert profile row using service role approach
+    // We use the user's session to insert
     if (data.user) {
-      await supabase.from('profiles').upsert({
-        id: data.user.id,
-        username: form.username,
-        full_name: form.name,
-        sport: form.sport,
-      });
+      // Set the session first so RLS works
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .insert({
+          id: data.user.id,
+          username: form.username,
+          full_name: form.name,
+          sport: form.sport,
+          bio: '',
+          avatar_url: '',
+        });
+
+      if (profileError) {
+        console.error('Profile insert error:', profileError.message, profileError.code);
+        // Try upsert as fallback
+        const { error: upsertError } = await supabase
+          .from('profiles')
+          .upsert({
+            id: data.user.id,
+            username: form.username,
+            full_name: form.name,
+            sport: form.sport,
+            bio: '',
+            avatar_url: '',
+          });
+        if (upsertError) {
+          console.error('Profile upsert also failed:', upsertError.message);
+        } else {
+          console.log('Profile saved via upsert');
+        }
+      } else {
+        console.log('Profile saved successfully');
+      }
     }
 
     setLoading(false);
     setStep(3);
+
+    setTimeout(() => {
+      router.push(`/profile/${form.username}`);
+    }, 2000);
   }
 
   return (
@@ -89,7 +123,6 @@ export default function Signup() {
 
       <div className={styles.card}>
 
-        {/* Step 1 — Account details */}
         {step === 1 && (
           <div className={styles.stepWrap}>
             <div className={styles.stepIndicator}>
@@ -107,72 +140,31 @@ export default function Signup() {
             <form onSubmit={handleNext} className={styles.form}>
               <div className={styles.formGroup}>
                 <label className={styles.label}>Full name</label>
-                <input
-                  className={styles.input}
-                  type="text"
-                  name="name"
-                  placeholder="John Smith"
-                  value={form.name}
-                  onChange={handleChange}
-                  required
-                />
+                <input className={styles.input} type="text" name="name" placeholder="John Smith" value={form.name} onChange={handleChange} required />
               </div>
 
               <div className={styles.formGroup}>
                 <label className={styles.label}>Username</label>
                 <div className={styles.usernameWrap}>
                   <span className={styles.usernamePrefix}>@</span>
-                  <input
-                    className={styles.usernameInput}
-                    type="text"
-                    name="username"
-                    placeholder="yourusername"
-                    value={form.username}
-                    onChange={handleChange}
-                    required
-                    minLength={3}
-                    maxLength={20}
-                  />
+                  <input className={styles.usernameInput} type="text" name="username" placeholder="yourusername" value={form.username} onChange={handleChange} required minLength={3} maxLength={20} />
                 </div>
-                {form.username && (
-                  <div className={styles.usernamePreview}>
-                    torchd.vercel.app/profile/{form.username}
-                  </div>
-                )}
+                {form.username && <div className={styles.usernamePreview}>torchd.vercel.app/profile/{form.username}</div>}
               </div>
 
               <div className={styles.formGroup}>
                 <label className={styles.label}>Email address</label>
-                <input
-                  className={styles.input}
-                  type="email"
-                  name="email"
-                  placeholder="you@example.com"
-                  value={form.email}
-                  onChange={handleChange}
-                  required
-                />
+                <input className={styles.input} type="email" name="email" placeholder="you@example.com" value={form.email} onChange={handleChange} required />
               </div>
 
               <div className={styles.formGroup}>
                 <label className={styles.label}>Password</label>
-                <input
-                  className={styles.input}
-                  type="password"
-                  name="password"
-                  placeholder="At least 8 characters"
-                  value={form.password}
-                  onChange={handleChange}
-                  required
-                  minLength={8}
-                />
+                <input className={styles.input} type="password" name="password" placeholder="At least 8 characters" value={form.password} onChange={handleChange} required minLength={8} />
               </div>
 
               {error && <div className={styles.errorMsg}>{error}</div>}
 
-              <button type="submit" className={styles.btnPrimary}>
-                Continue →
-              </button>
+              <button type="submit" className={styles.btnPrimary}>Continue →</button>
             </form>
 
             <p className={styles.terms}>
@@ -184,7 +176,6 @@ export default function Signup() {
           </div>
         )}
 
-        {/* Step 2 — Pick your sports */}
         {step === 2 && (
           <div className={styles.stepWrap}>
             <div className={styles.stepIndicator}>
@@ -209,12 +200,9 @@ export default function Signup() {
                   {key:'nhl', icon:'🏒', label:'NHL'},
                   {key:'all', icon:'🔥', label:'All Sports'},
                 ].map(s => (
-                  <button
-                    key={s.key}
-                    type="button"
+                  <button key={s.key} type="button"
                     className={`${styles.sportBtn} ${form.sport === s.key ? styles.sportSelected : ''}`}
-                    onClick={() => setForm({...form, sport: s.key})}
-                  >
+                    onClick={() => setForm({...form, sport: s.key})}>
                     <span className={styles.sportIcon}>{s.icon}</span>
                     <span className={styles.sportLabel}>{s.label}</span>
                   </button>
@@ -231,13 +219,16 @@ export default function Signup() {
           </div>
         )}
 
-        {/* Step 3 — Success */}
         {step === 3 && (
           <div className={styles.stepWrap}>
             <div className={styles.successWrap}>
               <div className={styles.successIcon}>🔥</div>
               <h1 className={styles.cardTitle}>You're in, @{form.username}!</h1>
-              <p className={styles.cardSub}>Welcome to Torchd, {form.name.split(' ')[0]}. Check your email to confirm your account, then start debating.</p>
+              <p className={styles.cardSub}>
+                Welcome to Torchd, {form.name.split(' ')[0]}. Check your email to confirm your account.
+                <br /><br />
+                <span style={{color:'#60A5FA'}}>Taking you to your profile...</span>
+              </p>
               <div className={styles.successActions}>
                 <Link href={`/profile/${form.username}`} className={styles.btnPrimary}>View my profile →</Link>
                 <Link href="/battle" className={styles.btnSecondary}>⚔️ Start a Battle</Link>
