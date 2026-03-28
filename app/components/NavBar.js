@@ -5,16 +5,57 @@ import { supabase } from '../supabase';
 
 export default function NavBar() {
   const [user, setUser] = useState(null);
+  const [profileSlug, setProfileSlug] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
+    async function fetchUserAndProfile() {
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUser = session?.user;
+      setUser(currentUser);
+
+      if (currentUser) {
+        // Fetch real username from profiles table
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', currentUser.id)
+          .single();
+
+        if (profile?.username) {
+          setProfileSlug(profile.username);
+        } else {
+          // Fallback to derived name if no profile yet
+          const fullName = currentUser.user_metadata?.full_name || '';
+          setProfileSlug(
+            fullName
+              ? fullName.toLowerCase().replace(/\s+/g, '')
+              : currentUser.email?.split('@')[0] || 'profile'
+          );
+        }
+      }
+
       setLoading(false);
-    });
+    }
+
+    fetchUserAndProfile();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      if (session?.user) {
+        supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', session.user.id)
+          .single()
+          .then(({ data: profile }) => {
+            if (profile?.username) {
+              setProfileSlug(profile.username);
+            }
+          });
+      } else {
+        setProfileSlug(null);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -25,19 +66,9 @@ export default function NavBar() {
     window.location.href = '/';
   }
 
-  // Use full name to build profile slug — "Michael Elesinmogun" → "michaelelesinmogun"
   const fullName = user?.user_metadata?.full_name || '';
-  const profileSlug = fullName
-    ? fullName.toLowerCase().replace(/\s+/g, '')
-    : user?.email?.split('@')[0] || 'profile';
-
-  // Display name — truncate if too long
   const displayName = fullName || user?.email?.split('@')[0] || '';
-  const truncatedName = displayName.length > 18
-    ? displayName.slice(0, 18) + '…'
-    : displayName;
-
-  // Initials from full name
+  const truncatedName = displayName.length > 18 ? displayName.slice(0, 18) + '…' : displayName;
   const initials = fullName
     ? fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : (user?.email?.[0] || '?').toUpperCase();
@@ -52,7 +83,6 @@ export default function NavBar() {
       fontFamily: 'DM Sans, sans-serif',
     }}>
 
-      {/* Logo */}
       <Link href="/" style={{
         fontFamily: 'Syne, sans-serif', fontSize: '22px', fontWeight: 800,
         color: '#3B82F6', textDecoration: 'none', letterSpacing: '-0.5px',
@@ -61,7 +91,6 @@ export default function NavBar() {
         🔥 Torchd
       </Link>
 
-      {/* Nav links */}
       <ul style={{
         display: 'flex', alignItems: 'center', gap: '0.25rem',
         listStyle: 'none', margin: 0, padding: 0,
@@ -85,14 +114,12 @@ export default function NavBar() {
         ))}
       </ul>
 
-      {/* Right side — auth state */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
         {loading ? (
           <div style={{ width: '80px', height: '32px' }}></div>
         ) : user ? (
           <>
-            {/* Profile link with avatar */}
-            <Link href={`/profile/${profileSlug}`} style={{
+            <Link href={`/profile/${profileSlug || 'profile'}`} style={{
               display: 'flex', alignItems: 'center', gap: '8px',
               textDecoration: 'none', padding: '6px 12px', borderRadius: '8px',
               border: '1px solid rgba(255,255,255,0.065)', color: '#EEF2FF',
@@ -112,7 +139,6 @@ export default function NavBar() {
               {truncatedName}
             </Link>
 
-            {/* Sign out */}
             <button onClick={handleSignOut} style={{
               fontSize: '14px', color: '#6B7A9E', background: 'none',
               border: '1px solid rgba(255,255,255,0.065)', borderRadius: '8px',
