@@ -20,19 +20,32 @@ export default function Login() {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email: form.email,
       password: form.password,
     });
 
-    setLoading(false);
-
-    if (error) {
-      setError(error.message);
+    if (signInError) {
+      setError(signInError.message);
+      setLoading(false);
       return;
     }
 
-    router.push('/');
+    // Fetch username from profiles table
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', data.user.id)
+      .single();
+
+    setLoading(false);
+
+    if (profile?.username) {
+      router.push(`/profile/${profile.username}`);
+    } else {
+      // Fallback to homepage if no profile yet
+      router.push('/');
+    }
   }
 
   return (
