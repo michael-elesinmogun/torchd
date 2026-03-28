@@ -253,6 +253,9 @@ export default function Profile({ params }) {
               )}
               <Link href="/battle" className={styles.challengeBtn}>⚔️ {isOwner ? 'Start a Battle' : 'Challenge to a Battle'}</Link>
               <button className={styles.shareBtn} onClick={shareProfile}>{copied ? '✓ Link copied!' : '🔗 Share profile'}</button>
+              {isOwner && (
+                <Link href="/settings" className={styles.settingsBtn}>⚙️ Settings</Link>
+              )}
             </div>
 
             <div className={styles.sideCard}>
