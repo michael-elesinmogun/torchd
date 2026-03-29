@@ -63,6 +63,8 @@ export default function Profile({ params }) {
   const [followingList, setFollowingList] = useState([]);
   const [followLoading, setFollowLoading] = useState(false);
 
+  const [battles, setBattles] = useState([]);
+  const [battlesLoading, setBattlesLoading] = useState(true);
   const [photoUrl, setPhotoUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -139,6 +141,17 @@ export default function Profile({ params }) {
 
         setIsFollowing(!!existingFollow);
       }
+
+      // Fetch battle history
+      const { data: battleData } = await supabase
+        .from('battles')
+        .select('*')
+        .or(`player1_username.eq.${username},player2_username.eq.${username}`)
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      setBattles(battleData || []);
+      setBattlesLoading(false);
 
       setLoading(false);
     }
@@ -455,12 +468,49 @@ export default function Profile({ params }) {
             </div>
 
             {activeTab === 'history' && (
-              <div className={styles.emptyState}>
-                <div className={styles.emptyIcon}>⚔️</div>
-                <div className={styles.emptyTitle}>No battles yet</div>
-                <p className={styles.emptyBody}>Once you start debating your battle history will show up here.</p>
-                <Link href="/battle" className={styles.emptyBtn}>Start your first battle →</Link>
-              </div>
+              battlesLoading ? (
+                <div className={styles.emptyState}>
+                  <div style={{color:'#6B7A9E',fontSize:'14px'}}>Loading battles...</div>
+                </div>
+              ) : battles.length === 0 ? (
+                <div className={styles.emptyState}>
+                  <div className={styles.emptyIcon}>⚔️</div>
+                  <div className={styles.emptyTitle}>No battles yet</div>
+                  <p className={styles.emptyBody}>Once you start debating your battle history will show up here.</p>
+                  <Link href="/battle" className={styles.emptyBtn}>Start your first battle →</Link>
+                </div>
+              ) : (
+                <div className={styles.battleHistory}>
+                  {battles.map(battle => {
+                    const isPlayer1 = battle.player1_username === username;
+                    const opponent = isPlayer1 ? battle.player2_username : battle.player1_username;
+                    const myStance = isPlayer1 ? battle.player1_stance : battle.player2_stance;
+                    const won = battle.winner === username;
+                    const lost = battle.winner && battle.winner !== username;
+                    const pending = !battle.winner;
+
+                    return (
+                      <div key={battle.id} className={styles.battleCard}>
+                        <div className={styles.battleCardTop}>
+                          <div className={`${styles.battleResult} ${won ? styles.battleWon : lost ? styles.battleLost : styles.battlePending}`}>
+                            {pending ? '🔴 LIVE' : won ? '✓ WIN' : '✗ LOSS'}
+                          </div>
+                          <div className={styles.battleDate}>
+                            {new Date(battle.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          </div>
+                        </div>
+                        <div className={styles.battleTopic}>"{battle.topic}"</div>
+                        {myStance && <div className={styles.battleStance}>{myStance}</div>}
+                        {opponent && (
+                          <div className={styles.battleOpponent}>
+                            vs <Link href={`/profile/${opponent}`} className={styles.battleOpponentLink}>@{opponent}</Link>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )
             )}
 
             {activeTab === 'topics' && (

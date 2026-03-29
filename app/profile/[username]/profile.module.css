@@ -303,3 +303,28 @@
   .emptyState { padding: 2rem 1.25rem; }
   .followListItem { padding: 0.75rem 1rem; }
 }
+
+/* ─── BATTLE HISTORY ─── */
+.battleHistory { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.battleCard {
+  background: #0f1623; border: 1px solid rgba(255,255,255,0.065);
+  border-radius: 14px; padding: 1.25rem;
+  transition: border-color 0.2s;
+}
+.battleCard:hover { border-color: rgba(59,130,246,0.22); }
+
+.battleCardTop { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; }
+
+.battleResult { font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 100px; }
+.battleWon { background: rgba(16,185,129,0.15); color: #34D399; border: 1px solid rgba(16,185,129,0.3); }
+.battleLost { background: rgba(239,68,68,0.15); color: #F87171; border: 1px solid rgba(239,68,68,0.3); }
+.battlePending { background: rgba(239,68,68,0.1); color: #EF4444; border: 1px solid rgba(239,68,68,0.22); }
+
+.battleDate { font-size: 12px; color: #3D4A66; }
+
+.battleTopic { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; color: #EEF2FF; margin-bottom: 6px; line-height: 1.4; }
+.battleStance { font-size: 12px; color: #6B7A9E; font-style: italic; margin-bottom: 6px; }
+.battleOpponent { font-size: 12px; color: #6B7A9E; }
+.battleOpponentLink { color: #60A5FA; text-decoration: none; font-weight: 600; }
+.battleOpponentLink:hover { text-decoration: underline; }
