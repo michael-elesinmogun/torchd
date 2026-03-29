@@ -351,8 +351,116 @@
 }
  
 .chatSend:hover { background: #60A5FA; }
- 
+
+/* ── 900px: hide sidebar ── */
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }
   .sidebar { display: none; }
+}
+
+/* ── 600px: full mobile ── */
+@media (max-width: 600px) {
+  .stage { padding: 0.75rem; gap: 0.75rem; }
+
+  /* Nav */
+  .navBack { display: none; }
+  .viewerCount { display: none; }
+
+  /* Topic bar */
+  .topicBar { padding: 0.75rem 1rem; gap: 0.5rem; }
+  .roundBadge { display: none; }
+  .topicText { font-size: 13px; }
+
+  /* Video stage — stack vertically, equal fixed heights */
+  .videoStage {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    min-height: unset;
+    border-radius: 0;
+    overflow: visible;
+    gap: 0;
+  }
+
+  .leftTile {
+    border-radius: 12px;
+    border: 1px solid rgba(59,130,246,0.2);
+    min-height: 0;
+    height: 190px;
+    padding: 1rem;
+    justify-content: flex-end;
+    overflow: hidden;
+  }
+
+  .rightTile {
+    border-radius: 12px;
+    border: 1px solid rgba(239,68,68,0.2);
+    min-height: 0;
+    height: 190px;
+    padding: 1rem;
+    justify-content: flex-end;
+    overflow: hidden;
+  }
+
+  .vsDivider {
+    width: 100%;
+    height: 28px;
+    min-height: unset;
+    flex-direction: row;
+    background: transparent;
+  }
+
+  .vsCircle { width: 28px; height: 28px; font-size: 10px; }
+
+  /* Avatar stays absolute-centered, just smaller */
+  .playerAvatarWrap {
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    gap: 4px;
+  }
+
+  .playerAvatar { width: 52px; height: 52px; font-size: 18px; }
+  .speakingLabel { font-size: 10px; padding: 2px 8px; }
+
+  .playerName { font-size: 13px; margin-bottom: 2px; }
+  .playerLocation { display: none; }
+  .stanceBadge { margin-bottom: 4px; font-size: 10px; padding: 3px 8px; }
+  .playerStats { font-size: 11px; gap: 6px; }
+
+  /* Enough bottom padding so vote buttons are never clipped */
+  .stage { padding-bottom: 2rem; }
+
+  /* Timer bar — simplify */
+  .timerBar {
+    padding: 0.75rem 1rem;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+  }
+
+  .timerNormal,
+  .timerWarning,
+  .timerCritical { font-size: 24px; }
+
+  .progressLabels { display: none; }
+  .roundPips { display: none; }
+
+  /* Vote buttons — stack vertically */
+  .voteArea {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 0.5rem;
+  }
+
+  .voteDivider {
+    padding: 0.25rem 0;
+    font-size: 11px;
+  }
+
+  .voteBtn {
+    padding: 0.875rem 1.25rem;
+    font-size: 13px;
+    border-radius: 10px;
+  }
+
+  .votePct { font-size: 18px; }
 }

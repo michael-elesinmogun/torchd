@@ -29,6 +29,11 @@ const FILTERS = ['All Sports', 'NBA', 'NFL', 'This Week', 'This Month', 'All Tim
 export default function Leaderboard() {
   const [activeFilter, setActiveFilter] = useState('All Sports');
 
+  // On desktop: 2nd | 1st | 3rd (visual podium height trick)
+  // On mobile: CSS single-column so we reorder in JSX to 1st, 2nd, 3rd
+  // We render 1st, 2nd, 3rd and use CSS order property for desktop rearrangement
+  const podiumDesktopOrder = [TOP3[1], TOP3[0], TOP3[2]]; // 1st, 2nd, 3rd in DOM
+
   return (
     <main className={styles.main}>
 
@@ -49,9 +54,13 @@ export default function Leaderboard() {
           </div>
         </div>
 
-        {/* Podium */}
+        {/* Podium — DOM order: 2nd|1st|3rd for desktop visual layout.
+             On mobile CSS sets grid-template-columns:1fr so we use
+             .podiumFirst { order:-1 } to pull 1st to the top */}
         <div className={styles.podiumWrap}>
           <div className={styles.podium}>
+
+            {/* 2ND — left on desktop */}
             <div className={`${styles.podiumCard} ${styles.podiumSecond}`}>
               <div className={styles.podiumRank}>🥈 2nd Place</div>
               <div className={styles.podiumAv} style={{ background: TOP3[0].bg }}>{TOP3[0].init}</div>
@@ -61,6 +70,7 @@ export default function Leaderboard() {
               <div className={styles.podiumWins}>{TOP3[0].wins} wins · {TOP3[0].winRate}% win rate</div>
             </div>
 
+            {/* 1ST — center on desktop, top on mobile via order:-1 */}
             <div className={`${styles.podiumCard} ${styles.podiumFirst}`}>
               <div className={styles.podiumRank}>🏆 Champion</div>
               <div className={styles.podiumCrown}>👑</div>
@@ -71,6 +81,7 @@ export default function Leaderboard() {
               <div className={styles.podiumWins}>{TOP3[1].wins} wins · {TOP3[1].winRate}% win rate</div>
             </div>
 
+            {/* 3RD — right on desktop */}
             <div className={`${styles.podiumCard} ${styles.podiumThird}`}>
               <div className={styles.podiumRank}>🥉 3rd Place</div>
               <div className={styles.podiumAv} style={{ background: TOP3[2].bg }}>{TOP3[2].init}</div>
@@ -79,6 +90,7 @@ export default function Leaderboard() {
               <div className={styles.podiumPts}>{TOP3[2].pts.toLocaleString()} pts</div>
               <div className={styles.podiumWins}>{TOP3[2].wins} wins · {TOP3[2].winRate}% win rate</div>
             </div>
+
           </div>
         </div>
 

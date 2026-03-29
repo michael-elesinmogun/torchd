@@ -48,11 +48,11 @@ export default function Signup() {
     setLoading(true);
     setError(null);
 
-    // Step 1: Create auth account
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: form.email,
       password: form.password,
       options: {
+        emailRedirectTo: `${window.location.origin}/confirm`,
         data: {
           full_name: form.name,
           username: form.username,
@@ -67,12 +67,7 @@ export default function Signup() {
       return;
     }
 
-    console.log('Auth user created:', data.user?.id);
-
-    // Step 2: Insert profile row using service role approach
-    // We use the user's session to insert
     if (data.user) {
-      // Set the session first so RLS works
       const { error: profileError } = await supabase
         .from('profiles')
         .insert({
@@ -85,8 +80,6 @@ export default function Signup() {
         });
 
       if (profileError) {
-        console.error('Profile insert error:', profileError.message, profileError.code);
-        // Try upsert as fallback
         const { error: upsertError } = await supabase
           .from('profiles')
           .upsert({
@@ -99,20 +92,12 @@ export default function Signup() {
           });
         if (upsertError) {
           console.error('Profile upsert also failed:', upsertError.message);
-        } else {
-          console.log('Profile saved via upsert');
         }
-      } else {
-        console.log('Profile saved successfully');
       }
     }
 
     setLoading(false);
     setStep(3);
-
-    setTimeout(() => {
-      router.push(`/profile/${form.username}`);
-    }, 2000);
   }
 
   return (
@@ -222,17 +207,23 @@ export default function Signup() {
         {step === 3 && (
           <div className={styles.stepWrap}>
             <div className={styles.successWrap}>
-              <div className={styles.successIcon}>🔥</div>
-              <h1 className={styles.cardTitle}>You're in, @{form.username}!</h1>
+              <div className={styles.successIcon}>📧</div>
+              <h1 className={styles.cardTitle}>Check your email</h1>
               <p className={styles.cardSub}>
-                Welcome to Torchd, {form.name.split(' ')[0]}. Check your email to confirm your account.
+                We sent a confirmation link to <strong style={{color:'#EEF2FF'}}>{form.email}</strong>.
                 <br /><br />
-                <span style={{color:'#60A5FA'}}>Taking you to your profile...</span>
+                Click the link in your email to activate your account, then come back to start debating.
               </p>
               <div className={styles.successActions}>
                 <Link href={`/profile/${form.username}`} className={styles.btnPrimary}>View my profile →</Link>
-                <Link href="/battle" className={styles.btnSecondary}>⚔️ Start a Battle</Link>
+                <Link href="/login" className={styles.btnSecondary}>Sign in →</Link>
               </div>
+              <p style={{fontSize:'12px',color:'#3D4A66',marginTop:'1rem'}}>
+                Didn't get it? Check your spam folder or <button style={{background:'none',border:'none',color:'#60A5FA',cursor:'pointer',fontSize:'12px',padding:0}} onClick={async () => {
+                  await supabase.auth.resend({ type: 'signup', email: form.email, options: { emailRedirectTo: `${window.location.origin}/confirm` } });
+                  alert('Confirmation email resent!');
+                }}>resend the email</button>.
+              </p>
             </div>
           </div>
         )}

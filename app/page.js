@@ -166,6 +166,40 @@ export default function Home() {
         </div>
       </section>
 
+      {/* LEADERBOARD PREVIEW */}
+      <section className={styles.lbPreviewSection}>
+        <div className={styles.container}>
+          <div className={styles.eyebrow}><span className={styles.eyebrowDot}></span> Rankings</div>
+          <div className={styles.lbPreviewHeader}>
+            <h2 className={styles.h2}>Top debaters this week</h2>
+            <Link href="/leaderboard" className={styles.lbPreviewLink}>See full leaderboard →</Link>
+          </div>
+          <div className={styles.lbPreviewList}>
+            {[
+              { rank: 1, init: 'MJ', name: 'Mike J.', sport: 'NBA · NFL', pts: 4820, winRate: 84, bg: '#3B82F6' },
+              { rank: 2, init: 'SR', name: 'Simone R.', sport: 'NBA', pts: 4210, winRate: 71, bg: '#10B981' },
+              { rank: 3, init: 'TW', name: 'Tyler W.', sport: 'NFL', pts: 3980, winRate: 67, bg: '#F59E0B' },
+              { rank: 4, init: 'KR', name: 'King Rick', sport: 'NBA · NFL', pts: 3720, winRate: 79, bg: '#8B5CF6' },
+              { rank: 5, init: 'AL', name: 'Ashley L.', sport: 'NBA', pts: 3510, winRate: 74, bg: '#EF4444' },
+            ].map((p) => (
+              <div key={p.rank} className={styles.lbPreviewRow}>
+                <div className={styles.lbPreviewRank} style={{ color: p.rank <= 3 ? '#F59E0B' : '#3D4A66' }}>{p.rank}</div>
+                <div className={styles.lbPreviewAv} style={{ background: p.bg }}>{p.init}</div>
+                <div className={styles.lbPreviewInfo}>
+                  <div className={styles.lbPreviewName}>{p.name}</div>
+                  <div className={styles.lbPreviewSport}>{p.sport}</div>
+                </div>
+                <div className={styles.lbPreviewPts}>{p.pts.toLocaleString()} <span>pts</span></div>
+                <div className={styles.lbPreviewWin} style={{ color: p.winRate >= 70 ? '#10B981' : '#F59E0B' }}>{p.winRate}%</div>
+              </div>
+            ))}
+          </div>
+          <div className={styles.lbPreviewFooter}>
+            <Link href="/leaderboard" className={styles.heroBtnPrimary}>View Full Leaderboard →</Link>
+          </div>
+        </div>
+      </section>
+
       {/* CTA */}
       <section className={styles.ctaSection}>
         <div className={styles.ctaGlow}></div>

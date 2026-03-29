@@ -272,10 +272,65 @@
   cursor: pointer; color: white; font-size: 13px;
 }
 .chatSend:hover { background: #60A5FA; }
- 
+
+/* ── 900px: hide sidebar, games single col, video 2-col ── */
 @media(max-width:900px){
-  .layout{grid-template-columns:1fr;}
-  .sidebar{display:none;}
-  .gamesGrid{grid-template-columns:1fr;}
-  .videoGrid{grid-template-columns:1fr 1fr;}
+  .layout { grid-template-columns: 1fr; }
+  .sidebar { display: none; }
+  .gamesGrid { grid-template-columns: 1fr; }
+  .videoGrid { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── 600px: full mobile ── */
+@media(max-width:600px){
+  .lobbyMain { padding: 1rem; gap: 1rem; }
+
+  /* Nav */
+  .navBack { display: none; }
+  .viewerCount { display: none; }
+
+  /* Header */
+  .lobbyHeader { gap: 0.5rem; }
+  .pageTitle { font-size: 1.5rem; }
+  .filters { gap: 0.375rem; }
+  .filterBtn { font-size: 12px; padding: 5px 11px; }
+
+  /* Game cards — single column */
+  .gamesGrid { grid-template-columns: 1fr; gap: 0.75rem; }
+
+  .gameCard { padding: 1rem; border-radius: 12px; }
+  .teamAbbr { font-size: 15px; }
+  .teamScore { font-size: 20px; }
+  .gamePeriod { font-size: 10px; }
+
+  /* Active lobby header */
+  .activeLobbyHeader { padding: 1rem; flex-wrap: wrap; gap: 0.5rem; }
+  .activeLobbyTitle { font-size: 13px; }
+  .joinCamBtn { font-size: 11px; padding: 7px 12px; }
+
+  /* Video grid — 2x2 */
+  .videoGrid { grid-template-columns: 1fr 1fr; }
+  .videoAvatar { width: 28px; height: 28px; font-size: 10px; margin-bottom: 4px; }
+  .videoName { font-size: 10px; }
+  .videoTeam { font-size: 9px; }
+  .videoTileEmpty { font-size: 10px; }
+
+  /* Hot takes */
+  .takeCard { padding: 0.875rem 1rem; }
+  .takeText { font-size: 13px; }
+  .takeActions { gap: 0.75rem; }
+
+  /* Sidebar — show as compact block below content on mobile */
+  .sidebar {
+    display: flex;
+    position: static;
+    height: auto;
+    border-left: none;
+    border-top: 1px solid rgba(255,255,255,0.065);
+    max-height: 320px;
+  }
+
+  .scoreboardSection { padding: 1rem; }
+  .chatMessages { padding: 0.5rem 0.75rem; }
+  .chatInputRow { padding: 0.5rem 0.75rem; }
 }
