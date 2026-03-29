@@ -77,7 +77,11 @@
 
 .profileName { font-family:'Syne',sans-serif; font-size:18px; font-weight:800; color:#EEF2FF; margin-bottom:3px; word-break:break-word; overflow-wrap:anywhere; line-height:1.2; }
 .profileHandle { font-size:13px; color:#6B7A9E; margin-bottom:4px; }
-.profileLocation { font-size:12px; color:#6B7A9E; margin-bottom:0.75rem; }
+.profileLocation { font-size:12px; color:#6B7A9E; }
+.profileLocationRow { display:flex; align-items:center; gap:6px; justify-content:center; margin-bottom:0.75rem; }
+.locationEditWrap { display:flex; align-items:center; gap:4px; justify-content:center; margin-bottom:0.75rem; flex-wrap:wrap; }
+.locationInput { background:#151e2e; border:1px solid rgba(59,130,246,0.3); border-radius:6px; padding:5px 8px; font-size:12px; color:#EEF2FF; outline:none; width:130px; font-family:'DM Sans',sans-serif; transition:border-color 0.2s; }
+.locationInput:focus { border-color:#3B82F6; }
 
 /* Bio editing */
 .bioWrap { margin-bottom: 1.25rem; }

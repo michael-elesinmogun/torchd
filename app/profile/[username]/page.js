@@ -43,6 +43,11 @@ export default function Profile({ params }) {
   const [bioInput, setBioInput] = useState('');
   const [savingBio, setSavingBio] = useState(false);
 
+  const [location, setLocation] = useState('');
+  const [editingLocation, setEditingLocation] = useState(false);
+  const [locationInput, setLocationInput] = useState('');
+  const [savingLocation, setSavingLocation] = useState(false);
+
   const [favSports, setFavSports] = useState([]);
   const [favTeams, setFavTeams] = useState([]);
   const [editingSports, setEditingSports] = useState(false);
@@ -81,6 +86,8 @@ export default function Profile({ params }) {
         setProfile(profileData);
         setBio(profileData.bio || '');
         setBioInput(profileData.bio || '');
+        setLocation(profileData.location || '');
+        setLocationInput(profileData.location || '');
         if (profileData.avatar_url) setPhotoUrl(profileData.avatar_url);
 
         const fullName = profileData.full_name || '';
@@ -171,6 +178,16 @@ export default function Profile({ params }) {
     const { error } = await supabase.from('profiles').update({ bio: bioInput }).eq('username', username);
     setSavingBio(false);
     if (!error) { setBio(bioInput); setEditingBio(false); setChecklist(prev => ({ ...prev, addBio: !!bioInput })); }
+  }
+
+  async function saveLocation() {
+    setSavingLocation(true);
+    const { error } = await supabase.from('profiles').update({ location: locationInput }).eq('username', username);
+    setSavingLocation(false);
+    if (!error) {
+      setLocation(locationInput);
+      setEditingLocation(false);
+    }
   }
 
   async function saveSports() {
@@ -264,7 +281,31 @@ export default function Profile({ params }) {
               )}
               {handleError && <div className={styles.handleError}>{handleError}</div>}
 
-              <div className={styles.profileLocation}>📍 Boston, MA</div>
+              {editingLocation ? (
+                <div className={styles.locationEditWrap}>
+                  <span style={{fontSize:'13px'}}>📍</span>
+                  <input
+                    className={styles.locationInput}
+                    value={locationInput}
+                    onChange={e => setLocationInput(e.target.value)}
+                    placeholder="City, State"
+                    maxLength={50}
+                    autoFocus
+                    onKeyDown={e => e.key === 'Enter' && saveLocation()}
+                  />
+                  <button className={styles.handleSaveBtn} onClick={saveLocation} disabled={savingLocation}>{savingLocation ? '...' : 'Save'}</button>
+                  <button className={styles.handleCancelBtn} onClick={() => { setEditingLocation(false); setLocationInput(location); }}>✕</button>
+                </div>
+              ) : (
+                <div className={styles.profileLocationRow}>
+                  <span className={styles.profileLocation}>
+                    {location ? `📍 ${location}` : isOwner ? '📍 Add location' : ''}
+                  </span>
+                  {isOwner && (
+                    <button className={styles.editHandleBtn} onClick={() => setEditingLocation(true)}>Edit</button>
+                  )}
+                </div>
+              )}
 
               {editingBio ? (
                 <div className={styles.bioEditWrap}>

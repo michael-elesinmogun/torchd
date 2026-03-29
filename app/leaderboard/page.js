@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { supabase } from '../supabase';
 import styles from './leaderboard.module.css';
 
 const TOP3 = [
@@ -26,8 +27,28 @@ const ROWS = [
 
 const FILTERS = ['All Sports', 'NBA', 'NFL', 'This Week', 'This Month', 'All Time'];
 
+const AVATAR_COLORS = ['#3B82F6','#10B981','#F59E0B','#8B5CF6','#EF4444','#06B6D4','#EC4899','#F97316','#14B8A6','#6366F1','#84CC16','#A855F7'];
+
 export default function Leaderboard() {
   const [activeFilter, setActiveFilter] = useState('All Sports');
+  const [realUsers, setRealUsers] = useState([]);
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    async function fetchUsers() {
+      const { data: { session } } = await supabase.auth.getSession();
+      setCurrentUser(session?.user ?? null);
+
+      const { data } = await supabase
+        .from('profiles')
+        .select('username, full_name, sport, avatar_url')
+        .order('username', { ascending: true })
+        .limit(50);
+
+      if (data) setRealUsers(data);
+    }
+    fetchUsers();
+  }, []);
 
   // On desktop: 2nd | 1st | 3rd (visual podium height trick)
   // On mobile: CSS single-column so we reorder in JSX to 1st, 2nd, 3rd
@@ -107,16 +128,46 @@ export default function Leaderboard() {
               <div>Trend</div>
             </div>
 
-            {ROWS.map(row => (
+            {realUsers.length > 0 ? realUsers.map((row, i) => {
+              const rank = i + 1;
+              const initials = row.full_name
+                ? row.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                : row.username.slice(0, 2).toUpperCase();
+              const bg = AVATAR_COLORS[i % AVATAR_COLORS.length];
+              const sportMap = { nba: 'NBA', nfl: 'NFL', soccer: 'Soccer', mlb: 'MLB', nhl: 'NHL', all: 'All Sports' };
+              const sport = sportMap[row.sport?.toLowerCase()] || '—';
+              const isMe = currentUser && row.username === currentUser.user_metadata?.username;
+
+              return (
+                <Link href={`/profile/${row.username}`} key={row.username} className={`${styles.tableRow} ${isMe ? styles.tableRowMe : ''}`}>
+                  <div className={`${styles.rankNum} ${rank <= 5 ? styles.rankTop : ''}`}>{rank}</div>
+                  <div className={styles.userCell}>
+                    <div className={styles.userAv} style={{ background: bg }}>
+                      {row.avatar_url
+                        ? <img src={row.avatar_url} alt={row.username} style={{width:'100%',height:'100%',borderRadius:'50%',objectFit:'cover'}} />
+                        : initials}
+                    </div>
+                    <div>
+                      <div className={styles.userName}>
+                        {row.full_name || row.username}
+                        {isMe && <span className={styles.youBadge}>YOU</span>}
+                      </div>
+                      <div className={styles.userSport}>{sport}</div>
+                    </div>
+                  </div>
+                  <div className={styles.ptsVal}>—</div>
+                  <div className={styles.winRateVal} style={{color:'#6B7A9E'}}>—</div>
+                  <div className={styles.battlesVal}>—</div>
+                  <div className={styles.trendVal}>—</div>
+                </Link>
+              );
+            }) : ROWS.map(row => (
               <Link href={`/profile/${row.name.toLowerCase().replace(/\s+/g, '')}`} key={row.rank} className={`${styles.tableRow} ${row.isMe ? styles.tableRowMe : ''}`}>
                 <div className={`${styles.rankNum} ${row.rank <= 5 ? styles.rankTop : ''}`}>{row.rank}</div>
                 <div className={styles.userCell}>
                   <div className={styles.userAv} style={{ background: row.bg }}>{row.init}</div>
                   <div>
-                    <div className={styles.userName}>
-                      {row.name}
-                      {row.isMe && <span className={styles.youBadge}>YOU</span>}
-                    </div>
+                    <div className={styles.userName}>{row.name}{row.isMe && <span className={styles.youBadge}>YOU</span>}</div>
                     <div className={styles.userSport}>{row.sport}</div>
                   </div>
                 </div>
