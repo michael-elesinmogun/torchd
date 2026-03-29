@@ -79,6 +79,7 @@ export default function NavBar() {
     { href: '/battle', label: '⚔️ Battle Mode' },
     { href: '/lobby', label: '🏟️ Game Lobby' },
     { href: '/leaderboard', label: '🏆 Leaderboard' },
+    { href: '/search', label: '🔍 Search' },
   ];
 
   return (
