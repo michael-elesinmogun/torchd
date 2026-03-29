@@ -177,6 +177,8 @@ function GameCard({ game, sport }) {
   const statusLabel = getStatusLabel(game.status);
   const statusColor = getStatusColor(game.status.type);
 
+  const gameRoomUrl = `/lobby/game/${sport}-${game.id}`;
+
   return (
     <div className={`${styles.gameCard} ${live ? styles.gameCardLive : ''}`}>
 
@@ -223,11 +225,8 @@ function GameCard({ game, sport }) {
       {/* Footer */}
       <div className={styles.gameCardBottom}>
         {game.venue && <div className={styles.gameVenue}>{game.venue}</div>}
-        <Link
-          href={`/battle/start`}
-          className={styles.debateBtn}
-        >
-          ⚔️ Debate this game
+        <Link href={gameRoomUrl} className={styles.debateBtn}>
+          💬 Join chat
         </Link>
       </div>
 
