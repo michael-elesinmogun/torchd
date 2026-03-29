@@ -1,12 +1,16 @@
 'use client';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import { supabase } from '../supabase';
 import styles from './battle.module.css';
+
+const BATTLE_ID = 'd63ea70a-6613-481b-9524-04d810cafdd0';
 
 export default function Battle() {
   const [seconds, setSeconds] = useState(105);
-  const [votes, setVotes] = useState({ jordan: 524, darius: 323 });
-  const [voted, setVoted] = useState(null);
+  const [votes, setVotes] = useState({ player1: 0, player2: 0 });
+  const [voted, setVoted] = useState(null); // 'player1' | 'player2' | null
+  const [user, setUser] = useState(null);
   const [viewers, setViewers] = useState(1247);
   const [activeTab, setActiveTab] = useState('chat');
   const [chatInput, setChatInput] = useState('');
@@ -26,28 +30,98 @@ export default function Battle() {
     { av: '#EC4899', init: 'VB', name: 'Vibe_B', badge: 'FOR', text: 'I came here as a MJ fan and Jordan is actually changing my mind...' },
   ];
 
+  // Load user session + existing vote + vote counts on mount
+  useEffect(() => {
+    async function init() {
+      // Get current user
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+
+      // Load vote counts
+      await loadVotes();
+
+      // Check if user already voted
+      if (currentUser) {
+        const { data: existingVote } = await supabase
+          .from('votes')
+          .select('side')
+          .eq('battle_id', BATTLE_ID)
+          .eq('user_id', currentUser.id)
+          .single();
+
+        if (existingVote) setVoted(existingVote.side);
+      }
+    }
+
+    init();
+
+    // Subscribe to real-time vote changes
+    const channel = supabase
+      .channel('votes-realtime')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'votes',
+        filter: `battle_id=eq.${BATTLE_ID}`,
+      }, () => {
+        loadVotes();
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, []);
+
+  async function loadVotes() {
+    const { data, error } = await supabase
+      .from('votes')
+      .select('side')
+      .eq('battle_id', BATTLE_ID);
+
+    if (error) return;
+
+    const p1 = data.filter(v => v.side === 'player1').length;
+    const p2 = data.filter(v => v.side === 'player2').length;
+    setVotes({ player1: p1, player2: p2 });
+  }
+
+  async function castVote(side) {
+    if (voted) return;
+
+    if (!user) {
+      window.location.href = '/login';
+      return;
+    }
+
+    // Optimistic update
+    setVoted(side);
+    setVotes(v => ({ ...v, [side]: v[side] + 1 }));
+
+    const { error } = await supabase
+      .from('votes')
+      .insert({ battle_id: BATTLE_ID, user_id: user.id, side });
+
+    if (error) {
+      // Revert on error
+      console.error('Vote error:', error.message);
+      setVoted(null);
+      setVotes(v => ({ ...v, [side]: v[side] - 1 }));
+    }
+  }
+
+  // Timer
   useEffect(() => {
     const interval = setInterval(() => setSeconds(s => s > 0 ? s - 1 : 0), 1000);
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (!voted) {
-        setVotes(v => ({
-          jordan: v.jordan + (Math.random() > 0.5 ? Math.floor(Math.random() * 3) : 0),
-          darius: v.darius + (Math.random() > 0.5 ? Math.floor(Math.random() * 2) : 0),
-        }));
-      }
-    }, 2800);
-    return () => clearInterval(interval);
-  }, [voted]);
-
+  // Viewer count wiggle
   useEffect(() => {
     const interval = setInterval(() => setViewers(v => Math.max(1000, v + Math.floor(Math.random() * 10) - 3)), 4000);
     return () => clearInterval(interval);
   }, []);
 
+  // Auto chat messages
   useEffect(() => {
     let idx = 0;
     const interval = setInterval(() => {
@@ -61,21 +135,15 @@ export default function Battle() {
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   }
 
-  function castVote(side) {
-    if (voted) return;
-    setVoted(side);
-    setVotes(v => ({ ...v, [side]: v[side] + 1 }));
-  }
-
   function sendChat() {
     if (!chatInput.trim()) return;
     setMessages(prev => [...prev, { av: '#3B82F6', init: 'Me', name: 'You', badge: null, text: chatInput, isMe: true }]);
     setChatInput('');
   }
 
-  const total = votes.jordan + votes.darius;
-  const jordanPct = Math.round((votes.jordan / total) * 100);
-  const dariusPct = 100 - jordanPct;
+  const total = votes.player1 + votes.player2;
+  const jordanPct = total === 0 ? 50 : Math.round((votes.player1 / total) * 100);
+  const dariusPct = total === 0 ? 50 : 100 - jordanPct;
   const timerClass = seconds <= 15 ? styles.timerCritical : seconds <= 30 ? styles.timerWarning : styles.timerNormal;
   const progressPct = (seconds / 120) * 100;
 
@@ -155,16 +223,31 @@ export default function Battle() {
           </div>
 
           <div className={styles.voteArea}>
-            <button className={`${styles.voteBtn} ${styles.voteBtnBlue} ${voted === 'jordan' ? styles.voteSelected : ''} ${voted && voted !== 'jordan' ? styles.voteDimmed : ''}`} onClick={() => castVote('jordan')}>
-              <span className={styles.voteBtnLabel}>Vote for Jordan</span>
+            <button
+              className={`${styles.voteBtn} ${styles.voteBtnBlue} ${voted === 'player1' ? styles.voteSelected : ''} ${voted && voted !== 'player1' ? styles.voteDimmed : ''}`}
+              onClick={() => castVote('player1')}
+            >
+              <span className={styles.voteBtnLabel}>{!user ? '🔒 Sign in to vote' : 'Vote for Jordan'}</span>
               <span className={styles.votePct}>{jordanPct}%</span>
             </button>
-            <div className={styles.voteDivider}>{voted ? 'Vote cast ✓' : 'Cast your vote'}</div>
-            <button className={`${styles.voteBtn} ${styles.voteBtnRed} ${voted === 'darius' ? styles.voteSelected : ''} ${voted && voted !== 'darius' ? styles.voteDimmed : ''}`} onClick={() => castVote('darius')}>
+            <div className={styles.voteDivider}>
+              {voted ? 'Vote cast ✓' : total > 0 ? `${total} votes` : 'Cast your vote'}
+            </div>
+            <button
+              className={`${styles.voteBtn} ${styles.voteBtnRed} ${voted === 'player2' ? styles.voteSelected : ''} ${voted && voted !== 'player2' ? styles.voteDimmed : ''}`}
+              onClick={() => castVote('player2')}
+            >
               <span className={styles.votePct}>{dariusPct}%</span>
-              <span className={styles.voteBtnLabel}>Vote for Darius</span>
+              <span className={styles.voteBtnLabel}>{!user ? '🔒 Sign in to vote' : 'Vote for Darius'}</span>
             </button>
           </div>
+
+          {!user && (
+            <p style={{ textAlign: 'center', fontSize: '13px', color: '#6B7A9E', marginTop: '0.5rem' }}>
+              <Link href="/login" style={{ color: '#60A5FA', textDecoration: 'none' }}>Sign in</Link> or{' '}
+              <Link href="/signup" style={{ color: '#60A5FA', textDecoration: 'none' }}>create an account</Link> to cast your vote
+            </p>
+          )}
 
         </div>
 
@@ -183,7 +266,7 @@ export default function Battle() {
               <div className={styles.trackerBarWrap}><div className={styles.trackerBarRed} style={{ width: `${dariusPct}%` }}></div></div>
               <div className={`${styles.trackerPct} ${styles.trackerPctRed}`}>{dariusPct}%</div>
             </div>
-            <div className={styles.trackerTotal}>{total.toLocaleString()} votes cast</div>
+            <div className={styles.trackerTotal}>{total} vote{total !== 1 ? 's' : ''} cast</div>
           </div>
 
           <div className={styles.sidebarTabs}>
