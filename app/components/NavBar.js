@@ -184,6 +184,20 @@ export default function NavBar() {
             </>
           )}
 
+          {/* Search icon — desktop only */}
+          <Link href="/search" className="nav-search-icon" style={{
+            fontSize: '18px', textDecoration: 'none',
+            padding: '6px 10px', borderRadius: '8px',
+            border: '1px solid rgba(255,255,255,0.065)',
+            transition: 'all 0.2s', lineHeight: 1,
+            display: 'flex', alignItems: 'center',
+          }}
+          onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.22)'; }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.065)'; }}
+          >
+            🔍
+          </Link>
+
           {/* Hamburger button — mobile only */}
           <button
             onClick={() => setMenuOpen(o => !o)}
@@ -271,6 +285,7 @@ export default function NavBar() {
         .nav-signin-btn { display: block !important; }
         .nav-hamburger { display: none !important; }
         .nav-name-label { display: inline !important; }
+        .nav-search-icon { display: flex !important; }
 
         @media (max-width: 768px) {
           .nav-desktop-links { display: none !important; }
@@ -278,6 +293,7 @@ export default function NavBar() {
           .nav-signin-btn { display: none !important; }
           .nav-hamburger { display: block !important; }
           .nav-name-label { display: none !important; }
+          .nav-search-icon { display: none !important; }
         }
       `}</style>
     </>

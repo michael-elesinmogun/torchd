@@ -16,19 +16,22 @@ export default function Settings() {
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
   const [newEmail, setNewEmail] = useState('');
-  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
   // Privacy
   const [isPublic, setIsPublic] = useState(true);
   const [showOnLeaderboard, setShowOnLeaderboard] = useState(true);
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
+  const [privacySuccess, setPrivacySuccess] = useState('');
 
   // Notifications
   const [notifBattleRequests, setNotifBattleRequests] = useState(true);
   const [notifNewFollowers, setNotifNewFollowers] = useState(true);
   const [notifBattleResults, setNotifBattleResults] = useState(true);
   const [notifWeeklyDigest, setNotifWeeklyDigest] = useState(false);
+  const [savingNotifs, setSavingNotifs] = useState(false);
+  const [notifsSuccess, setNotifsSuccess] = useState('');
 
   // Status messages
   const [nameSuccess, setNameSuccess] = useState('');
@@ -55,11 +58,20 @@ export default function Settings() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('username')
+        .select('username, is_public, show_on_leaderboard, notif_battle_requests, notif_new_followers, notif_battle_results, notif_weekly_digest')
         .eq('id', currentUser.id)
         .single();
 
-      if (profile?.username) setProfileSlug(profile.username);
+      if (profile) {
+        setProfileSlug(profile.username || '');
+        setIsPublic(profile.is_public ?? true);
+        setShowOnLeaderboard(profile.show_on_leaderboard ?? true);
+        setNotifBattleRequests(profile.notif_battle_requests ?? true);
+        setNotifNewFollowers(profile.notif_new_followers ?? true);
+        setNotifBattleResults(profile.notif_battle_results ?? true);
+        setNotifWeeklyDigest(profile.notif_weekly_digest ?? false);
+      }
+
       setLoading(false);
     }
     fetchUser();
@@ -67,77 +79,84 @@ export default function Settings() {
 
   async function saveDisplayName() {
     setSavingName(true);
-    setNameError('');
-    setNameSuccess('');
-
-    const { error } = await supabase.auth.updateUser({
-      data: { full_name: displayName }
-    });
-
-    // Also update in profiles table
+    setNameError(''); setNameSuccess('');
+    const { error } = await supabase.auth.updateUser({ data: { full_name: displayName } });
     if (!error) {
-      await supabase
-        .from('profiles')
-        .update({ full_name: displayName })
-        .eq('id', user.id);
+      await supabase.from('profiles').update({ full_name: displayName }).eq('id', user.id);
     }
-
     setSavingName(false);
-    if (error) { setNameError(error.message); }
-    else { setNameSuccess('Display name updated successfully!'); }
+    if (error) setNameError(error.message);
+    else setNameSuccess('Display name updated!');
   }
 
   async function saveEmail() {
     setSavingEmail(true);
-    setEmailError('');
-    setEmailSuccess('');
-
+    setEmailError(''); setEmailSuccess('');
     const { error } = await supabase.auth.updateUser({ email: newEmail });
     setSavingEmail(false);
-    if (error) { setEmailError(error.message); }
-    else { setEmailSuccess('Confirmation email sent to your new address. Check your inbox!'); }
+    if (error) setEmailError(error.message);
+    else setEmailSuccess('Confirmation email sent to your new address. Check your inbox!');
   }
 
   async function savePassword() {
     setSavingPassword(true);
-    setPasswordError('');
-    setPasswordSuccess('');
-
+    setPasswordError(''); setPasswordSuccess('');
     if (newPassword !== confirmPassword) {
       setPasswordError('Passwords do not match');
-      setSavingPassword(false);
-      return;
+      setSavingPassword(false); return;
     }
     if (newPassword.length < 8) {
       setPasswordError('Password must be at least 8 characters');
-      setSavingPassword(false);
-      return;
+      setSavingPassword(false); return;
     }
-
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     setSavingPassword(false);
-    if (error) { setPasswordError(error.message); }
+    if (error) setPasswordError(error.message);
     else {
       setPasswordSuccess('Password updated successfully!');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
+      setNewPassword(''); setConfirmPassword('');
     }
+  }
+
+  async function savePrivacy() {
+    setSavingPrivacy(true);
+    setPrivacySuccess('');
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_public: isPublic, show_on_leaderboard: showOnLeaderboard })
+      .eq('id', user.id);
+    setSavingPrivacy(false);
+    if (!error) setPrivacySuccess('Privacy settings saved!');
+  }
+
+  async function saveNotifications() {
+    setSavingNotifs(true);
+    setNotifsSuccess('');
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        notif_battle_requests: notifBattleRequests,
+        notif_new_followers: notifNewFollowers,
+        notif_battle_results: notifBattleResults,
+        notif_weekly_digest: notifWeeklyDigest,
+      })
+      .eq('id', user.id);
+    setSavingNotifs(false);
+    if (!error) setNotifsSuccess('Notification preferences saved!');
   }
 
   async function deleteAccount() {
     if (deleteInput !== 'DELETE') return;
-    // Sign out and redirect — full deletion requires server-side in production
     await supabase.auth.signOut();
     router.push('/');
   }
 
   const sections = [
-    { id: 'account', label: '👤 Account', icon: '👤' },
-    { id: 'password', label: '🔒 Password', icon: '🔒' },
-    { id: 'privacy', label: '🔐 Privacy', icon: '🔐' },
-    { id: 'notifications', label: '🔔 Notifications', icon: '🔔' },
-    { id: 'danger', label: '⚠️ Danger Zone', icon: '⚠️' },
+    { id: 'account', label: '👤 Account' },
+    { id: 'password', label: '🔒 Password' },
+    { id: 'privacy', label: '🔐 Privacy' },
+    { id: 'notifications', label: '🔔 Notifications' },
+    { id: 'danger', label: '⚠️ Danger Zone' },
   ];
 
   if (loading) {
@@ -152,22 +171,18 @@ export default function Settings() {
     <main className={styles.main}>
       <div className={styles.page}>
 
-        {/* Header */}
         <div className={styles.pageHeader}>
           <div>
             <h1 className={styles.pageTitle}>Settings</h1>
             <p className={styles.pageSub}>Manage your account and preferences</p>
           </div>
           {profileSlug && (
-            <Link href={`/profile/${profileSlug}`} className={styles.backBtn}>
-              ← Back to profile
-            </Link>
+            <Link href={`/profile/${profileSlug}`} className={styles.backBtn}>← Back to profile</Link>
           )}
         </div>
 
         <div className={styles.layout}>
 
-          {/* Sidebar nav */}
           <div className={styles.sidebar}>
             {sections.map(s => (
               <button
@@ -180,10 +195,8 @@ export default function Settings() {
             ))}
           </div>
 
-          {/* Main content */}
           <div className={styles.content}>
 
-            {/* Account section */}
             {activeSection === 'account' && (
               <div className={styles.section}>
                 <div className={styles.sectionTitle}>Account Information</div>
@@ -192,16 +205,8 @@ export default function Settings() {
                 <div className={styles.formBlock}>
                   <div className={styles.formBlockTitle}>Display Name</div>
                   <div className={styles.formRow}>
-                    <input
-                      className={styles.input}
-                      type="text"
-                      value={displayName}
-                      onChange={e => setDisplayName(e.target.value)}
-                      placeholder="Your full name"
-                    />
-                    <button className={styles.saveBtn} onClick={saveDisplayName} disabled={savingName}>
-                      {savingName ? 'Saving...' : 'Save'}
-                    </button>
+                    <input className={styles.input} type="text" value={displayName} onChange={e => setDisplayName(e.target.value)} placeholder="Your full name" />
+                    <button className={styles.saveBtn} onClick={saveDisplayName} disabled={savingName}>{savingName ? 'Saving...' : 'Save'}</button>
                   </div>
                   {nameSuccess && <div className={styles.successMsg}>{nameSuccess}</div>}
                   {nameError && <div className={styles.errorMsg}>{nameError}</div>}
@@ -213,15 +218,8 @@ export default function Settings() {
                   <div className={styles.formBlockTitle}>Email Address</div>
                   <div className={styles.formBlockSub}>We'll send a confirmation to your new email before changing it</div>
                   <div className={styles.formRow}>
-                    <input
-                      className={styles.input}
-                      type="email"
-                      value={newEmail}
-                      onChange={e => setNewEmail(e.target.value)}
-                    />
-                    <button className={styles.saveBtn} onClick={saveEmail} disabled={savingEmail || newEmail === email}>
-                      {savingEmail ? 'Sending...' : 'Update'}
-                    </button>
+                    <input className={styles.input} type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)} />
+                    <button className={styles.saveBtn} onClick={saveEmail} disabled={savingEmail || newEmail === email}>{savingEmail ? 'Sending...' : 'Update'}</button>
                   </div>
                   {emailSuccess && <div className={styles.successMsg}>{emailSuccess}</div>}
                   {emailError && <div className={styles.errorMsg}>{emailError}</div>}
@@ -229,12 +227,10 @@ export default function Settings() {
               </div>
             )}
 
-            {/* Password section */}
             {activeSection === 'password' && (
               <div className={styles.section}>
                 <div className={styles.sectionTitle}>Change Password</div>
                 <div className={styles.sectionSub}>Choose a strong password at least 8 characters long</div>
-
                 <div className={styles.formBlock}>
                   <div className={styles.formGroup}>
                     <label className={styles.label}>New password</label>
@@ -253,50 +249,42 @@ export default function Settings() {
               </div>
             )}
 
-            {/* Privacy section */}
             {activeSection === 'privacy' && (
               <div className={styles.section}>
                 <div className={styles.sectionTitle}>Privacy Settings</div>
                 <div className={styles.sectionSub}>Control who can see your profile and activity</div>
-
                 <div className={styles.formBlock}>
                   <div className={styles.toggleRow}>
                     <div className={styles.toggleInfo}>
                       <div className={styles.toggleTitle}>Public profile</div>
                       <div className={styles.toggleSub}>Anyone can view your profile, debates and stats</div>
                     </div>
-                    <button
-                      className={`${styles.toggle} ${isPublic ? styles.toggleOn : styles.toggleOff}`}
-                      onClick={() => setIsPublic(!isPublic)}
-                    >
+                    <button className={`${styles.toggle} ${isPublic ? styles.toggleOn : styles.toggleOff}`} onClick={() => setIsPublic(!isPublic)}>
                       <div className={styles.toggleThumb}></div>
                     </button>
                   </div>
-
                   <div className={styles.divider}></div>
-
                   <div className={styles.toggleRow}>
                     <div className={styles.toggleInfo}>
                       <div className={styles.toggleTitle}>Show on leaderboard</div>
                       <div className={styles.toggleSub}>Your rank and stats appear on the global leaderboard</div>
                     </div>
-                    <button
-                      className={`${styles.toggle} ${showOnLeaderboard ? styles.toggleOn : styles.toggleOff}`}
-                      onClick={() => setShowOnLeaderboard(!showOnLeaderboard)}
-                    >
+                    <button className={`${styles.toggle} ${showOnLeaderboard ? styles.toggleOn : styles.toggleOff}`} onClick={() => setShowOnLeaderboard(!showOnLeaderboard)}>
                       <div className={styles.toggleThumb}></div>
                     </button>
                   </div>
+                  {privacySuccess && <div className={styles.successMsg} style={{marginTop:'1rem'}}>{privacySuccess}</div>}
+                  <button className={styles.saveBtnFull} onClick={savePrivacy} disabled={savingPrivacy} style={{marginTop:'1.5rem'}}>
+                    {savingPrivacy ? 'Saving...' : 'Save Privacy Settings'}
+                  </button>
                 </div>
               </div>
             )}
 
-            {/* Notifications section */}
             {activeSection === 'notifications' && (
               <div className={styles.section}>
                 <div className={styles.sectionTitle}>Notification Preferences</div>
                 <div className={styles.sectionSub}>Choose what you want to be notified about</div>
-
                 <div className={styles.formBlock}>
                   {[
                     { state: notifBattleRequests, setter: setNotifBattleRequests, title: 'Battle requests', sub: 'When someone challenges you to a debate' },
@@ -311,56 +299,38 @@ export default function Settings() {
                           <div className={styles.toggleTitle}>{item.title}</div>
                           <div className={styles.toggleSub}>{item.sub}</div>
                         </div>
-                        <button
-                          className={`${styles.toggle} ${item.state ? styles.toggleOn : styles.toggleOff}`}
-                          onClick={() => item.setter(!item.state)}
-                        >
+                        <button className={`${styles.toggle} ${item.state ? styles.toggleOn : styles.toggleOff}`} onClick={() => item.setter(!item.state)}>
                           <div className={styles.toggleThumb}></div>
                         </button>
                       </div>
                     </div>
                   ))}
+                  {notifsSuccess && <div className={styles.successMsg} style={{marginTop:'1rem'}}>{notifsSuccess}</div>}
+                  <button className={styles.saveBtnFull} onClick={saveNotifications} disabled={savingNotifs} style={{marginTop:'1.5rem'}}>
+                    {savingNotifs ? 'Saving...' : 'Save Notification Preferences'}
+                  </button>
                 </div>
               </div>
             )}
 
-            {/* Danger zone */}
             {activeSection === 'danger' && (
               <div className={styles.section}>
                 <div className={styles.sectionTitle} style={{color:'#F87171'}}>Danger Zone</div>
                 <div className={styles.sectionSub}>These actions are permanent and cannot be undone</div>
-
                 <div className={`${styles.formBlock} ${styles.dangerBlock}`}>
                   <div className={styles.dangerTitle}>Delete Account</div>
                   <p className={styles.dangerBody}>
                     Permanently delete your account and all associated data — your profile, battle history, followers and stats. This cannot be reversed.
                   </p>
-
                   {!showDeleteConfirm ? (
-                    <button className={styles.deleteBtn} onClick={() => setShowDeleteConfirm(true)}>
-                      Delete my account
-                    </button>
+                    <button className={styles.deleteBtn} onClick={() => setShowDeleteConfirm(true)}>Delete my account</button>
                   ) : (
                     <div className={styles.deleteConfirm}>
                       <p className={styles.deleteConfirmText}>Type <strong>DELETE</strong> to confirm:</p>
-                      <input
-                        className={`${styles.input} ${styles.deleteInput}`}
-                        type="text"
-                        value={deleteInput}
-                        onChange={e => setDeleteInput(e.target.value)}
-                        placeholder="Type DELETE"
-                      />
+                      <input className={`${styles.input} ${styles.deleteInput}`} type="text" value={deleteInput} onChange={e => setDeleteInput(e.target.value)} placeholder="Type DELETE" />
                       <div className={styles.deleteActions}>
-                        <button
-                          className={styles.deleteConfirmBtn}
-                          onClick={deleteAccount}
-                          disabled={deleteInput !== 'DELETE'}
-                        >
-                          Yes, delete my account
-                        </button>
-                        <button className={styles.deleteCancelBtn} onClick={() => { setShowDeleteConfirm(false); setDeleteInput(''); }}>
-                          Cancel
-                        </button>
+                        <button className={styles.deleteConfirmBtn} onClick={deleteAccount} disabled={deleteInput !== 'DELETE'}>Yes, delete my account</button>
+                        <button className={styles.deleteCancelBtn} onClick={() => { setShowDeleteConfirm(false); setDeleteInput(''); }}>Cancel</button>
                       </div>
                     </div>
                   )}
