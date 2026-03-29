@@ -1,13 +1,12 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useState, useEffect, useRef, use } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '../../../supabase';
 import styles from './room.module.css';
 
-export default function BattleRoom() {
-  const params = useParams();
-  const id = params?.id;
+export default function BattleRoom({ params }) {
+  const { id } = use(params);
   const router = useRouter();
   const iframeRef = useRef(null);
 
@@ -19,6 +18,7 @@ export default function BattleRoom() {
   const [voted, setVoted] = useState(null);
   const [chatInput, setChatInput] = useState('');
   const [messages, setMessages] = useState([]);
+
   const [copied, setCopied] = useState(false);
   const [viewers, setViewers] = useState(0);
 
