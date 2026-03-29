@@ -21,6 +21,13 @@ export default function BattleRoom({ params }) {
 
   const [copied, setCopied] = useState(false);
   const [viewers, setViewers] = useState(0);
+  const [videoJoined, setVideoJoined] = useState(false);
+  const [localStream, setLocalStream] = useState(null);
+  const [remoteStream, setRemoteStream] = useState(null);
+  const [micOn, setMicOn] = useState(true);
+  const [camOn, setCamOn] = useState(true);
+  const localVideoRef = useRef(null);
+  const remoteVideoRef = useRef(null);
 
   useEffect(() => {
     async function init() {
@@ -106,6 +113,27 @@ export default function BattleRoom({ params }) {
     if (error) { setVoted(null); setVotes(v => ({ ...v, [side]: v[side] - 1 })); }
   }
 
+  async function joinVideo() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      setLocalStream(stream);
+      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
+      setVideoJoined(true);
+    } catch (err) {
+      alert('Could not access camera/microphone. Please check permissions.');
+    }
+  }
+
+  function leaveVideo() {
+    if (localStream) {
+      localStream.getTracks().forEach(t => t.stop());
+      setLocalStream(null);
+    }
+    setVideoJoined(false);
+    setMicOn(true);
+    setCamOn(true);
+  }
+
   function copyLink() {
     navigator.clipboard.writeText(window.location.href);
     setCopied(true);
@@ -167,21 +195,69 @@ export default function BattleRoom({ params }) {
           </div>
 
           {/* Daily.co iframe */}
-          {battle.room_url ? (
-            <div className={styles.videoWrap}>
-              <iframe
-                ref={iframeRef}
-                src={battle.room_url}
-                className={styles.videoFrame}
-                allow="camera; microphone; fullscreen; display-capture"
-                title="Battle Room"
+          {videoJoined ? (
+            <div className={styles.videoStage}>
+              <video
+                ref={el => {
+                  localVideoRef.current = el;
+                  if (el && localStream) el.srcObject = localStream;
+                }}
+                autoPlay
+                muted
+                playsInline
+                className={styles.localVideo}
               />
+              {remoteStream && (
+                <video
+                  ref={remoteVideoRef}
+                  autoPlay
+                  playsInline
+                  className={styles.remoteVideo}
+                />
+              )}
+              <div className={styles.videoControls}>
+                <button
+                  className={`${styles.controlBtn} ${micOn ? '' : styles.controlBtnOff}`}
+                  onClick={() => {
+                    localStream?.getAudioTracks().forEach(t => { t.enabled = !micOn; });
+                    setMicOn(m => !m);
+                  }}
+                >
+                  {micOn ? '🎤' : '🔇'}
+                </button>
+                <button
+                  className={`${styles.controlBtn} ${camOn ? '' : styles.controlBtnOff}`}
+                  onClick={() => {
+                    localStream?.getVideoTracks().forEach(t => { t.enabled = !camOn; });
+                    setCamOn(c => !c);
+                  }}
+                >
+                  {camOn ? '📹' : '🚫'}
+                </button>
+                <button
+                  className={`${styles.controlBtn} ${styles.controlBtnLeave}`}
+                  onClick={leaveVideo}
+                >
+                  Leave
+                </button>
+              </div>
             </div>
           ) : (
-            <div className={styles.noRoom}>
-              <div className={styles.noRoomIcon}>📹</div>
-              <div className={styles.noRoomTitle}>Waiting for video room...</div>
-              <p className={styles.noRoomSub}>The battle host is setting up the room.</p>
+            <div className={styles.joinVideoWrap}>
+              <div className={styles.joinVideoIcon}>⚔️</div>
+              <div className={styles.joinVideoTitle}>
+                {battle.player2_username ? 'Your opponent is ready' : 'Waiting for opponent'}
+              </div>
+              <p className={styles.joinVideoSub}>
+                {battle.player2_username
+                  ? 'Tap Join Room to go live and start the debate.'
+                  : 'Share the link below while you wait. Tap Join Room when ready.'}
+              </p>
+              {battle.room_url && (
+                <button className={styles.joinVideoBtn} onClick={joinVideo}>
+                  🎥 Join Room
+                </button>
+              )}
             </div>
           )}
 
