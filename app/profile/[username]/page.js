@@ -49,27 +49,28 @@ export default function Profile({ params }) {
   const [savingSports, setSavingSports] = useState(false);
 
   const [activeTab, setActiveTab] = useState('history');
-  const [following, setFollowing] = useState(false);
-  const [followCount, setFollowCount] = useState(0);
+
+  // Real follow state
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followingCount, setFollowingCount] = useState(0);
+  const [followerList, setFollowerList] = useState([]);
+  const [followingList, setFollowingList] = useState([]);
+  const [followLoading, setFollowLoading] = useState(false);
+
   const [photoUrl, setPhotoUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [checklist, setChecklist] = useState({
-    addBio: false,
-    pickTeams: false,
-    firstBattle: false,
-  });
+  const [checklist, setChecklist] = useState({ addBio: false, pickTeams: false, firstBattle: false });
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
 
-      // Get logged in user
       const { data: { session } } = await supabase.auth.getSession();
       const currentUser = session?.user;
       setUser(currentUser);
 
-      // Fetch the profile being viewed by username
       const { data: profileData } = await supabase
         .from('profiles')
         .select('*')
@@ -82,7 +83,6 @@ export default function Profile({ params }) {
         setBioInput(profileData.bio || '');
         if (profileData.avatar_url) setPhotoUrl(profileData.avatar_url);
 
-        // Display name always comes from profile data
         const fullName = profileData.full_name || '';
         setDisplayName(fullName || username);
         setInitials(
@@ -91,22 +91,46 @@ export default function Profile({ params }) {
             : username.slice(0, 2).toUpperCase()
         );
 
-        // Set sport
         const sportMap = { nba: 'NBA', nfl: 'NFL', soccer: 'Soccer', mlb: 'MLB', nhl: 'NHL', all: 'NBA' };
         const mappedSport = sportMap[profileData.sport?.toLowerCase()];
         if (mappedSport) setFavSports([mappedSport]);
 
-        setChecklist({
-          addBio: !!profileData.bio,
-          pickTeams: !!profileData.sport,
-          firstBattle: false,
-        });
+        setChecklist({ addBio: !!profileData.bio, pickTeams: !!profileData.sport, firstBattle: false });
       } else {
-        // No profile found — derive name from URL
-        setDisplayName(
-          username.split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
-        );
+        setDisplayName(username.split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
         setInitials(username.slice(0, 2).toUpperCase());
+      }
+
+      // Fetch follower count + list
+      const { data: followers } = await supabase
+        .from('follows')
+        .select('follower_id')
+        .eq('following_username', username);
+
+      setFollowerCount(followers?.length || 0);
+      setFollowerList(followers || []);
+
+      // Fetch following count + list for this profile's user
+      if (profileData?.id) {
+        const { data: followingData } = await supabase
+          .from('follows')
+          .select('following_username')
+          .eq('follower_id', profileData.id);
+
+        setFollowingCount(followingData?.length || 0);
+        setFollowingList(followingData || []);
+      }
+
+      // Check if current user is following this profile
+      if (currentUser) {
+        const { data: existingFollow } = await supabase
+          .from('follows')
+          .select('id')
+          .eq('follower_id', currentUser.id)
+          .eq('following_username', username)
+          .single();
+
+        setIsFollowing(!!existingFollow);
       }
 
       setLoading(false);
@@ -116,15 +140,37 @@ export default function Profile({ params }) {
 
   const isOwner = user && profile && user.id === profile.id;
 
+  async function handleFollow() {
+    if (!user) { router.push('/login'); return; }
+    if (followLoading) return;
+    setFollowLoading(true);
+
+    if (isFollowing) {
+      // Unfollow
+      setIsFollowing(false);
+      setFollowerCount(c => c - 1);
+      await supabase
+        .from('follows')
+        .delete()
+        .eq('follower_id', user.id)
+        .eq('following_username', username);
+    } else {
+      // Follow
+      setIsFollowing(true);
+      setFollowerCount(c => c + 1);
+      await supabase
+        .from('follows')
+        .insert({ follower_id: user.id, following_username: username });
+    }
+
+    setFollowLoading(false);
+  }
+
   async function saveBio() {
     setSavingBio(true);
     const { error } = await supabase.from('profiles').update({ bio: bioInput }).eq('username', username);
     setSavingBio(false);
-    if (!error) {
-      setBio(bioInput);
-      setEditingBio(false);
-      setChecklist(prev => ({ ...prev, addBio: !!bioInput }));
-    }
+    if (!error) { setBio(bioInput); setEditingBio(false); setChecklist(prev => ({ ...prev, addBio: !!bioInput })); }
   }
 
   async function saveSports() {
@@ -132,10 +178,7 @@ export default function Profile({ params }) {
     const sportValue = favSports[0]?.toLowerCase() || '';
     const { error } = await supabase.from('profiles').update({ sport: sportValue }).eq('username', username);
     setSavingSports(false);
-    if (!error) {
-      setEditingSports(false);
-      setChecklist(prev => ({ ...prev, pickTeams: favSports.length > 0 }));
-    }
+    if (!error) { setEditingSports(false); setChecklist(prev => ({ ...prev, pickTeams: favSports.length > 0 })); }
   }
 
   async function saveHandle() {
@@ -165,7 +208,6 @@ export default function Profile({ params }) {
     setUploading(false);
   }
 
-  function toggleFollow() { setFollowing(!following); setFollowCount(f => following ? f - 1 : f + 1); }
   function toggleSport(sport) { setFavSports(prev => prev.includes(sport) ? prev.filter(s => s !== sport) : [...prev, sport]); }
   function toggleTeam(team) { setFavTeams(prev => prev.includes(team) ? prev.filter(t => t !== team) : [...prev, team]); }
   function shareProfile() { navigator.clipboard.writeText(window.location.href).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }); }
@@ -241,21 +283,29 @@ export default function Profile({ params }) {
               )}
 
               <div className={styles.followRow}>
-                <div className={styles.followStat}><span className={styles.followNum}>{followCount}</span><span className={styles.followLabel}>Followers</span></div>
+                <button className={styles.followStat} onClick={() => setActiveTab('followers')}>
+                  <span className={styles.followNum}>{followerCount}</span>
+                  <span className={styles.followLabel}>Followers</span>
+                </button>
                 <div className={styles.followDivider}></div>
-                <div className={styles.followStat}><span className={styles.followNum}>0</span><span className={styles.followLabel}>Following</span></div>
+                <button className={styles.followStat} onClick={() => setActiveTab('following')}>
+                  <span className={styles.followNum}>{followingCount}</span>
+                  <span className={styles.followLabel}>Following</span>
+                </button>
               </div>
 
               {!isOwner && (
-                <button className={`${styles.followBtn} ${following ? styles.followingBtn : ''}`} onClick={toggleFollow}>
-                  {following ? '✓ Following' : '+ Follow'}
+                <button
+                  className={`${styles.followBtn} ${isFollowing ? styles.followingBtn : ''}`}
+                  onClick={handleFollow}
+                  disabled={followLoading}
+                >
+                  {followLoading ? '...' : isFollowing ? '✓ Following' : '+ Follow'}
                 </button>
               )}
               <Link href="/battle" className={styles.challengeBtn}>⚔️ {isOwner ? 'Start a Battle' : 'Challenge to a Battle'}</Link>
               <button className={styles.shareBtn} onClick={shareProfile}>{copied ? '✓ Link copied!' : '🔗 Share profile'}</button>
-              {isOwner && (
-                <Link href="/settings" className={styles.settingsBtn}>⚙️ Settings</Link>
-              )}
+              {isOwner && <Link href="/settings" className={styles.settingsBtn}>⚙️ Settings</Link>}
             </div>
 
             <div className={styles.sideCard}>
@@ -287,8 +337,7 @@ export default function Profile({ params }) {
                   <div className={styles.sportBadges}>
                     {favSports.length > 0
                       ? favSports.map(sport => <div key={sport} className={styles.sportBadge}>{sport}</div>)
-                      : <div style={{fontSize:'13px',color:'#3D4A66'}}>No sports selected yet</div>
-                    }
+                      : <div style={{fontSize:'13px',color:'#3D4A66'}}>No sports selected yet</div>}
                   </div>
                   <div className={styles.teamBadges}>
                     {favTeams.map(team => <div key={team} className={styles.teamBadge}>🏆 {team}</div>)}
@@ -359,15 +408,70 @@ export default function Profile({ params }) {
             <div className={styles.tabs}>
               {['history', 'topics', 'followers', 'following'].map(tab => (
                 <button key={tab} className={`${styles.tab} ${activeTab === tab ? styles.tabActive : ''}`} onClick={() => setActiveTab(tab)}>
-                  {tab.charAt(0).toUpperCase() + tab.slice(1)}
+                  {tab === 'followers' ? `Followers (${followerCount})` : tab === 'following' ? `Following (${followingCount})` : tab.charAt(0).toUpperCase() + tab.slice(1)}
                 </button>
               ))}
             </div>
 
-            {activeTab === 'history' && <div className={styles.emptyState}><div className={styles.emptyIcon}>⚔️</div><div className={styles.emptyTitle}>No battles yet</div><p className={styles.emptyBody}>Once you start debating your battle history will show up here.</p><Link href="/battle" className={styles.emptyBtn}>Start your first battle →</Link></div>}
-            {activeTab === 'topics' && <div className={styles.emptyState}><div className={styles.emptyIcon}>🔥</div><div className={styles.emptyTitle}>No favorite topics yet</div><p className={styles.emptyBody}>Topics you debate most will appear here automatically.</p><Link href="/battle" className={styles.emptyBtn}>Start debating →</Link></div>}
-            {activeTab === 'followers' && <div className={styles.emptyState}><div className={styles.emptyIcon}>👥</div><div className={styles.emptyTitle}>No followers yet</div><p className={styles.emptyBody}>Win some battles and people will start following you.</p><Link href="/battle" className={styles.emptyBtn}>Start building your rep →</Link></div>}
-            {activeTab === 'following' && <div className={styles.emptyState}><div className={styles.emptyIcon}>👀</div><div className={styles.emptyTitle}>Not following anyone yet</div><p className={styles.emptyBody}>Follow other debaters to see their battles and takes.</p><Link href="/leaderboard" className={styles.emptyBtn}>Find debaters to follow →</Link></div>}
+            {activeTab === 'history' && (
+              <div className={styles.emptyState}>
+                <div className={styles.emptyIcon}>⚔️</div>
+                <div className={styles.emptyTitle}>No battles yet</div>
+                <p className={styles.emptyBody}>Once you start debating your battle history will show up here.</p>
+                <Link href="/battle" className={styles.emptyBtn}>Start your first battle →</Link>
+              </div>
+            )}
+
+            {activeTab === 'topics' && (
+              <div className={styles.emptyState}>
+                <div className={styles.emptyIcon}>🔥</div>
+                <div className={styles.emptyTitle}>No favorite topics yet</div>
+                <p className={styles.emptyBody}>Topics you debate most will appear here automatically.</p>
+                <Link href="/battle" className={styles.emptyBtn}>Start debating →</Link>
+              </div>
+            )}
+
+            {activeTab === 'followers' && (
+              followerCount === 0 ? (
+                <div className={styles.emptyState}>
+                  <div className={styles.emptyIcon}>👥</div>
+                  <div className={styles.emptyTitle}>No followers yet</div>
+                  <p className={styles.emptyBody}>Win some battles and people will start following you.</p>
+                  <Link href="/battle" className={styles.emptyBtn}>Start building your rep →</Link>
+                </div>
+              ) : (
+                <div className={styles.followList}>
+                  {followerList.map((f, i) => (
+                    <div key={i} className={styles.followListItem}>
+                      <div className={styles.followListAv} style={{background:'#3B82F6'}}>👤</div>
+                      <div className={styles.followListName}>Follower</div>
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+
+            {activeTab === 'following' && (
+              followingCount === 0 ? (
+                <div className={styles.emptyState}>
+                  <div className={styles.emptyIcon}>👀</div>
+                  <div className={styles.emptyTitle}>Not following anyone yet</div>
+                  <p className={styles.emptyBody}>Follow other debaters to see their battles and takes.</p>
+                  <Link href="/leaderboard" className={styles.emptyBtn}>Find debaters to follow →</Link>
+                </div>
+              ) : (
+                <div className={styles.followList}>
+                  {followingList.map((f, i) => (
+                    <Link key={i} href={`/profile/${f.following_username}`} className={styles.followListItem}>
+                      <div className={styles.followListAv} style={{background:'#3B82F6'}}>
+                        {f.following_username.slice(0,2).toUpperCase()}
+                      </div>
+                      <div className={styles.followListName}>@{f.following_username}</div>
+                    </Link>
+                  ))}
+                </div>
+              )
+            )}
           </div>
         </div>
       </div>

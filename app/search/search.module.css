@@ -1,0 +1,173 @@
+.main {
+  background: #060912;
+  color: #EEF2FF;
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+}
+
+.page {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 5rem clamp(1rem, 4vw, 2rem) 4rem;
+}
+
+.searchHeader {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.title {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(1.8rem, 4vw, 2.5rem);
+  font-weight: 800;
+  color: #EEF2FF;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+.sub {
+  font-size: 15px;
+  color: #6B7A9E;
+}
+
+/* Search bar */
+.searchBarWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.searchIcon {
+  position: absolute;
+  left: 16px;
+  font-size: 16px;
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  background: #0f1623;
+  border: 1px solid rgba(255,255,255,0.065);
+  border-radius: 14px;
+  padding: 14px 48px;
+  font-size: 16px;
+  color: #EEF2FF;
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.searchInput:focus {
+  border-color: rgba(59,130,246,0.4);
+}
+
+.searchInput::placeholder { color: #3D4A66; }
+
+.clearBtn {
+  position: absolute;
+  right: 14px;
+  background: none;
+  border: none;
+  color: #3D4A66;
+  font-size: 14px;
+  cursor: pointer;
+  padding: 4px;
+  transition: color 0.2s;
+}
+.clearBtn:hover { color: #EEF2FF; }
+
+/* Results */
+.results { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.status {
+  text-align: center;
+  font-size: 14px;
+  color: #6B7A9E;
+  padding: 2rem 0;
+}
+
+.emptyState {
+  text-align: center;
+  padding: 3rem 2rem;
+  background: #0f1623;
+  border: 1px solid rgba(255,255,255,0.065);
+  border-radius: 16px;
+}
+
+.emptyIcon { font-size: 40px; margin-bottom: 0.75rem; display: block; }
+.emptyTitle { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; color: #EEF2FF; margin-bottom: 0.5rem; }
+.emptySub { font-size: 14px; color: #6B7A9E; }
+
+/* Result card */
+.resultCard {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  background: #0f1623;
+  border: 1px solid rgba(255,255,255,0.065);
+  border-radius: 14px;
+  padding: 1rem 1.25rem;
+  transition: border-color 0.2s;
+}
+
+.resultCard:hover { border-color: rgba(59,130,246,0.22); }
+
+.resultLeft {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  flex: 1;
+  min-width: 0;
+}
+
+.resultAv {
+  width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 800;
+  color: white; overflow: hidden;
+}
+
+.resultAvImg {
+  width: 100%; height: 100%; object-fit: cover; border-radius: 50%;
+}
+
+.resultInfo { flex: 1; min-width: 0; }
+.resultName { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700; color: #EEF2FF; margin-bottom: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.resultHandle { font-size: 12px; color: #6B7A9E; margin-bottom: 4px; }
+.resultSport { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 100px; background: rgba(59,130,246,0.12); color: #60A5FA; border: 1px solid rgba(59,130,246,0.22); margin-bottom: 4px; }
+.resultBio { font-size: 12px; color: #6B7A9E; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-style: italic; }
+
+/* Follow button */
+.followBtn {
+  font-family: 'Syne', sans-serif;
+  font-size: 13px; font-weight: 700;
+  color: #EEF2FF; background: #3B82F6;
+  border: none; border-radius: 8px;
+  padding: 8px 16px; cursor: pointer;
+  transition: all 0.2s; flex-shrink: 0;
+  white-space: nowrap;
+}
+.followBtn:hover { background: #60A5FA; transform: translateY(-1px); }
+.followBtn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+.followingBtn {
+  background: #151e2e;
+  border: 1px solid rgba(59,130,246,0.3);
+  color: #60A5FA;
+}
+.followingBtn:hover {
+  background: rgba(239,68,68,0.1);
+  border-color: rgba(239,68,68,0.3);
+  color: #F87171;
+}
+
+@media (max-width: 600px) {
+  .page { padding: 5rem 1rem 4rem; }
+  .resultCard { padding: 0.875rem 1rem; }
+  .resultAv { width: 38px; height: 38px; font-size: 12px; }
+  .resultName { font-size: 14px; }
+  .followBtn { padding: 7px 12px; font-size: 12px; }
+}

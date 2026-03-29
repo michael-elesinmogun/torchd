@@ -105,13 +105,14 @@
 
 /* Follow row */
 .followRow { display:flex; align-items:center; justify-content:center; gap:1rem; margin-bottom:1.25rem; }
-.followStat { text-align:center; }
+.followStat { text-align:center; background:none; border:none; cursor:pointer; padding:0; }
 .followNum { font-family:'Syne',sans-serif; font-size:18px; font-weight:800; color:#EEF2FF; display:block; }
 .followLabel { font-size:11px; color:#6B7A9E; }
 .followDivider { width:1px; height:30px; background:rgba(255,255,255,0.065); }
 
 .followBtn { width:100%; border-radius:10px; padding:10px; font-family:'Syne',sans-serif; font-size:14px; font-weight:700; cursor:pointer; transition:all 0.2s; margin-bottom:8px; background:#3B82F6; border:none; color:#EEF2FF; }
 .followBtn:hover { background:#60A5FA; transform:translateY(-1px); }
+.followBtn:disabled { opacity:0.6; cursor:not-allowed; transform:none; }
 .followingBtn { background:#151e2e; border:1px solid rgba(59,130,246,0.3); color:#60A5FA; }
 .followingBtn:hover { background:rgba(239,68,68,0.1); border-color:rgba(239,68,68,0.3); color:#F87171; }
 
@@ -203,13 +204,6 @@
 .emptyBtn { display:inline-flex; align-items:center; background:#3B82F6; border-radius:10px; padding:10px 20px; font-family:'Syne',sans-serif; font-size:14px; font-weight:700; color:#EEF2FF; text-decoration:none; transition:all 0.2s; }
 .emptyBtn:hover { background:#60A5FA; transform:translateY(-1px); }
 
-@media(max-width:900px){
-  .layout{grid-template-columns:1fr;}
-  .sidebar{position:static;}
-  .navLinks{display:none;}
-  .btnGhost{display:none;}
-}
-
 /* ─── HANDLE EDITING ─── */
 .profileHandleRow { display:flex; align-items:center; gap:6px; justify-content:center; margin-bottom:4px; }
 .profileHandle { font-size:13px; color:#6B7A9E; }
@@ -235,7 +229,42 @@
 }
 .settingsBtn:hover { color: #EEF2FF; border-color: rgba(59,130,246,0.22); }
 
-/* ─── MOBILE RESPONSIVE ─── */
+/* ─── FOLLOW LIST ─── */
+.followList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem 0;
+}
+
+.followListItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0.875rem 1.25rem;
+  background: #0f1623;
+  border: 1px solid rgba(255,255,255,0.065);
+  border-radius: 12px;
+  text-decoration: none;
+  transition: border-color 0.2s;
+  cursor: pointer;
+}
+
+.followListItem:hover { border-color: rgba(59,130,246,0.22); }
+
+.followListAv {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 800;
+  color: white; flex-shrink: 0;
+}
+
+.followListName {
+  font-family: 'Syne', sans-serif;
+  font-size: 14px; font-weight: 700; color: #EEF2FF;
+}
+
+/* ─── RESPONSIVE ─── */
 @media(max-width:900px){
   .layout { grid-template-columns: 1fr; }
   .sidebar { position: static; }
@@ -245,45 +274,28 @@
 
 @media(max-width:600px){
   .page { padding: 1.5rem 1rem 4rem; }
-
-  /* Profile card */
   .profileCard { padding: 1.5rem 1.25rem; }
   .avatar { width: 70px; height: 70px; font-size: 24px; }
   .avatarImg { width: 70px; height: 70px; }
   .avatarContainer { width: 70px; height: 70px; }
   .profileName { font-size: 16px; }
-
-  /* Stats grid */
   .statsGrid { grid-template-columns: 1fr 1fr; }
-
-  /* Tabs */
   .tabs { overflow-x: auto; }
   .tab { font-size: 12px; padding: 8px 8px; white-space: nowrap; }
-
-  /* Checklist */
   .checklistCard { padding: 1.25rem; }
   .checklistTitle { font-size: 15px; }
   .checklistPct { font-size: 20px; }
-
-  /* First battle card */
   .firstBattleCard { padding: 1.5rem 1.25rem; }
   .firstBattleTitle { font-size: 18px; }
-
-  /* Topics */
   .topicRow { flex-direction: column; align-items: flex-start; gap: 0.5rem; }
   .topicDebateBtn { align-self: flex-end; }
-
-  /* Side cards */
   .sideCard { padding: 1rem; }
   .sportsEditGrid { gap: 4px; }
   .sportEditBtn { font-size: 11px; padding: 4px 8px; }
   .teamsEditGrid { gap: 4px; }
   .teamEditBtn { font-size: 10px; padding: 3px 7px; }
-
-  /* Handle edit */
   .handleEditWrap { flex-wrap: wrap; justify-content: center; }
   .handleInput { width: 100px; }
-
-  /* Empty states */
   .emptyState { padding: 2rem 1.25rem; }
+  .followListItem { padding: 0.75rem 1rem; }
 }
