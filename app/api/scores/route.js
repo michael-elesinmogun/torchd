@@ -40,9 +40,10 @@ export async function GET(request) {
         shortName: event.shortName,
         date: event.date,
         status: {
-          type: status?.type?.name, // STATUS_SCHEDULED, STATUS_IN_PROGRESS, STATUS_FINAL
+          type: status?.type?.name,
           description: status?.type?.description,
           detail: status?.type?.detail || status?.displayClock,
+          shortDetail: status?.type?.shortDetail,
           period: status?.period,
           clock: status?.displayClock,
           completed: status?.type?.completed,

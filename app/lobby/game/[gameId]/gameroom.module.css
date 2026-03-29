@@ -2,21 +2,23 @@
   background: #060912;
   color: #EEF2FF;
   font-family: 'DM Sans', sans-serif;
-  min-height: 100vh;
+  height: 100vh;
   padding-top: 62px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 /* SCORE HEADER */
 .scoreHeader {
-  background: #0f1623;
+  background: #0a0f1e;
   border-bottom: 1px solid rgba(255,255,255,0.065);
-  padding: 1rem clamp(1rem, 4vw, 2rem);
+  padding: 0.875rem clamp(1rem, 4vw, 2rem);
   display: flex;
   align-items: center;
   gap: 1.5rem;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .backBtn {
@@ -29,6 +31,8 @@
   display: flex; align-items: center; gap: 1.5rem;
   flex: 1; justify-content: center;
 }
+
+
 
 .scoreBoardLoading { flex: 1; text-align: center; font-size: 14px; color: #6B7A9E; }
 
@@ -79,11 +83,32 @@
 }
 .debateBtn:hover { background: #60A5FA; }
 
+/* TWO COLUMN LAYOUT */
+.mainContent {
+  flex: 1; display: flex;
+  min-height: 0;
+  overflow: hidden;
+  border-top: 1px solid rgba(255,255,255,0.065);
+  user-select: none;
+}
+
+.gamecastCol {
+  display: flex; flex-direction: column;
+  min-height: 0; flex-shrink: 0;
+}
+
+.colHeader {
+  font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
+  color: #EEF2FF; padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid rgba(255,255,255,0.065);
+  flex-shrink: 0;
+}
+
 /* CHAT */
 .chatWrap {
-  flex: 1; display: flex; flex-direction: column;
-  max-width: 800px; width: 100%; margin: 0 auto;
-  padding: 0 clamp(1rem, 4vw, 2rem);
+  display: flex; flex-direction: column;
+  min-height: 0; flex-shrink: 0;
+  padding: 0 clamp(1rem, 2vw, 1.5rem);
 }
 
 .chatHeader {
@@ -107,9 +132,9 @@
 }
 
 .messages {
-  flex: 1; overflow-y: auto; padding: 1rem 0;
-  display: flex; flex-direction: column; gap: 4px;
-  min-height: calc(100vh - 280px);
+  flex: 1; overflow-y: auto; padding: 0.5rem 0;
+  display: flex; flex-direction: column; gap: 0;
+  height: 0;
   scrollbar-width: thin; scrollbar-color: #1c2840 transparent;
 }
 
@@ -121,30 +146,49 @@
 .chatEmptySub { font-size: 13px; color: #6B7A9E; }
 
 .message {
-  display: flex; flex-direction: column; max-width: 75%;
-  align-self: flex-start;
+  display: flex; gap: 8px; align-items: flex-start;
+  padding: 0.25rem 0;
+  animation: msgIn 0.25s ease both;
 }
 
-.messageMe { align-self: flex-end; align-items: flex-end; }
+.chatRow {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 0.5rem 1rem;
+  animation: msgIn 0.25s ease both;
+  position: relative;
+}
+.chatRow:hover { background: rgba(255,255,255,0.02); }
+.chatRow:hover .msgReactBtn { opacity: 1; }
+
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.messageMe { flex-direction: row-reverse; }
+
+.messageAvatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: #3B82F6; display: flex; align-items: center; justify-content: center;
+  font-family: 'Syne', sans-serif; font-size: 10px; font-weight: 800;
+  color: white; flex-shrink: 0; margin-top: 2px;
+}
+
+.messageBody { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
 
 .messageUsername {
-  font-size: 11px; color: #6B7A9E; margin-bottom: 2px; padding: 0 4px;
+  font-size: 11px; color: #6B7A9E; padding: 0 4px;
 }
 
 .messageBubble {
-  background: #151e2e; border-radius: 4px 14px 14px 14px;
-  padding: 8px 12px; font-size: 14px; color: #EEF2FF;
-  line-height: 1.5; word-break: break-word;
-}
-
-.messageMe .messageBubble {
-  background: rgba(59,130,246,0.15);
-  border: 1px solid rgba(59,130,246,0.2);
-  border-radius: 14px 4px 14px 14px;
+  display: inline-block;
+  background: #151e2e; border-radius: 4px 12px 12px 12px;
+  padding: 7px 11px; font-size: 13px; color: #EEF2FF;
+  line-height: 1.5; word-break: break-word; max-width: 100%;
 }
 
 .messageTime {
-  font-size: 10px; color: #3D4A66; padding: 2px 4px;
+  font-size: 10px; color: #3D4A66; padding: 0 4px;
 }
 
 /* Input */
@@ -207,6 +251,9 @@
 
 .cameraWrap {
   border-bottom: 1px solid rgba(255,255,255,0.065);
+  position: relative; flex-shrink: 0; overflow: hidden;
+  display: flex; flex-direction: column;
+  will-change: height;
 }
 
 .cameraHeader {
@@ -225,8 +272,8 @@
 .leaveCameraBtn:hover { color: #F87171; border-color: rgba(239,68,68,0.3); }
 
 .cameraFrame {
-  width: 100%; height: 400px; border: none; display: block;
-  background: #060912;
+  width: 100%; flex: 1; border: none; display: block;
+  background: #060912; min-height: 0;
 }
 
 @media (max-width: 600px) {
@@ -234,3 +281,131 @@
   .joinCameraBtn { width: 100%; text-align: center; }
   .cameraFrame { height: 280px; }
 }
+
+/* TABS */
+.tabs { display: flex; gap: 4px; }
+
+.tab {
+  font-size: 13px; font-weight: 600; color: #6B7A9E;
+  background: none; border: none; border-bottom: 2px solid transparent;
+  padding: 8px 12px; cursor: pointer; transition: all 0.2s;
+  font-family: 'DM Sans', sans-serif;
+}
+.tab:hover { color: #EEF2FF; }
+.tabActive { color: #EEF2FF; border-bottom-color: #3B82F6; }
+
+/* GAMECAST */
+.gamecastWrap {
+  flex: 1; overflow-y: auto; padding: 0;
+  display: flex; flex-direction: column; gap: 0;
+  height: 0;
+  scrollbar-width: thin; scrollbar-color: #1c2840 transparent;
+}
+
+.play {
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  display: flex; flex-direction: column; gap: 4px;
+  transition: background 0.15s;
+  animation: playSlideIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-fill-mode: both;
+}
+
+@keyframes playSlideIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+.play:hover { background: rgba(255,255,255,0.02); }
+
+.playScoring {
+  background: rgba(59,130,246,0.05) !important;
+  border-left: 3px solid #3B82F6;
+  padding-left: calc(1.25rem - 3px);
+}
+
+.playClock {
+  font-size: 10px; font-weight: 700; color: #3D4A66;
+  text-transform: uppercase; letter-spacing: 0.06em;
+}
+
+.playText { font-size: 13px; color: #C4CCDF; line-height: 1.55; }
+.playScoring .playText { color: #EEF2FF; font-weight: 500; }
+
+.playScore {
+  font-family: 'Syne', sans-serif; font-size: 13px;
+  font-weight: 800; color: #3B82F6;
+}
+
+/* DRAG DIVIDER */
+.divider {
+  width: 6px; flex-shrink: 0;
+  background: rgba(255,255,255,0.04);
+  border-left: 1px solid rgba(255,255,255,0.065);
+  border-right: 1px solid rgba(255,255,255,0.065);
+  cursor: col-resize;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s;
+  z-index: 10;
+}
+.divider:hover { background: rgba(59,130,246,0.15); }
+
+.dividerHandle {
+  width: 2px; height: 40px; border-radius: 2px;
+  background: rgba(255,255,255,0.15);
+}
+.divider:hover .dividerHandle { background: #3B82F6; }
+
+/* REACTIONS */
+.reactionsBar {
+  display: flex; gap: 4px; padding: 6px 0;
+  border-top: 1px solid rgba(255,255,255,0.065);
+  flex-wrap: wrap; flex-shrink: 0;
+}
+
+.reactionBtn {
+  background: #151e2e; border: 1px solid rgba(255,255,255,0.065);
+  border-radius: 8px; padding: 5px 8px; font-size: 16px;
+  cursor: pointer; transition: all 0.15s; line-height: 1;
+}
+.reactionBtn:hover { background: #1c2840; border-color: rgba(59,130,246,0.22); transform: scale(1.15); }
+
+/* VERTICAL DRAG DIVIDER */
+.verticalDivider {
+  height: 8px; width: 100%; flex-shrink: 0;
+  background: rgba(255,255,255,0.04);
+  border-top: 1px solid rgba(255,255,255,0.065);
+  cursor: row-resize;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s;
+  position: absolute; bottom: 0; left: 0; right: 0;
+}
+.verticalDivider:hover { background: rgba(59,130,246,0.15); }
+
+.verticalDividerHandle {
+  width: 40px; height: 2px; border-radius: 2px;
+  background: rgba(255,255,255,0.15);
+}
+.verticalDivider:hover .verticalDividerHandle { background: #3B82F6; }
+
+/* MESSAGE REACTIONS */
+.msgReactBtn {
+  opacity: 0; position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%);
+  background: #1c2840; border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px; padding: 3px 7px; cursor: pointer;
+  font-size: 14px; transition: all 0.15s; color: #6B7A9E;
+}
+.msgReactBtn:hover { background: #253452; color: #EEF2FF; }
+
+.msgReactions {
+  display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px;
+}
+
+.msgReaction {
+  display: inline-flex; align-items: center; gap: 3px;
+  background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2);
+  border-radius: 100px; padding: 2px 8px;
+  font-size: 12px; cursor: pointer; transition: all 0.15s;
+  color: #EEF2FF;
+}
+.msgReaction:hover { background: rgba(59,130,246,0.2); }
+.msgReactionCount { font-size: 11px; color: #6B7A9E; }
