@@ -24,7 +24,6 @@ const SUGGESTED_TOPICS = {
 
 const AVATAR_COLORS = ['#3B82F6','#10B981','#F59E0B','#8B5CF6','#EF4444','#06B6D4','#EC4899','#F97316'];
 
-// Defined OUTSIDE the parent so React doesn't treat it as a new component on every render
 function UserCard({ u, index, styles }) {
   const bg = AVATAR_COLORS[index % AVATAR_COLORS.length];
   const initials = u.full_name
@@ -34,13 +33,11 @@ function UserCard({ u, index, styles }) {
   return (
     <Link href={`/profile/${u.username}`} className={styles.followListItem}>
       <div className={styles.followListAv} style={{ background: bg }}>
-        {u.avatar_url
-          ? <img src={u.avatar_url} alt={u.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-          : initials}
+        {initials}
       </div>
       <div>
         <div className={styles.followListName}>{u.full_name || u.username}</div>
-        <div className={styles.followListHandle} style={{ fontSize: '12px', color: '#6B7A9E' }}>@{u.username}</div>
+        <div style={{ fontSize: '12px', color: '#6B7A9E' }}>@{u.username}</div>
       </div>
     </Link>
   );
@@ -107,7 +104,7 @@ export default function Profile({ params }) {
         .from('profiles')
         .select('*')
         .eq('username', username)
-        .single();
+        .maybeSingle(); // ← safe: returns null instead of 406
 
       if (profileData) {
         setProfile(profileData);
@@ -134,7 +131,7 @@ export default function Profile({ params }) {
         setInitials(username.slice(0, 2).toUpperCase());
       }
 
-      // Fetch followers — get IDs then look up profiles
+      // Followers — get IDs, then fetch usernames + names only (no avatar_url to avoid bad URLs)
       const { data: followersRaw } = await supabase
         .from('follows')
         .select('follower_id')
@@ -146,14 +143,14 @@ export default function Profile({ params }) {
       if (followerIds.length > 0) {
         const { data: followerProfiles } = await supabase
           .from('profiles')
-          .select('username, full_name, avatar_url')
+          .select('username, full_name')
           .in('id', followerIds);
         setFollowerList(followerProfiles || []);
       } else {
         setFollowerList([]);
       }
 
-      // Fetch following — look up profiles by username
+      // Following — fetch usernames + names only
       if (profileData?.id) {
         const { data: followingRaw } = await supabase
           .from('follows')
@@ -166,7 +163,7 @@ export default function Profile({ params }) {
         if (followingUsernames.length > 0) {
           const { data: followingProfiles } = await supabase
             .from('profiles')
-            .select('username, full_name, avatar_url')
+            .select('username, full_name')
             .in('username', followingUsernames);
           setFollowingList(followingProfiles || []);
         } else {
@@ -174,20 +171,20 @@ export default function Profile({ params }) {
         }
       }
 
-      setListsLoading(false);
-
-      // Check if current user follows this profile
+      // ← KEY FIX: maybeSingle() instead of single() — no 406 when not following
       if (currentUser) {
         const { data: existingFollow } = await supabase
           .from('follows')
           .select('id')
           .eq('follower_id', currentUser.id)
           .eq('following_username', username)
-          .single();
+          .maybeSingle();
         setIsFollowing(!!existingFollow);
       }
 
-      // Battle history
+      // Always runs now — was blocked before by the 406 crash above
+      setListsLoading(false);
+
       const { data: battleData } = await supabase
         .from('battles')
         .select('*')
@@ -208,7 +205,6 @@ export default function Profile({ params }) {
     if (!user) { router.push('/login'); return; }
     if (followLoading) return;
     setFollowLoading(true);
-
     if (isFollowing) {
       setIsFollowing(false);
       setFollowerCount(c => c - 1);
@@ -250,7 +246,7 @@ export default function Profile({ params }) {
     if (!/^[a-z0-9_]+$/.test(handleInput)) { setHandleError('Only letters, numbers and underscores'); return; }
     setSavingHandle(true);
     setHandleError('');
-    const { data: existing } = await supabase.from('profiles').select('username').eq('username', handleInput).single();
+    const { data: existing } = await supabase.from('profiles').select('username').eq('username', handleInput).maybeSingle();
     if (existing) { setHandleError('That username is already taken'); setSavingHandle(false); return; }
     const { error } = await supabase.from('profiles').update({ username: handleInput }).eq('id', user.id);
     setSavingHandle(false);
