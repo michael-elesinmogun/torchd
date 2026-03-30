@@ -5,14 +5,7 @@ import Link from 'next/link';
 import { supabase } from '../../../supabase';
 import styles from './room.module.css';
 
-const ICE_SERVERS = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-  ],
-};
-
-const ROUND_DURATION = 120; // 2 minutes per round
+const ROUND_DURATION = 120;
 const TOTAL_ROUNDS = 3;
 
 const ROUND_CONFIG = {
@@ -35,28 +28,22 @@ export default function BattleRoom({ params }) {
   const [messages, setMessages] = useState([]);
   const [copied, setCopied] = useState(false);
   const [videoJoined, setVideoJoined] = useState(false);
-  const [remoteConnected, setRemoteConnected] = useState(false);
-  const [micOn, setMicOn] = useState(true);
-  const [camOn, setCamOn] = useState(true);
-  const [connectionStatus, setConnectionStatus] = useState('');
+  const [participantCount, setParticipantCount] = useState(0);
 
+  // Round system
   const [currentRound, setCurrentRound] = useState(0);
   const [roundTimeLeft, setRoundTimeLeft] = useState(ROUND_DURATION);
   const [battleEnded, setBattleEnded] = useState(false);
   const [winner, setWinner] = useState(null);
+
   const roundTimerRef = useRef(null);
   const currentRoundRef = useRef(0);
-
-  const localVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
-  const pcRef = useRef(null);
-  const signalingChannelRef = useRef(null);
-  const localStreamRef = useRef(null);
+  const callFrameRef = useRef(null);
   const chatBottomRef = useRef(null);
   const profileRef = useRef(null);
   const battleRef = useRef(null);
   const votesRef = useRef({ player1: 0, player2: 0 });
-  const remoteConnectedRef = useRef(false);
+  const isPlayer1Ref = useRef(false);
 
   useEffect(() => {
     async function init() {
@@ -91,9 +78,7 @@ export default function BattleRoom({ params }) {
       }
 
       const { data: voteData } = await supabase
-        .from('votes')
-        .select('side')
-        .eq('battle_id', id);
+        .from('votes').select('side').eq('battle_id', id);
 
       if (voteData) {
         const v = {
@@ -106,10 +91,8 @@ export default function BattleRoom({ params }) {
 
       if (currentUser) {
         const { data: existingVote } = await supabase
-          .from('votes')
-          .select('side')
-          .eq('battle_id', id)
-          .eq('user_id', currentUser.id)
+          .from('votes').select('side')
+          .eq('battle_id', id).eq('user_id', currentUser.id)
           .maybeSingle();
         if (existingVote) setVoted(existingVote.side);
       }
@@ -118,18 +101,12 @@ export default function BattleRoom({ params }) {
 
       const voteChannel = supabase
         .channel(`votes-${id}`)
-        .on('postgres_changes', {
-          event: '*', schema: 'public', table: 'votes',
-          filter: `battle_id=eq.${id}`,
-        }, () => loadVotes())
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'votes', filter: `battle_id=eq.${id}` }, () => loadVotes())
         .subscribe();
 
       const battleChannel = supabase
         .channel(`battle-status-${id}`)
-        .on('postgres_changes', {
-          event: 'UPDATE', schema: 'public', table: 'battles',
-          filter: `id=eq.${id}`,
-        }, (payload) => {
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'battles', filter: `id=eq.${id}` }, (payload) => {
           const updated = payload.new;
           setBattle(updated);
           battleRef.current = updated;
@@ -141,16 +118,20 @@ export default function BattleRoom({ params }) {
         })
         .subscribe();
 
+      // Round sync via Supabase broadcast
+      const roundChannel = supabase
+        .channel(`round-sync-${id}`, { config: { broadcast: { self: false } } })
+        .on('broadcast', { event: 'start-round' }, ({ payload }) => {
+          startRound(payload.round);
+        })
+        .subscribe();
+
       const chatChannel = supabase
         .channel(`battle-chat-${id}`)
-        .on('postgres_changes', {
-          event: 'INSERT', schema: 'public', table: 'game_chats',
-          filter: `game_id=eq.battle-${id}`,
-        }, (payload) => {
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'game_chats', filter: `game_id=eq.battle-${id}` }, (payload) => {
           const row = payload.new;
           setMessages(prev => [...prev, {
-            name: row.username,
-            text: row.message,
+            name: row.username, text: row.message,
             isMe: row.user_id === currentUser?.id,
             time: new Date(row.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
           }]);
@@ -158,16 +139,12 @@ export default function BattleRoom({ params }) {
         .subscribe();
 
       const { data: existingChats } = await supabase
-        .from('game_chats')
-        .select('*')
-        .eq('game_id', `battle-${id}`)
-        .order('created_at', { ascending: true })
-        .limit(100);
+        .from('game_chats').select('*').eq('game_id', `battle-${id}`)
+        .order('created_at', { ascending: true }).limit(100);
 
       if (existingChats) {
         setMessages(existingChats.map(row => ({
-          name: row.username,
-          text: row.message,
+          name: row.username, text: row.message,
           isMe: row.user_id === currentUser?.id,
           time: new Date(row.created_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
         })));
@@ -176,14 +153,18 @@ export default function BattleRoom({ params }) {
       return () => {
         supabase.removeChannel(voteChannel);
         supabase.removeChannel(battleChannel);
+        supabase.removeChannel(roundChannel);
         supabase.removeChannel(chatChannel);
       };
     }
 
     init();
     return () => {
-      cleanupWebRTC();
       clearInterval(roundTimerRef.current);
+      if (callFrameRef.current) {
+        callFrameRef.current.destroy();
+        callFrameRef.current = null;
+      }
     };
   }, [id]);
 
@@ -191,7 +172,7 @@ export default function BattleRoom({ params }) {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // ── Round timer ──────────────────────────────────────────────────────────────
+  // ── Round system ─────────────────────────────────────────────────────────────
 
   function startRound(round) {
     clearInterval(roundTimerRef.current);
@@ -204,12 +185,9 @@ export default function BattleRoom({ params }) {
       setRoundTimeLeft(prev => {
         if (prev <= 1) {
           clearInterval(roundTimerRef.current);
-          const nextRound = currentRoundRef.current + 1;
-          if (nextRound > TOTAL_ROUNDS) {
-            declareWinner();
-          } else {
-            startRound(nextRound);
-          }
+          const next = currentRoundRef.current + 1;
+          if (next > TOTAL_ROUNDS) declareWinner();
+          else startRound(next);
           return 0;
         }
         return prev - 1;
@@ -218,20 +196,18 @@ export default function BattleRoom({ params }) {
   }
 
   function enforceMicForRound(round) {
-    const profileData = profileRef.current;
+    if (!callFrameRef.current) return;
     const battleData = battleRef.current;
-    if (!profileData || !battleData || !localStreamRef.current) return;
+    const profileData = profileRef.current;
+    if (!battleData || !profileData) return;
 
     const isP1 = battleData.player1_username === profileData.username;
     const config = ROUND_CONFIG[round];
-
     let shouldHaveMic = true;
     if (config.speaker === 'player1') shouldHaveMic = isP1;
     else if (config.speaker === 'player2') shouldHaveMic = !isP1;
-    else shouldHaveMic = true;
 
-    localStreamRef.current.getAudioTracks().forEach(t => { t.enabled = shouldHaveMic; });
-    setMicOn(shouldHaveMic);
+    callFrameRef.current.setLocalAudio(shouldHaveMic);
   }
 
   async function declareWinner() {
@@ -239,15 +215,12 @@ export default function BattleRoom({ params }) {
     const battleData = battleRef.current;
     if (!battleData) return;
 
-    let winnerUsername = null;
+    let winnerUsername = 'tie';
     if (v.player1 > v.player2) winnerUsername = battleData.player1_username;
     else if (v.player2 > v.player1) winnerUsername = battleData.player2_username;
-    else winnerUsername = 'tie';
 
     await supabase.from('battles').update({
-      status: 'ended',
-      winner: winnerUsername,
-      ended_at: new Date().toISOString(),
+      status: 'ended', winner: winnerUsername, ended_at: new Date().toISOString(),
     }).eq('id', id);
 
     setBattleEnded(true);
@@ -257,10 +230,7 @@ export default function BattleRoom({ params }) {
   async function loadVotes() {
     const { data } = await supabase.from('votes').select('side').eq('battle_id', id);
     if (data) {
-      const v = {
-        player1: data.filter(v => v.side === 'player1').length,
-        player2: data.filter(v => v.side === 'player2').length,
-      };
+      const v = { player1: data.filter(v => v.side === 'player1').length, player2: data.filter(v => v.side === 'player2').length };
       setVotes(v);
       votesRef.current = v;
     }
@@ -279,142 +249,101 @@ export default function BattleRoom({ params }) {
     }
   }
 
-  // ── WebRTC ───────────────────────────────────────────────────────────────────
-
-  function createPeerConnection(stream, battleData, profileData) {
-    const pc = new RTCPeerConnection(ICE_SERVERS);
-    pcRef.current = pc;
-    stream.getTracks().forEach(track => pc.addTrack(track, stream));
-
-    pc.ontrack = (event) => {
-      if (remoteVideoRef.current) remoteVideoRef.current.srcObject = event.streams[0];
-      remoteConnectedRef.current = true;
-      setRemoteConnected(true);
-      setConnectionStatus('Connected!');
-    };
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate && signalingChannelRef.current) {
-        signalingChannelRef.current.send({
-          type: 'broadcast', event: 'ice-candidate',
-          payload: { candidate: event.candidate, from: profileData.username },
-        });
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      const state = pc.connectionState;
-      if (state === 'connected') {
-        remoteConnectedRef.current = true;
-        setConnectionStatus('Connected!');
-        setRemoteConnected(true);
-      } else if (state === 'disconnected' || state === 'failed') {
-        remoteConnectedRef.current = false;
-        setConnectionStatus('Opponent disconnected');
-        setRemoteConnected(false);
-      }
-    };
-
-    return pc;
-  }
+  // ── Daily.co iframe ──────────────────────────────────────────────────────────
 
   async function joinVideo() {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-      localStreamRef.current = stream;
-      setVideoJoined(true);
-      if (localVideoRef.current) localVideoRef.current.srcObject = stream;
-
-      const { data: battleData } = await supabase.from('battles').select('*').eq('id', id).single();
+      const battleData = battleRef.current;
       const profileData = profileRef.current;
       const isPlayer1 = battleData.player1_username === profileData?.username;
+      isPlayer1Ref.current = isPlayer1;
 
-      if (isPlayer1) {
-        await supabase.from('battles').update({ status: 'waiting' }).eq('id', id);
-      } else {
-        await supabase.from('battles').update({ status: 'live', player2_username: profileData?.username }).eq('id', id);
+      // Update battle status
+      if (!isPlayer1) {
+        await supabase.from('battles').update({
+          status: 'live', player2_username: profileData?.username,
+        }).eq('id', id);
+        setBattle(prev => ({ ...prev, status: 'live', player2_username: profileData?.username }));
       }
 
-      setBattle(prev => ({
-        ...prev,
-        status: isPlayer1 ? 'waiting' : 'live',
-        player2_username: isPlayer1 ? prev.player2_username : profileData?.username,
-      }));
-
-      const signalingChannel = supabase.channel(`webrtc-${id}`, { config: { broadcast: { self: false } } });
-      signalingChannelRef.current = signalingChannel;
-      const pc = createPeerConnection(stream, battleData, profileData);
-
-      signalingChannel
-        .on('broadcast', { event: 'offer' }, async ({ payload }) => {
-          if (payload.to !== profileData?.username) return;
-          setConnectionStatus('Connecting...');
-          await pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          signalingChannel.send({ type: 'broadcast', event: 'answer', payload: { answer, to: payload.from, from: profileData?.username } });
-        })
-        .on('broadcast', { event: 'answer' }, async ({ payload }) => {
-          if (payload.to !== profileData?.username) return;
-          await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
-        })
-        .on('broadcast', { event: 'ice-candidate' }, async ({ payload }) => {
-          if (payload.from === profileData?.username) return;
-          try { await pc.addIceCandidate(new RTCIceCandidate(payload.candidate)); } catch (e) { console.warn('ICE error:', e); }
-        })
-        .on('broadcast', { event: 'peer-joined' }, async ({ payload }) => {
-          if (isPlayer1 && payload.username !== profileData?.username) {
-            setConnectionStatus('Opponent joined — connecting...');
-            const offer = await pc.createOffer();
-            await pc.setLocalDescription(offer);
-            signalingChannel.send({ type: 'broadcast', event: 'offer', payload: { offer, to: payload.username, from: profileData?.username } });
-          }
-        })
-        .on('broadcast', { event: 'start-round' }, ({ payload }) => {
-          startRound(payload.round);
-        })
-        .subscribe(async (status) => {
-          if (status === 'SUBSCRIBED') {
-            signalingChannel.send({ type: 'broadcast', event: 'peer-joined', payload: { username: profileData?.username } });
-            if (!isPlayer1) setConnectionStatus('Waiting for opponent camera...');
-          }
+      // Load Daily.co script dynamically
+      if (!window.DailyIframe) {
+        await new Promise((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://unpkg.com/@daily-co/daily-js';
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
         });
+      }
+
+      const frame = window.DailyIframe.createFrame(
+        document.getElementById('daily-container'),
+        {
+          iframeStyle: {
+            width: '100%',
+            height: '100%',
+            border: 'none',
+            borderRadius: '14px',
+          },
+          showLeaveButton: false,
+          showFullscreenButton: false,
+        }
+      );
+
+      callFrameRef.current = frame;
+
+      frame.on('joined-meeting', () => {
+        setVideoJoined(true);
+      });
+
+      frame.on('participant-joined', (e) => {
+        setParticipantCount(prev => prev + 1);
+      });
+
+      frame.on('participant-left', (e) => {
+        setParticipantCount(prev => Math.max(0, prev - 1));
+      });
+
+      frame.on('left-meeting', () => {
+        leaveVideo();
+      });
+
+      await frame.join({ url: battleData.room_url });
 
     } catch (err) {
-      alert('Could not access camera/microphone. Please check permissions.');
+      console.error('Daily join error:', err);
+      alert('Could not join video room. Please check your connection.');
     }
   }
 
   function handleStartBattle() {
-    // Hard guard — both players must be connected and present
-    if (!remoteConnectedRef.current || !battleRef.current?.player2_username) return;
+    const battleData = battleRef.current;
+    if (!battleData?.player2_username || participantCount < 1) return;
 
-    signalingChannelRef.current?.send({
+    // Broadcast round start to both players via Supabase
+    supabase.channel(`round-sync-${id}`).send({
       type: 'broadcast', event: 'start-round', payload: { round: 1 },
     });
     startRound(1);
   }
 
-  function cleanupWebRTC() {
-    if (pcRef.current) { pcRef.current.close(); pcRef.current = null; }
-    if (signalingChannelRef.current) { supabase.removeChannel(signalingChannelRef.current); signalingChannelRef.current = null; }
-    if (localStreamRef.current) { localStreamRef.current.getTracks().forEach(t => t.stop()); localStreamRef.current = null; }
-  }
-
-  function leaveVideo() {
+  async function leaveVideo() {
     clearInterval(roundTimerRef.current);
-    cleanupWebRTC();
+
+    if (callFrameRef.current) {
+      try { await callFrameRef.current.leave(); } catch {}
+      try { callFrameRef.current.destroy(); } catch {}
+      callFrameRef.current = null;
+    }
+
     setVideoJoined(false);
-    setRemoteConnected(false);
-    remoteConnectedRef.current = false;
-    setMicOn(true);
-    setCamOn(true);
-    setConnectionStatus('');
+    setParticipantCount(0);
     setCurrentRound(0);
 
-    if (battle && profileRef.current && (
-      battle.player1_username === profileRef.current.username ||
-      battle.player2_username === profileRef.current.username
+    if (battleRef.current && profileRef.current && (
+      battleRef.current.player1_username === profileRef.current.username ||
+      battleRef.current.player2_username === profileRef.current.username
     )) {
       supabase.from('battles').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', id);
     }
@@ -456,7 +385,7 @@ export default function BattleRoom({ params }) {
   const p2Pct = 100 - p1Pct;
   const isPlayer = user && (battle.player1_username === profile?.username || battle.player2_username === profile?.username);
   const isPlayer1 = profile?.username === battle.player1_username;
-  const bothConnected = remoteConnected && !!battle?.player2_username;
+  const bothInRoom = !!battle?.player2_username && participantCount >= 1;
   const shareLink = typeof window !== 'undefined' ? window.location.href : '';
   const roundConfig = currentRound > 0 ? ROUND_CONFIG[currentRound] : null;
   const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -518,92 +447,59 @@ export default function BattleRoom({ params }) {
             </div>
           )}
 
-          {/* Video stage */}
-          {videoJoined ? (
-            <div className={styles.videoStage}>
-              <video ref={remoteVideoRef} autoPlay playsInline className={styles.remoteVideo} />
+          {/* Daily.co video container — always mounted, hidden when not joined */}
+          <div
+            id="daily-container"
+            style={{
+              width: '100%', aspectRatio: '16/9',
+              background: '#000', borderRadius: '14px', overflow: 'hidden',
+              display: videoJoined ? 'block' : 'none',
+              position: 'relative',
+            }}
+          />
 
-              {!remoteConnected && (
-                <div className={styles.remoteWaiting}>
-                  <div className={styles.remoteWaitingIcon}>⏳</div>
-                  <div className={styles.remoteWaitingText}>{connectionStatus || 'Waiting for opponent to join...'}</div>
-                </div>
-              )}
-
-              <video
-                ref={el => { localVideoRef.current = el; if (el && localStreamRef.current) el.srcObject = localStreamRef.current; }}
-                autoPlay muted playsInline className={styles.localVideo}
-              />
-
-              {connectionStatus && remoteConnected && currentRound === 0 && (
-                <div className={styles.connectionBadge}>🟢 {connectionStatus}</div>
-              )}
-
-              {/* Muted indicator */}
-              {!micOn && currentRound > 0 && (
-                <div style={{
-                  position: 'absolute', top: '12px', left: '12px',
-                  background: 'rgba(239,68,68,0.9)', color: 'white',
-                  fontSize: '11px', fontWeight: 700, borderRadius: '100px',
-                  padding: '4px 10px',
-                }}>
-                  🔇 Your mic is muted this round
-                </div>
-              )}
-
-              {/* Waiting for opponent to start hint */}
-              {remoteConnected && currentRound === 0 && !isPlayer1 && !battleEnded && (
-                <div style={{
-                  position: 'absolute', top: '12px', left: '12px',
-                  background: 'rgba(59,130,246,0.9)', color: 'white',
-                  fontSize: '11px', fontWeight: 700, borderRadius: '100px',
-                  padding: '4px 12px',
-                }}>
-                  ⏳ Waiting for Player 1 to start the battle...
-                </div>
-              )}
-
-              <div className={styles.videoControls}>
-                {/* Start Battle — Player 1 only, BOTH players must be connected */}
-                {isPlayer1 && bothConnected && currentRound === 0 && !battleEnded && (
-                  <button
-                    onClick={handleStartBattle}
-                    style={{
-                      background: '#10B981', border: 'none', borderRadius: '100px',
-                      padding: '0 20px', height: '44px', color: 'white',
-                      fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    ▶ Start Battle
-                  </button>
-                )}
+          {/* Controls below Daily iframe */}
+          {videoJoined && (
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              {/* Start Battle — Player 1, both in room, round not started */}
+              {isPlayer1 && bothInRoom && currentRound === 0 && !battleEnded && (
                 <button
-                  className={`${styles.controlBtn} ${micOn ? '' : styles.controlBtnOff}`}
-                  onClick={() => {
-                    if (currentRound === 3 || currentRound === 0) {
-                      localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = !micOn; });
-                      setMicOn(m => !m);
-                    }
+                  onClick={handleStartBattle}
+                  style={{
+                    background: '#10B981', border: 'none', borderRadius: '100px',
+                    padding: '10px 24px', color: 'white',
+                    fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px',
+                    cursor: 'pointer',
                   }}
                 >
-                  {micOn ? '🎤' : '🔇'}
+                  ▶ Start Battle
                 </button>
-                <button
-                  className={`${styles.controlBtn} ${camOn ? '' : styles.controlBtnOff}`}
-                  onClick={() => {
-                    localStreamRef.current?.getVideoTracks().forEach(t => { t.enabled = !camOn; });
-                    setCamOn(c => !c);
-                  }}
-                >
-                  {camOn ? '📹' : '🚫'}
-                </button>
-                <button className={`${styles.controlBtn} ${styles.controlBtnLeave}`} onClick={leaveVideo}>
-                  Leave
-                </button>
-              </div>
+              )}
+              {!isPlayer1 && bothInRoom && currentRound === 0 && !battleEnded && (
+                <div style={{
+                  background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)',
+                  borderRadius: '100px', padding: '10px 20px',
+                  fontSize: '13px', color: '#60A5FA', fontWeight: 600,
+                }}>
+                  ⏳ Waiting for Player 1 to start...
+                </div>
+              )}
+              <button
+                onClick={leaveVideo}
+                style={{
+                  background: '#EF4444', border: 'none', borderRadius: '100px',
+                  padding: '10px 24px', color: 'white',
+                  fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px',
+                  cursor: 'pointer',
+                }}
+              >
+                Leave
+              </button>
             </div>
-          ) : (
+          )}
+
+          {/* Join prompt */}
+          {!videoJoined && (
             <div className={styles.joinVideoWrap}>
               <div className={styles.joinVideoIcon}>⚔️</div>
               <div className={styles.joinVideoTitle}>
@@ -642,17 +538,9 @@ export default function BattleRoom({ params }) {
               </div>
             )}
 
-            {voted && (
-              <div className={styles.voteCast}>✓ Vote cast — {voted === 'player1' ? battle.player1_username : battle.player2_username}</div>
-            )}
-            {isPlayer && !battleEnded && (
-              <div className={styles.playerNotice}>You're in this battle — you can't vote on your own debate</div>
-            )}
-            {!user && (
-              <div className={styles.loginPrompt}>
-                <Link href="/login" className={styles.loginLink}>Sign in</Link> to vote
-              </div>
-            )}
+            {voted && <div className={styles.voteCast}>✓ Vote cast — {voted === 'player1' ? battle.player1_username : battle.player2_username}</div>}
+            {isPlayer && !battleEnded && <div className={styles.playerNotice}>You're in this battle — you can't vote on your own debate</div>}
+            {!user && <div className={styles.loginPrompt}><Link href="/login" className={styles.loginLink}>Sign in</Link> to vote</div>}
           </div>
 
           {/* Waiting card */}
