@@ -323,6 +323,18 @@
   padding-left: calc(1.25rem - 3px);
 }
 
+.playScoringAway {
+  background: rgba(59,130,246,0.05) !important;
+  border-left: 3px solid var(--away-color, #3B82F6);
+  padding-left: calc(1.25rem - 3px);
+}
+
+.playScoringHome {
+  background: rgba(16,185,129,0.05) !important;
+  border-left: 3px solid var(--home-color, #10B981);
+  padding-left: calc(1.25rem - 3px);
+}
+
 .playClock {
   font-size: 10px; font-weight: 700; color: #3D4A66;
   text-transform: uppercase; letter-spacing: 0.06em;
@@ -409,3 +421,29 @@
 }
 .msgReaction:hover { background: rgba(59,130,246,0.2); }
 .msgReactionCount { font-size: 11px; color: #6B7A9E; }
+
+/* PLAY TEAM LOGO */
+.playHeader {
+  display: flex; align-items: center; gap: 6px;
+}
+
+.playTeamLogo {
+  width: 18px; height: 18px; object-fit: contain; flex-shrink: 0;
+}
+
+/* CHAT EMPTY LOGOS */
+.chatEmptyLogos {
+  display: flex; align-items: center; justify-content: center;
+  gap: 1rem; margin-bottom: 0.75rem;
+}
+
+.chatEmptyLogo {
+  width: 56px; height: 56px; object-fit: contain;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4));
+}
+
+.chatEmptyVs {
+  font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 800;
+  color: #3D4A66; background: #151e2e; border-radius: 6px;
+  padding: 4px 8px;
+}

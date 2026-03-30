@@ -8,7 +8,7 @@ import styles from './gameroom.module.css';
 function getStatusLabel(status) {
   if (status.type === 'STATUS_IN_PROGRESS') return status.detail || status.clock || 'LIVE';
   if (status.type === 'STATUS_HALFTIME') return 'Halftime';
-  if (status.type === 'STATUS_END_PERIOD') return `End of ${status.detail || 'Period'}`;
+  if (status.type === 'STATUS_END_PERIOD') return status.detail || 'End of Period';
   if (status.type === 'STATUS_FINAL') return 'Final';
   const date = new Date(status.detail || '');
   return isNaN(date) ? status.description || 'Upcoming' : date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -293,19 +293,45 @@ export default function GameRoom() {
                 <div className={styles.chatEmptyTitle}>No plays yet</div>
                 <p className={styles.chatEmptySub}>Play-by-play appears here during the game.</p>
               </div>
-            ) : plays.map((play, i) => (
-              <div
-                key={play.id || i}
-                className={`${styles.play} ${play.scoringPlay ? styles.playScoring : ''}`}
-                style={{ animationDelay: `${Math.min(i, 10) * 80}ms` }}
-              >
-                <div className={styles.playClock}>{play.clock} {play.periodText}</div>
-                <div className={styles.playText}>{play.text}</div>
-                {play.scoringPlay && (
-                  <div className={styles.playScore}>{play.awayScore} – {play.homeScore}</div>
-                )}
-              </div>
-            ))}
+            ) : plays.map((play, i) => {
+              // Determine which team scored by comparing score to previous play
+              let scoringClass = '';
+              if (play.scoringPlay) {
+                const prevPlay = plays[i + 1];
+                const awayDiff = prevPlay ? (play.awayScore - prevPlay.awayScore) : 0;
+                const homeDiff = prevPlay ? (play.homeScore - prevPlay.homeScore) : 0;
+                if (awayDiff > 0) scoringClass = styles.playScoringAway;
+                else if (homeDiff > 0) scoringClass = styles.playScoringHome;
+                else scoringClass = styles.playScoring;
+              }
+
+              const awayColor = game?.away?.color ? `#${game.away.color}` : '#3B82F6';
+              const homeColor = game?.home?.color ? `#${game.home.color}` : '#10B981';
+
+              return (
+                <div
+                  key={play.id || i}
+                  className={`${styles.play} ${scoringClass}`}
+                  style={{
+                    animationDelay: `${Math.min(i, 10) * 80}ms`,
+                    '--away-color': awayColor,
+                    '--home-color': homeColor,
+                  }}
+                >
+                  <div className={styles.playHeader}>
+                    <div className={styles.playClock}>{play.clock} {play.periodText}</div>
+                  </div>
+                  <div className={styles.playText}>{play.text}</div>
+                  {play.scoringPlay && game && (
+                    <div className={styles.playScore}>
+                      <span style={{color: awayColor}}>{game.away?.abbr} {play.awayScore}</span>
+                      <span style={{color:'#3D4A66'}}> – </span>
+                      <span style={{color: homeColor}}>{game.home?.abbr} {play.homeScore}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -340,7 +366,13 @@ export default function GameRoom() {
               <div className={styles.chatLoading}>Loading chat...</div>
             ) : messages.length === 0 ? (
               <div className={styles.chatEmpty}>
-                <div className={styles.chatEmptyIcon}>{game ? `${game.away.abbr} 🆚 ${game.home.abbr}` : '💬'}</div>
+                {game ? (
+                  <div className={styles.chatEmptyLogos}>
+                    {game.away.logo && <img src={game.away.logo} alt={game.away.abbr} className={styles.chatEmptyLogo} />}
+                    <span className={styles.chatEmptyVs}>VS</span>
+                    {game.home.logo && <img src={game.home.logo} alt={game.home.abbr} className={styles.chatEmptyLogo} />}
+                  </div>
+                ) : <div className={styles.chatEmptyIcon}>💬</div>}
                 <div className={styles.chatEmptyTitle}>Be the first to react!</div>
                 <p className={styles.chatEmptySub}>{game ? `Chat with other ${game.away.abbr} and ${game.home.abbr} fans watching live.` : 'Chat with other fans.'}</p>
               </div>

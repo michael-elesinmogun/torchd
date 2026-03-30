@@ -37,6 +37,8 @@ export async function GET(request) {
       period: play.period?.number,
       periodText: play.period?.displayValue,
       team: play.team?.abbreviation,
+      teamLogo: play.team?.logo || null,
+      teamColor: play.team?.color || null,
       scoreValue: play.scoreValue,
       scoringPlay: play.scoringPlay,
       awayScore: play.awayScore,
