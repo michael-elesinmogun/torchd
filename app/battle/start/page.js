@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '../../supabase';
@@ -18,18 +18,27 @@ const TOPICS = [
   { tag: 'NFL', text: 'Defensive players should be eligible for MVP' },
 ];
 
+const SEEK_DURATION = 10 * 60; // 10 minutes in seconds
+
 export default function StartBattle() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [step, setStep] = useState(1); // 1: pick topic, 2: pick stance, 3: creating room
+  const [step, setStep] = useState(1);
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [customTopic, setCustomTopic] = useState('');
-  const [stance, setStance] = useState(null); // 'for' | 'against'
+  const [stance, setStance] = useState(null);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
   const [createdBattle, setCreatedBattle] = useState(null);
-  const [copied, setCopied] = useState(false);
+
+  // Seeking / waiting state
+  const [seekTimeLeft, setSeekTimeLeft] = useState(SEEK_DURATION);
+  const [battleAccepted, setBattleAccepted] = useState(false);
+  const [acceptedBy, setAcceptedBy] = useState('');
+  const [seekExpired, setSeekExpired] = useState(false);
+
+  const seekTimerRef = useRef(null);
 
   useEffect(() => {
     async function init() {
@@ -41,12 +50,57 @@ export default function StartBattle() {
         .from('profiles')
         .select('username, full_name')
         .eq('id', session.user.id)
-        .single();
+        .maybeSingle();
 
       setProfile(profileData);
     }
     init();
   }, []);
+
+  // Start countdown + realtime watch when we enter step 3
+  useEffect(() => {
+    if (step !== 3 || !createdBattle) return;
+
+    const expiresAt = new Date(createdBattle.expires_at).getTime();
+    const initialLeft = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
+    setSeekTimeLeft(initialLeft);
+
+    // Tick every second
+    seekTimerRef.current = setInterval(() => {
+      setSeekTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(seekTimerRef.current);
+          // Mark expired in DB
+          supabase.from('battles').update({ status: 'expired' }).eq('id', createdBattle.id);
+          setSeekExpired(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    // Watch for someone accepting (status → live)
+    const channel = supabase
+      .channel(`seeking-watch-${createdBattle.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'battles',
+        filter: `id=eq.${createdBattle.id}`,
+      }, (payload) => {
+        if (payload.new.status === 'live') {
+          clearInterval(seekTimerRef.current);
+          setBattleAccepted(true);
+          setAcceptedBy(payload.new.player2_username || '');
+          // Navigate to battle room after a brief moment
+          setTimeout(() => router.push(`/battle/room/${createdBattle.id}`), 2500);
+        }
+      })
+      .subscribe();
+
+    return () => {
+      clearInterval(seekTimerRef.current);
+      supabase.removeChannel(channel);
+    };
+  }, [step, createdBattle]);
 
   const topic = selectedTopic === 'custom' ? customTopic : selectedTopic?.text || '';
 
@@ -56,21 +110,25 @@ export default function StartBattle() {
     setError('');
 
     try {
-      // 1. Insert battle into Supabase
+      const expiresAt = new Date(Date.now() + SEEK_DURATION * 1000).toISOString();
+
       const { data: battle, error: battleError } = await supabase
         .from('battles')
         .insert({
           topic: topic.trim(),
           player1_username: profile.username,
-          player1_stance: stance === 'for' ? `FOR — ${topic.trim().slice(0, 40)}` : `AGAINST — ${topic.trim().slice(0, 40)}`,
-          status: 'waiting',
+          player1_stance: stance === 'for'
+            ? `FOR — ${topic.trim().slice(0, 40)}`
+            : `AGAINST — ${topic.trim().slice(0, 40)}`,
+          status: 'seeking',
+          expires_at: expiresAt,
         })
         .select()
         .single();
 
       if (battleError) throw new Error(battleError.message);
 
-      // 2. Create Daily.co room
+      // Create Daily.co room upfront
       const roomRes = await fetch('/api/create-room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -80,13 +138,12 @@ export default function StartBattle() {
       const roomData = await roomRes.json();
       if (roomData.error) throw new Error(roomData.error);
 
-      // 3. Save room URL to battle
       await supabase
         .from('battles')
-        .update({ room_url: roomData.url, status: 'waiting' })
+        .update({ room_url: roomData.url })
         .eq('id', battle.id);
 
-      setCreatedBattle({ ...battle, room_url: roomData.url });
+      setCreatedBattle({ ...battle, room_url: roomData.url, expires_at: expiresAt });
       setStep(3);
     } catch (err) {
       setError(err.message);
@@ -95,16 +152,15 @@ export default function StartBattle() {
     }
   }
 
-  function copyLink() {
-    const link = `${window.location.origin}/battle/room/${createdBattle.id}`;
-    navigator.clipboard.writeText(link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  async function cancelChallenge() {
+    if (!createdBattle) return;
+    await supabase.from('battles').update({ status: 'expired' }).eq('id', createdBattle.id);
+    router.push('/battle');
   }
 
-  function joinRoom() {
-    router.push(`/battle/room/${createdBattle.id}`);
-  }
+  const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const timerPct = (seekTimeLeft / SEEK_DURATION) * 100;
+  const timerColor = seekTimeLeft <= 60 ? '#EF4444' : seekTimeLeft <= 180 ? '#F59E0B' : '#3B82F6';
 
   return (
     <main className={styles.main}>
@@ -200,40 +256,76 @@ export default function StartBattle() {
                 onClick={createBattle}
                 disabled={!stance || creating}
               >
-                {creating ? 'Creating your battle room...' : '⚔️ Create Battle Room →'}
+                {creating ? 'Creating your battle room...' : '⚔️ Post Challenge →'}
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 3: Room created */}
+        {/* Step 3: Waiting for opponent */}
         {step === 3 && createdBattle && (
           <div className={styles.stepWrap}>
-            <div className={styles.successIcon}>🔥</div>
-            <h2 className={styles.successTitle}>Your battle room is ready!</h2>
-            <p className={styles.successSub}>Share the link below with your opponent. Once they join, the battle begins.</p>
 
-            <div className={styles.topicDisplay}>"{topic}"</div>
+            {/* Accepted state */}
+            {battleAccepted ? (
+              <div className={styles.acceptedWrap}>
+                <div className={styles.acceptedIcon}>🔥</div>
+                <h2 className={styles.acceptedTitle}>Challenge accepted!</h2>
+                <p className={styles.acceptedSub}>
+                  {acceptedBy ? `@${acceptedBy}` : 'Your opponent'} is ready to battle.
+                  Taking you to the room now...
+                </p>
+                <div className={styles.acceptedSpinner}></div>
+              </div>
+            ) : seekExpired ? (
+              /* Expired state */
+              <div className={styles.expiredWrap}>
+                <div className={styles.expiredIcon}>⏰</div>
+                <h2 className={styles.expiredTitle}>Challenge expired</h2>
+                <p className={styles.expiredSub}>Nobody accepted in 10 minutes. Try posting again.</p>
+                <Link href="/battle/start" className={styles.nextBtn} style={{ textDecoration: 'none', textAlign: 'center' }}>
+                  Post a new challenge →
+                </Link>
+                <Link href="/battle" className={styles.laterBtn}>Browse open challenges</Link>
+              </div>
+            ) : (
+              /* Seeking state */
+              <>
+                <div className={styles.seekingHeader}>
+                  <div className={styles.seekingPulse}></div>
+                  <span className={styles.seekingLabel}>Looking for an opponent...</span>
+                </div>
 
-            <div className={styles.linkBox}>
-              <div className={styles.linkUrl}>{typeof window !== 'undefined' ? window.location.origin : ''}/battle/room/{createdBattle.id}</div>
-              <button className={styles.copyBtn} onClick={copyLink}>
-                {copied ? '✓ Copied!' : '📋 Copy link'}
-              </button>
-            </div>
+                <div className={styles.topicDisplay}>"{topic}"</div>
 
-            <div className={styles.roomActions}>
-              <button className={styles.joinRoomBtn} onClick={joinRoom}>
-                🎥 Join the room now →
-              </button>
-              <Link href="/battle" className={styles.laterBtn}>
-                I'll join later
-              </Link>
-            </div>
+                <div className={styles.stanceDisplay}>
+                  Your stance: <strong>{stance === 'for' ? 'FOR ✊' : 'AGAINST 🚫'}</strong>
+                </div>
 
-            <p className={styles.roomNote}>
-              Your opponent will need a Torchd account to join. The room stays open for 3 hours.
-            </p>
+                {/* Countdown */}
+                <div className={styles.countdownWrap}>
+                  <div className={styles.countdownTime} style={{ color: timerColor }}>
+                    {formatTime(seekTimeLeft)}
+                  </div>
+                  <div className={styles.countdownLabel}>until challenge expires</div>
+                  <div className={styles.countdownTrack}>
+                    <div
+                      className={styles.countdownFill}
+                      style={{ width: `${timerPct}%`, background: timerColor }}
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.seekingInfo}>
+                  Your challenge is live on the <Link href="/battle" className={styles.seekingLink}>battles page</Link>.
+                  Anyone can accept it while this timer runs.
+                </div>
+
+                <button className={styles.cancelBtn} onClick={cancelChallenge}>
+                  Cancel challenge
+                </button>
+              </>
+            )}
           </div>
         )}
 

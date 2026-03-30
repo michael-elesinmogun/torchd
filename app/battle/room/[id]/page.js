@@ -2,6 +2,7 @@
 import { useState, useEffect, useRef, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import DailyIframe from '@daily-co/daily-js';
 import { supabase } from '../../../supabase';
 import styles from './room.module.css';
 
@@ -13,25 +14,6 @@ const ROUND_CONFIG = {
   2: { label: 'Round 2', desc: 'Player 2 speaks · Player 1 muted', speaker: 'player2' },
   3: { label: 'Round 3', desc: 'Open mic — both players speak freely', speaker: 'both' },
 };
-
-// Load Daily script once globally
-let dailyScriptLoaded = false;
-function loadDailyScript() {
-  return new Promise((resolve, reject) => {
-    if (dailyScriptLoaded || window.DailyIframe) {
-      dailyScriptLoaded = true;
-      resolve();
-      return;
-    }
-    // Remove any existing Daily scripts first
-    document.querySelectorAll('script[src*="daily"]').forEach(s => s.remove());
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/@daily-co/daily-js';
-    script.onload = () => { dailyScriptLoaded = true; resolve(); };
-    script.onerror = reject;
-    document.head.appendChild(script);
-  });
-}
 
 export default function BattleRoom({ params }) {
   const { id } = use(params);
@@ -186,13 +168,11 @@ export default function BattleRoom({ params }) {
       try { callFrameRef.current.destroy(); } catch {}
       callFrameRef.current = null;
     }
-    // Also destroy any lingering Daily frames on the page
-    if (window.DailyIframe) {
-      try {
-        const existing = window.DailyIframe.getCallInstance();
-        if (existing) existing.destroy();
-      } catch {}
-    }
+    // Also destroy any lingering Daily frames
+    try {
+      const existing = DailyIframe.getCallInstance();
+      if (existing) existing.destroy();
+    } catch {}
   }
 
   // ── Round system ─────────────────────────────────────────────────────────────
@@ -276,7 +256,6 @@ export default function BattleRoom({ params }) {
 
     try {
       const battleData = battleRef.current;
-      const profileData = profileRef.current;
 
       if (!battleData?.room_url) {
         setJoinError('No room URL found. Please create a new battle.');
@@ -284,25 +263,13 @@ export default function BattleRoom({ params }) {
         return;
       }
 
-      const isPlayer1 = battleData.player1_username === profileData?.username;
-
-      if (!isPlayer1) {
-        await supabase.from('battles').update({
-          status: 'live', player2_username: profileData?.username,
-        }).eq('id', id);
-        setBattle(prev => ({ ...prev, status: 'live', player2_username: profileData?.username }));
-      }
-
       // Destroy any existing frame first
       destroyFrame();
-
-      // Load Daily script
-      await loadDailyScript();
 
       const container = document.getElementById('daily-container');
       if (!container) throw new Error('Container not found');
 
-      const frame = window.DailyIframe.createFrame(container, {
+      const frame = DailyIframe.createFrame(container, {
         iframeStyle: {
           width: '100%',
           height: '100%',
@@ -557,8 +524,8 @@ export default function BattleRoom({ params }) {
             {!user && <div className={styles.loginPrompt}><Link href="/login" className={styles.loginLink}>Sign in</Link> to vote</div>}
           </div>
 
-          {/* Waiting card */}
-          {(battle.status === 'waiting' || !battle.player2_username) && !battleEnded && (
+          {/* Waiting card — shown if someone navigates directly to a seeking battle */}
+          {(battle.status === 'seeking' || !battle.player2_username) && !battleEnded && (
             <div className={styles.waitingCard}>
               <div className={styles.waitingTitle}>⏳ Waiting for opponent</div>
               <p className={styles.waitingSub}>Share this link to invite someone to debate you:</p>
