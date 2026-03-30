@@ -38,7 +38,7 @@ export default function Login() {
 
     // If there's a redirect param, go there first
     if (redirect) {
-      router.push('/login?redirect=/battle');
+      router.push(redirect);
       return;
     }
 
