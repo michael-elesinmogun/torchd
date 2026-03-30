@@ -275,7 +275,7 @@ export default function BattleRoom({ params }) {
 
     // Mobile Safari: open Daily room directly in browser tab
     // iOS blocks camera access in cross-origin iframes
-    if (isMobileSafari()) {
+    if (true) {
       setVideoJoined(true); // show "you're in the call" UI
       joiningRef.current = false;
       // Open Daily room in same tab — user comes back with back button
