@@ -22,6 +22,8 @@ const SUGGESTED_TOPICS = {
   NHL: ['Gretzky is untouchable as the greatest of all time', 'The salary cap has killed dynasty teams', 'Sidney Crosby is the best player of his generation', 'The Bruins have been the model franchise of the last decade'],
 };
 
+const AVATAR_COLORS = ['#3B82F6','#10B981','#F59E0B','#8B5CF6','#EF4444','#06B6D4','#EC4899','#F97316'];
+
 export default function Profile({ params }) {
   const { username } = React.use(params);
   const router = useRouter();
@@ -55,10 +57,10 @@ export default function Profile({ params }) {
 
   const [activeTab, setActiveTab] = useState('history');
 
-  // Real follow state
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
+  // Now stores full profile objects: { username, full_name, avatar_url }
   const [followerList, setFollowerList] = useState([]);
   const [followingList, setFollowingList] = useState([]);
   const [followLoading, setFollowLoading] = useState(false);
@@ -110,24 +112,44 @@ export default function Profile({ params }) {
         setInitials(username.slice(0, 2).toUpperCase());
       }
 
-      // Fetch follower count + list
-      const { data: followers } = await supabase
+      // Fetch followers — get follower_id list, then look up their profiles
+      const { data: followersRaw } = await supabase
         .from('follows')
         .select('follower_id')
         .eq('following_username', username);
 
-      setFollowerCount(followers?.length || 0);
-      setFollowerList(followers || []);
+      const followerIds = followersRaw?.map(f => f.follower_id) || [];
+      setFollowerCount(followerIds.length);
 
-      // Fetch following count + list for this profile's user
+      if (followerIds.length > 0) {
+        const { data: followerProfiles } = await supabase
+          .from('profiles')
+          .select('username, full_name, avatar_url')
+          .in('id', followerIds);
+        setFollowerList(followerProfiles || []);
+      } else {
+        setFollowerList([]);
+      }
+
+      // Fetch following — already stores username directly
       if (profileData?.id) {
-        const { data: followingData } = await supabase
+        const { data: followingRaw } = await supabase
           .from('follows')
           .select('following_username')
           .eq('follower_id', profileData.id);
 
-        setFollowingCount(followingData?.length || 0);
-        setFollowingList(followingData || []);
+        const followingUsernames = followingRaw?.map(f => f.following_username) || [];
+        setFollowingCount(followingUsernames.length);
+
+        if (followingUsernames.length > 0) {
+          const { data: followingProfiles } = await supabase
+            .from('profiles')
+            .select('username, full_name, avatar_url')
+            .in('username', followingUsernames);
+          setFollowingList(followingProfiles || []);
+        } else {
+          setFollowingList([]);
+        }
       }
 
       // Check if current user is following this profile
@@ -138,11 +160,10 @@ export default function Profile({ params }) {
           .eq('follower_id', currentUser.id)
           .eq('following_username', username)
           .single();
-
         setIsFollowing(!!existingFollow);
       }
 
-      // Fetch battle history
+      // Battle history
       const { data: battleData } = await supabase
         .from('battles')
         .select('*')
@@ -152,7 +173,6 @@ export default function Profile({ params }) {
 
       setBattles(battleData || []);
       setBattlesLoading(false);
-
       setLoading(false);
     }
     fetchData();
@@ -166,21 +186,16 @@ export default function Profile({ params }) {
     setFollowLoading(true);
 
     if (isFollowing) {
-      // Unfollow
       setIsFollowing(false);
       setFollowerCount(c => c - 1);
-      await supabase
-        .from('follows')
-        .delete()
+      setFollowerList(prev => prev.filter(f => f.id !== user.id));
+      await supabase.from('follows').delete()
         .eq('follower_id', user.id)
         .eq('following_username', username);
     } else {
-      // Follow
       setIsFollowing(true);
       setFollowerCount(c => c + 1);
-      await supabase
-        .from('follows')
-        .insert({ follower_id: user.id, following_username: username });
+      await supabase.from('follows').insert({ follower_id: user.id, following_username: username });
     }
 
     setFollowLoading(false);
@@ -197,10 +212,7 @@ export default function Profile({ params }) {
     setSavingLocation(true);
     const { error } = await supabase.from('profiles').update({ location: locationInput }).eq('username', username);
     setSavingLocation(false);
-    if (!error) {
-      setLocation(locationInput);
-      setEditingLocation(false);
-    }
+    if (!error) { setLocation(locationInput); setEditingLocation(false); }
   }
 
   async function saveSports() {
@@ -242,6 +254,28 @@ export default function Profile({ params }) {
   function toggleTeam(team) { setFavTeams(prev => prev.includes(team) ? prev.filter(t => t !== team) : [...prev, team]); }
   function shareProfile() { navigator.clipboard.writeText(window.location.href).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }); }
 
+  function getInitials(u) {
+    if (u.full_name) return u.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+    return u.username.slice(0, 2).toUpperCase();
+  }
+
+  function UserCard({ u, index }) {
+    const bg = AVATAR_COLORS[index % AVATAR_COLORS.length];
+    return (
+      <Link href={`/profile/${u.username}`} className={styles.followListItem}>
+        <div className={styles.followListAv} style={{ background: bg }}>
+          {u.avatar_url
+            ? <img src={u.avatar_url} alt={u.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+            : getInitials(u)}
+        </div>
+        <div>
+          <div className={styles.followListName}>{u.full_name || u.username}</div>
+          <div className={styles.followListHandle}>@{u.username}</div>
+        </div>
+      </Link>
+    );
+  }
+
   const completedCount = Object.values(checklist).filter(Boolean).length;
   const totalCount = Object.keys(checklist).length;
   const progressPct = Math.round((completedCount / totalCount) * 100);
@@ -250,8 +284,8 @@ export default function Profile({ params }) {
   if (loading) {
     return (
       <main className={styles.main}>
-        <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'80vh'}}>
-          <div style={{fontFamily:'Syne,sans-serif',fontSize:'18px',color:'#6B7A9E'}}>Loading profile...</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '80vh' }}>
+          <div style={{ fontFamily: 'Syne,sans-serif', fontSize: '18px', color: '#6B7A9E' }}>Loading profile...</div>
         </div>
       </main>
     );
@@ -273,7 +307,7 @@ export default function Profile({ params }) {
                   }
                   {isOwner && <div className={styles.avatarOverlay}>{uploading ? '⏳' : '📷'}</div>}
                 </div>
-                {isOwner && <input ref={fileInputRef} type="file" accept="image/*" style={{display:'none'}} onChange={handlePhotoUpload} />}
+                {isOwner && <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePhotoUpload} />}
                 {isOwner && <div className={styles.avatarHint}>Click to upload photo</div>}
               </div>
 
@@ -296,27 +330,15 @@ export default function Profile({ params }) {
 
               {editingLocation ? (
                 <div className={styles.locationEditWrap}>
-                  <span style={{fontSize:'13px'}}>📍</span>
-                  <input
-                    className={styles.locationInput}
-                    value={locationInput}
-                    onChange={e => setLocationInput(e.target.value)}
-                    placeholder="City, State"
-                    maxLength={50}
-                    autoFocus
-                    onKeyDown={e => e.key === 'Enter' && saveLocation()}
-                  />
+                  <span style={{ fontSize: '13px' }}>📍</span>
+                  <input className={styles.locationInput} value={locationInput} onChange={e => setLocationInput(e.target.value)} placeholder="City, State" maxLength={50} autoFocus onKeyDown={e => e.key === 'Enter' && saveLocation()} />
                   <button className={styles.handleSaveBtn} onClick={saveLocation} disabled={savingLocation}>{savingLocation ? '...' : 'Save'}</button>
                   <button className={styles.handleCancelBtn} onClick={() => { setEditingLocation(false); setLocationInput(location); }}>✕</button>
                 </div>
               ) : (
                 <div className={styles.profileLocationRow}>
-                  <span className={styles.profileLocation}>
-                    {location ? `📍 ${location}` : isOwner ? '📍 Add location' : ''}
-                  </span>
-                  {isOwner && (
-                    <button className={styles.editHandleBtn} onClick={() => setEditingLocation(true)}>Edit</button>
-                  )}
+                  <span className={styles.profileLocation}>{location ? `📍 ${location}` : isOwner ? '📍 Add location' : ''}</span>
+                  {isOwner && <button className={styles.editHandleBtn} onClick={() => setEditingLocation(true)}>Edit</button>}
                 </div>
               )}
 
@@ -349,11 +371,7 @@ export default function Profile({ params }) {
               </div>
 
               {!isOwner && (
-                <button
-                  className={`${styles.followBtn} ${isFollowing ? styles.followingBtn : ''}`}
-                  onClick={handleFollow}
-                  disabled={followLoading}
-                >
+                <button className={`${styles.followBtn} ${isFollowing ? styles.followingBtn : ''}`} onClick={handleFollow} disabled={followLoading}>
                   {followLoading ? '...' : isFollowing ? '✓ Following' : '+ Follow'}
                 </button>
               )}
@@ -391,7 +409,7 @@ export default function Profile({ params }) {
                   <div className={styles.sportBadges}>
                     {favSports.length > 0
                       ? favSports.map(sport => <div key={sport} className={styles.sportBadge}>{sport}</div>)
-                      : <div style={{fontSize:'13px',color:'#3D4A66'}}>No sports selected yet</div>}
+                      : <div style={{ fontSize: '13px', color: '#3D4A66' }}>No sports selected yet</div>}
                   </div>
                   <div className={styles.teamBadges}>
                     {favTeams.map(team => <div key={team} className={styles.teamBadge}>🏆 {team}</div>)}
@@ -403,10 +421,10 @@ export default function Profile({ params }) {
             <div className={styles.sideCard}>
               <div className={styles.sideCardTitle}>Stats</div>
               <div className={styles.statsGrid}>
-                <div className={styles.statItem}><div className={styles.statNum} style={{color:'#3D4A66'}}>0</div><div className={styles.statLabel}>Battles</div></div>
-                <div className={styles.statItem}><div className={styles.statNum} style={{color:'#3D4A66'}}>—</div><div className={styles.statLabel}>Win Rate</div></div>
-                <div className={styles.statItem}><div className={styles.statNum} style={{color:'#3D4A66'}}>—</div><div className={styles.statLabel}>Rank</div></div>
-                <div className={styles.statItem}><div className={styles.statNum} style={{color:'#3D4A66'}}>—</div><div className={styles.statLabel}>Streak</div></div>
+                <div className={styles.statItem}><div className={styles.statNum} style={{ color: '#3D4A66' }}>0</div><div className={styles.statLabel}>Battles</div></div>
+                <div className={styles.statItem}><div className={styles.statNum} style={{ color: '#3D4A66' }}>—</div><div className={styles.statLabel}>Win Rate</div></div>
+                <div className={styles.statItem}><div className={styles.statNum} style={{ color: '#3D4A66' }}>—</div><div className={styles.statLabel}>Rank</div></div>
+                <div className={styles.statItem}><div className={styles.statNum} style={{ color: '#3D4A66' }}>—</div><div className={styles.statLabel}>Streak</div></div>
               </div>
             </div>
           </div>
@@ -419,7 +437,7 @@ export default function Profile({ params }) {
                     <div><div className={styles.checklistTitle}>Complete your profile</div><div className={styles.checklistSub}>{completedCount} of {totalCount} done</div></div>
                     <div className={styles.checklistPct}>{progressPct}%</div>
                   </div>
-                  <div className={styles.progressTrack}><div className={styles.progressFill} style={{width:`${progressPct}%`}}></div></div>
+                  <div className={styles.progressTrack}><div className={styles.progressFill} style={{ width: `${progressPct}%` }}></div></div>
                   <div className={styles.checklistItems}>
                     {[
                       { key: 'addBio', title: 'Add a bio', sub: 'Tell the world your take' },
@@ -470,7 +488,7 @@ export default function Profile({ params }) {
             {activeTab === 'history' && (
               battlesLoading ? (
                 <div className={styles.emptyState}>
-                  <div style={{color:'#6B7A9E',fontSize:'14px'}}>Loading battles...</div>
+                  <div style={{ color: '#6B7A9E', fontSize: '14px' }}>Loading battles...</div>
                 </div>
               ) : battles.length === 0 ? (
                 <div className={styles.emptyState}>
@@ -487,13 +505,11 @@ export default function Profile({ params }) {
                     const myStance = isPlayer1 ? battle.player1_stance : battle.player2_stance;
                     const won = battle.winner === username;
                     const lost = battle.winner && battle.winner !== username;
-                    const pending = !battle.winner;
-
                     return (
                       <div key={battle.id} className={styles.battleCard}>
                         <div className={styles.battleCardTop}>
                           <div className={`${styles.battleResult} ${won ? styles.battleWon : lost ? styles.battleLost : styles.battlePending}`}>
-                            {pending ? '🔴 LIVE' : won ? '✓ WIN' : '✗ LOSS'}
+                            {!battle.winner ? '🔴 LIVE' : won ? '✓ WIN' : '✗ LOSS'}
                           </div>
                           <div className={styles.battleDate}>
                             {new Date(battle.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -523,7 +539,7 @@ export default function Profile({ params }) {
             )}
 
             {activeTab === 'followers' && (
-              followerCount === 0 ? (
+              followerList.length === 0 ? (
                 <div className={styles.emptyState}>
                   <div className={styles.emptyIcon}>👥</div>
                   <div className={styles.emptyTitle}>No followers yet</div>
@@ -532,18 +548,13 @@ export default function Profile({ params }) {
                 </div>
               ) : (
                 <div className={styles.followList}>
-                  {followerList.map((f, i) => (
-                    <div key={i} className={styles.followListItem}>
-                      <div className={styles.followListAv} style={{background:'#3B82F6'}}>👤</div>
-                      <div className={styles.followListName}>Follower</div>
-                    </div>
-                  ))}
+                  {followerList.map((u, i) => <UserCard key={u.username} u={u} index={i} />)}
                 </div>
               )
             )}
 
             {activeTab === 'following' && (
-              followingCount === 0 ? (
+              followingList.length === 0 ? (
                 <div className={styles.emptyState}>
                   <div className={styles.emptyIcon}>👀</div>
                   <div className={styles.emptyTitle}>Not following anyone yet</div>
@@ -552,17 +563,11 @@ export default function Profile({ params }) {
                 </div>
               ) : (
                 <div className={styles.followList}>
-                  {followingList.map((f, i) => (
-                    <Link key={i} href={`/profile/${f.following_username}`} className={styles.followListItem}>
-                      <div className={styles.followListAv} style={{background:'#3B82F6'}}>
-                        {f.following_username.slice(0,2).toUpperCase()}
-                      </div>
-                      <div className={styles.followListName}>@{f.following_username}</div>
-                    </Link>
-                  ))}
+                  {followingList.map((u, i) => <UserCard key={u.username} u={u} index={i} />)}
                 </div>
               )
             )}
+
           </div>
         </div>
       </div>

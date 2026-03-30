@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { usePathname } from 'next/navigation';
 import { supabase } from '../supabase';
 
@@ -9,12 +9,28 @@ export default function NavBar() {
   const [profileSlug, setProfileSlug] = useState(null);
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const notifRef = useRef(null);
   const pathname = usePathname();
 
-  // Close menu on route change
-  useEffect(() => { setMenuOpen(false); }, [pathname]);
+  useEffect(() => { setMenuOpen(false); setNotifOpen(false); }, [pathname]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClick(e) {
+      if (notifRef.current && !notifRef.current.contains(e.target)) {
+        setNotifOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
 
   useEffect(() => {
+    let notifChannel = null;
+
     async function fetchUserAndProfile() {
       const { data: { session } } = await supabase.auth.getSession();
       const currentUser = session?.user;
@@ -37,6 +53,22 @@ export default function NavBar() {
               : currentUser.email?.split('@')[0] || 'profile'
           );
         }
+
+        await loadNotifications(currentUser.id);
+
+        // Realtime — new notifications pop in instantly
+        notifChannel = supabase
+          .channel(`notifications-${currentUser.id}`)
+          .on('postgres_changes', {
+            event: 'INSERT',
+            schema: 'public',
+            table: 'notifications',
+            filter: `user_id=eq.${currentUser.id}`,
+          }, (payload) => {
+            setNotifications(prev => [payload.new, ...prev]);
+            setUnreadCount(c => c + 1);
+          })
+          .subscribe();
       }
 
       setLoading(false);
@@ -55,13 +87,65 @@ export default function NavBar() {
           .then(({ data: profile }) => {
             if (profile?.username) setProfileSlug(profile.username);
           });
+        loadNotifications(session.user.id);
       } else {
         setProfileSlug(null);
+        setNotifications([]);
+        setUnreadCount(0);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      if (notifChannel) supabase.removeChannel(notifChannel);
+    };
   }, []);
+
+  async function loadNotifications(userId) {
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(20);
+
+    if (data) {
+      setNotifications(data);
+      setUnreadCount(data.filter(n => !n.read).length);
+    }
+  }
+
+  async function openNotifications() {
+    const opening = !notifOpen;
+    setNotifOpen(opening);
+
+    // Mark all unread as read when opening
+    if (opening && unreadCount > 0) {
+      const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
+      if (unreadIds.length > 0) {
+        await supabase.from('notifications').update({ read: true }).in('id', unreadIds);
+        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+        setUnreadCount(0);
+      }
+    }
+  }
+
+  function timeAgo(dateStr) {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  }
+
+  function notifIcon(type) {
+    if (type === 'new_follower') return '👤';
+    if (type === 'battle_request') return '⚔️';
+    if (type === 'battle_result') return '🏆';
+    return '🔔';
+  }
 
   async function handleSignOut() {
     await supabase.auth.signOut();
@@ -82,7 +166,6 @@ export default function NavBar() {
     { href: '/search', label: '🔍 Search' },
   ];
 
-  // Logo links to /lobby if logged in, otherwise /
   const logoHref = user ? '/lobby' : '/';
 
   return (
@@ -135,6 +218,111 @@ export default function NavBar() {
             <div style={{ width: '80px', height: '32px' }}></div>
           ) : user ? (
             <>
+              {/* Bell */}
+              <div ref={notifRef} style={{ position: 'relative' }}>
+                <button
+                  onClick={openNotifications}
+                  style={{
+                    position: 'relative', background: 'none',
+                    border: '1px solid rgba(255,255,255,0.065)', borderRadius: '8px',
+                    padding: '6px 10px', cursor: 'pointer', fontSize: '18px', lineHeight: 1,
+                    display: 'flex', alignItems: 'center', transition: 'all 0.2s',
+                    color: '#EEF2FF',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.22)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.065)'; }}
+                >
+                  🔔
+                  {unreadCount > 0 && (
+                    <span style={{
+                      position: 'absolute', top: '-6px', right: '-6px',
+                      background: '#EF4444', color: 'white', fontSize: '10px',
+                      fontWeight: 700, borderRadius: '100px', minWidth: '18px',
+                      height: '18px', display: 'flex', alignItems: 'center',
+                      justifyContent: 'center', padding: '0 4px',
+                      fontFamily: 'Syne, sans-serif',
+                    }}>
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* Dropdown */}
+                {notifOpen && (
+                  <div style={{
+                    position: 'absolute', top: 'calc(100% + 10px)', right: 0,
+                    width: '320px', background: '#0f1623',
+                    border: '1px solid rgba(255,255,255,0.065)', borderRadius: '14px',
+                    boxShadow: '0 20px 60px rgba(0,0,0,0.5)', zIndex: 300, overflow: 'hidden',
+                  }}>
+                    {/* Header */}
+                    <div style={{
+                      padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.065)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    }}>
+                      <span style={{ fontSize: '13px', fontWeight: 700, fontFamily: 'Syne, sans-serif', color: '#EEF2FF' }}>
+                        Notifications
+                      </span>
+                      <span style={{ fontSize: '11px', color: '#6B7A9E' }}>
+                        {notifications.length === 0 ? '' : unreadCount === 0 ? 'All caught up ✓' : `${unreadCount} unread`}
+                      </span>
+                    </div>
+
+                    {/* List */}
+                    <div style={{ maxHeight: '360px', overflowY: 'auto', scrollbarWidth: 'thin' }}>
+                      {notifications.length === 0 ? (
+                        <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#6B7A9E', fontSize: '13px' }}>
+                          <div style={{ fontSize: '32px', marginBottom: '0.5rem' }}>🔔</div>
+                          No notifications yet
+                        </div>
+                      ) : notifications.map(n => (
+                        <div key={n.id} style={{
+                          padding: '12px 16px',
+                          background: n.read ? 'transparent' : 'rgba(59,130,246,0.05)',
+                          borderBottom: '1px solid rgba(255,255,255,0.04)',
+                          display: 'flex', gap: '10px', alignItems: 'flex-start',
+                        }}>
+                          <div style={{
+                            width: '34px', height: '34px', borderRadius: '50%',
+                            background: '#151e2e', display: 'flex', alignItems: 'center',
+                            justifyContent: 'center', fontSize: '15px', flexShrink: 0,
+                          }}>
+                            {notifIcon(n.type)}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: '13px', color: '#EEF2FF', lineHeight: 1.5 }}>
+                              {n.from_username ? (
+                                <>
+                                  <Link
+                                    href={`/profile/${n.from_username}`}
+                                    onClick={() => setNotifOpen(false)}
+                                    style={{ color: '#60A5FA', fontWeight: 600, textDecoration: 'none' }}
+                                  >
+                                    @{n.from_username}
+                                  </Link>
+                                  {' '}
+                                  {n.type === 'new_follower' ? 'started following you' : n.message}
+                                </>
+                              ) : n.message}
+                            </div>
+                            <div style={{ fontSize: '11px', color: '#6B7A9E', marginTop: '3px' }}>
+                              {timeAgo(n.created_at)}
+                            </div>
+                          </div>
+                          {!n.read && (
+                            <div style={{
+                              width: '7px', height: '7px', borderRadius: '50%',
+                              background: '#3B82F6', flexShrink: 0, marginTop: '6px',
+                            }} />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Profile */}
               <Link href={`/profile/${profileSlug || 'profile'}`} style={{
                 display: 'flex', alignItems: 'center', gap: '8px',
                 textDecoration: 'none', padding: '6px 12px', borderRadius: '8px',
@@ -186,7 +374,7 @@ export default function NavBar() {
             </>
           )}
 
-          {/* Search icon — desktop only */}
+          {/* Search */}
           <Link href="/search" className="nav-search-icon" style={{
             fontSize: '18px', textDecoration: 'none',
             padding: '6px 10px', borderRadius: '8px',
@@ -200,7 +388,7 @@ export default function NavBar() {
             🔍
           </Link>
 
-          {/* Hamburger button — mobile only */}
+          {/* Hamburger */}
           <button
             onClick={() => setMenuOpen(o => !o)}
             className="nav-hamburger"
@@ -218,21 +406,20 @@ export default function NavBar() {
 
       </nav>
 
-      {/* Mobile dropdown menu */}
+      {/* Mobile menu */}
       {menuOpen && (
         <div style={{
           position: 'fixed', top: '62px', left: 0, right: 0, zIndex: 199,
           background: 'rgba(6,9,18,0.98)', backdropFilter: 'blur(20px)',
           borderBottom: '1px solid rgba(255,255,255,0.065)',
-          padding: '1rem',
-          display: 'flex', flexDirection: 'column', gap: '0.5rem',
+          padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem',
         }}>
           {navLinks.map(link => (
             <Link key={link.href} href={link.href} style={{
               fontSize: '15px', color: '#EEF2FF', textDecoration: 'none',
               padding: '12px 16px', borderRadius: '10px',
               background: '#0f1623', border: '1px solid rgba(255,255,255,0.065)',
-              fontWeight: 500, transition: 'all 0.2s',
+              fontWeight: 500,
             }}>
               {link.label}
             </Link>
@@ -250,6 +437,22 @@ export default function NavBar() {
               }}>
                 👤 My Profile (@{profileSlug})
               </Link>
+              <div style={{
+                fontSize: '15px', color: '#EEF2FF', padding: '12px 16px',
+                borderRadius: '10px', background: '#0f1623',
+                border: '1px solid rgba(255,255,255,0.065)',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              }}>
+                <span>🔔 Notifications</span>
+                {unreadCount > 0 && (
+                  <span style={{
+                    background: '#EF4444', color: 'white', fontSize: '11px',
+                    fontWeight: 700, borderRadius: '100px', padding: '2px 8px',
+                  }}>
+                    {unreadCount}
+                  </span>
+                )}
+              </div>
               <button onClick={handleSignOut} style={{
                 fontSize: '15px', color: '#6B7A9E', background: 'none',
                 border: '1px solid rgba(255,255,255,0.065)', borderRadius: '10px',
