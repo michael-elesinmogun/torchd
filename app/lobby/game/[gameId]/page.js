@@ -51,6 +51,10 @@ export default function GameRoom() {
   const [creatingRoom, setCreatingRoom] = useState(false);
   const [plays, setPlays] = useState([]);
   const [gamcastLoading, setGamecastLoading] = useState(false);
+  const [activePeriod, setActivePeriod] = useState('all');
+  const [activeStatsTab, setActiveStatsTab] = useState('plays'); // 'plays' | 'team' | 'box'
+  const [teamStats, setTeamStats] = useState([]);
+  const [players, setPlayers] = useState([]);
   const [splitPct, setSplitPct] = useState(50);
   const [reactions, setReactions] = useState({}); // { msgId: { emoji: count } }
   const REACTION_EMOJIS = ['🔥','💀','😤','👑','🐐'];
@@ -83,6 +87,8 @@ export default function GameRoom() {
           });
         }
       }
+      if (data.teamStats) setTeamStats(data.teamStats);
+      if (data.players) setPlayers(data.players);
     } catch (e) {}
     if (!isRefresh) setGamecastLoading(false);
   }
@@ -283,8 +289,36 @@ export default function GameRoom() {
 
         {/* Play-by-play */}
         <div className={styles.gamecastCol} style={{width: `${splitPct}%`}}>
-          <div className={styles.colHeader}>📊 Play-by-Play</div>
-          <div className={styles.gamecastWrap}>
+          {/* Main tabs */}
+          <div className={styles.mainStatsTabs}>
+            <button className={`${styles.mainStatsTab} ${activeStatsTab === 'plays' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('plays')}>▶ Plays</button>
+            <button className={`${styles.mainStatsTab} ${activeStatsTab === 'team' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('team')}>📊 Team</button>
+            <button className={`${styles.mainStatsTab} ${activeStatsTab === 'box' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('box')}>🏀 Box Score</button>
+          </div>
+
+          {/* Period tabs — only show on plays tab */}
+          {activeStatsTab === 'plays' && <>
+          {plays.length > 0 && (() => {
+            const periods = ['all', ...new Set(plays.map(p => p.period).filter(Boolean).sort((a,b) => a-b))];
+            return (
+              <div className={styles.periodTabs}>
+                {periods.map(p => (
+                  <button
+                    key={p}
+                    className={`${styles.periodTab} ${activePeriod === p ? styles.periodTabActive : ''}`}
+                    onClick={() => setActivePeriod(p)}
+                  >
+                    {p === 'all' ? 'All' : p <= 4 ? `Q${p}` : `OT${p - 4}`}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+
+          </>}
+
+          {/* Plays tab */}
+          {activeStatsTab === 'plays' && <div className={styles.gamecastWrap}>
             {gamcastLoading ? (
               <div className={styles.chatLoading}>Loading...</div>
             ) : plays.length === 0 ? (
@@ -293,13 +327,13 @@ export default function GameRoom() {
                 <div className={styles.chatEmptyTitle}>No plays yet</div>
                 <p className={styles.chatEmptySub}>Play-by-play appears here during the game.</p>
               </div>
-            ) : plays.map((play, i) => {
+            ) : plays.filter(p => activePeriod === 'all' || p.period === activePeriod).map((play, i) => {
               // Determine which team scored by comparing score to previous play
               let scoringClass = '';
               if (play.scoringPlay) {
-                const prevPlay = plays[i + 1];
-                const awayDiff = prevPlay ? (play.awayScore - prevPlay.awayScore) : 0;
-                const homeDiff = prevPlay ? (play.homeScore - prevPlay.homeScore) : 0;
+                const prevPlayCheck = plays[i + 1];
+                const awayDiff = prevPlayCheck ? (play.awayScore - prevPlayCheck.awayScore) : 0;
+                const homeDiff = prevPlayCheck ? (play.homeScore - prevPlayCheck.homeScore) : 0;
                 if (awayDiff > 0) scoringClass = styles.playScoringAway;
                 else if (homeDiff > 0) scoringClass = styles.playScoringHome;
                 else scoringClass = styles.playScoring;
@@ -307,6 +341,14 @@ export default function GameRoom() {
 
               const awayColor = game?.away?.color ? `#${game.away.color}` : '#3B82F6';
               const homeColor = game?.home?.color ? `#${game.home.color}` : '#10B981';
+
+              // Determine scoring team logo
+              const prevPlay = plays[i + 1];
+              let scoringLogo = null;
+              if (play.scoringPlay && prevPlay) {
+                if (play.awayScore > prevPlay.awayScore) scoringLogo = game?.away?.logo;
+                else if (play.homeScore > prevPlay.homeScore) scoringLogo = game?.home?.logo;
+              }
 
               return (
                 <div
@@ -319,20 +361,102 @@ export default function GameRoom() {
                   }}
                 >
                   <div className={styles.playHeader}>
+                    {scoringLogo && (
+                      <img src={scoringLogo} alt="" className={styles.playTeamLogo} />
+                    )}
                     <div className={styles.playClock}>{play.clock} {play.periodText}</div>
                   </div>
                   <div className={styles.playText}>{play.text}</div>
                   {play.scoringPlay && game && (
                     <div className={styles.playScore}>
-                      <span style={{color: awayColor}}>{game.away?.abbr} {play.awayScore}</span>
-                      <span style={{color:'#3D4A66'}}> – </span>
-                      <span style={{color: homeColor}}>{game.home?.abbr} {play.homeScore}</span>
+                      <span className={styles.scoreTeamPill} style={{
+                        background: `${awayColor}22`,
+                        border: `1px solid ${awayColor}55`,
+                        color: '#EEF2FF',
+                      }}>{game.away?.abbr} {play.awayScore}</span>
+                      <span style={{color:'#3D4A66',margin:'0 4px'}}>–</span>
+                      <span className={styles.scoreTeamPill} style={{
+                        background: `${homeColor}22`,
+                        border: `1px solid ${homeColor}55`,
+                        color: '#EEF2FF',
+                      }}>{game.home?.abbr} {play.homeScore}</span>
                     </div>
                   )}
                 </div>
               );
             })}
-          </div>
+          </div>}
+
+          {/* Team stats tab */}
+          {activeStatsTab === 'team' && (
+            <div className={styles.gamecastWrap}>
+              {teamStats.length === 0 ? (
+                <div className={styles.chatLoading}>Loading team stats...</div>
+              ) : teamStats.map(team => (
+                <div key={team.team} className={styles.teamStatsBlock}>
+                  <div className={styles.teamStatsHeader}>
+                    {team.logo && <img src={team.logo} alt={team.team} className={styles.teamStatsLogo} />}
+                    <span className={styles.teamStatsName}>{team.name}</span>
+                  </div>
+                  <div className={styles.teamStatsGrid}>
+                    {team.statistics?.filter(s => ['fieldGoalsMade-fieldGoalsAttempted','threePointFieldGoalsMade-threePointFieldGoalsAttempted','freeThrowsMade-freeThrowsAttempted','totalRebounds','assists','turnovers','steals','blocks','points'].includes(s.name) || ['FG','3PT','FT','REB','AST','TO','STL','BLK','PTS'].includes(s.abbreviation)).map(stat => (
+                      <div key={stat.name} className={styles.teamStatItem}>
+                        <div className={styles.teamStatValue}>{stat.displayValue}</div>
+                        <div className={styles.teamStatLabel}>{stat.abbreviation || stat.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Box score tab */}
+          {activeStatsTab === 'box' && (
+            <div className={styles.gamecastWrap}>
+              {players.length === 0 ? (
+                <div className={styles.chatLoading}>Loading box score...</div>
+              ) : players.map(teamPlayers => {
+                const statGroup = teamPlayers.statistics?.[0];
+                if (!statGroup) return null;
+                const labels = statGroup.labels || [];
+                const keyStats = ['MIN','PTS','REB','AST','STL','BLK','FG','3PT','TO'];
+                const keyIndices = keyStats.map(k => labels.indexOf(k)).filter(i => i >= 0);
+                const displayLabels = keyIndices.map(i => labels[i]);
+                return (
+                  <div key={teamPlayers.team} className={styles.boxScoreBlock}>
+                    <div className={styles.teamStatsHeader}>
+                      {teamPlayers.teamLogo && <img src={teamPlayers.teamLogo} alt={teamPlayers.team} className={styles.teamStatsLogo} />}
+                      <span className={styles.teamStatsName}>{teamPlayers.teamName}</span>
+                    </div>
+                    <div className={styles.boxScoreTable}>
+                      <div className={styles.boxScoreRow + ' ' + styles.boxScoreHeader}>
+                        <div className={styles.boxScorePlayer}>PLAYER</div>
+                        {displayLabels.map(l => <div key={l} className={styles.boxScoreStat}>{l}</div>)}
+                      </div>
+                      {statGroup.athletes?.map(athlete => (
+                        <div key={athlete.id} className={`${styles.boxScoreRow} ${athlete.starter ? styles.boxScoreStarter : ''} ${athlete.didNotPlay ? styles.boxScoreDNP : ''}`}>
+                          <div className={styles.boxScorePlayer}>
+                            <span className={styles.boxScoreJersey}>{athlete.jersey}</span>
+                            <span className={styles.boxScoreName}>{athlete.shortName}</span>
+                            <span className={styles.boxScorePos}>{athlete.position}</span>
+                          </div>
+                          {athlete.didNotPlay ? (
+                            <div className={styles.boxScoreDNPLabel} style={{flex:4,textAlign:'left',paddingLeft:'4px'}}>
+                              {athlete.reason || 'DNP'}
+                            </div>
+                          ) : keyIndices.map((ki, idx) => (
+                            <div key={idx} className={styles.boxScoreStat}>{athlete.stats?.[ki] || '—'}</div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
         </div>
 
         {/* Horizontal drag divider */}

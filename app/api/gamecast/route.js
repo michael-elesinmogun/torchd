@@ -29,8 +29,7 @@ export async function GET(request) {
 
     const data = await res.json();
 
-    // Extract plays
-    const plays = (data.plays || []).slice(-30).reverse().map(play => ({
+    const plays = (data.plays || []).slice(-200).reverse().map(play => ({
       id: play.id,
       text: play.text,
       clock: play.clock?.displayValue,
@@ -46,28 +45,56 @@ export async function GET(request) {
       type: play.type?.text,
     }));
 
-    // Extract leaders
     const boxscore = data.boxscore || {};
     const teams = boxscore.teams || [];
 
-    const leaders = teams.map(team => ({
+    const teamStats = teams.map(team => ({
       team: team.team?.abbreviation,
+      name: team.team?.displayName,
+      logo: team.team?.logo,
       color: team.team?.color,
-      statistics: (team.statistics || []).slice(0, 4).map(s => ({
+      homeAway: team.homeAway,
+      statistics: (team.statistics || []).map(s => ({
         name: s.name,
         displayValue: s.displayValue,
         label: s.label,
+        abbreviation: s.abbreviation,
       })),
     }));
 
-    // Game status
+    const players = (boxscore.players || []).map(teamPlayers => ({
+      team: teamPlayers.team?.abbreviation,
+      teamName: teamPlayers.team?.displayName,
+      teamLogo: teamPlayers.team?.logo,
+      teamColor: teamPlayers.team?.color,
+      homeAway: teamPlayers.homeAway,
+      statistics: (teamPlayers.statistics || []).map(statGroup => ({
+        name: statGroup.name,
+        keys: statGroup.keys || [],
+        labels: statGroup.labels || [],
+        athletes: (statGroup.athletes || []).map(athlete => ({
+          id: athlete.athlete?.id,
+          name: athlete.athlete?.displayName,
+          shortName: athlete.athlete?.shortName,
+          jersey: athlete.athlete?.jersey,
+          position: athlete.athlete?.position?.abbreviation,
+          starter: athlete.starter,
+          active: athlete.active,
+          stats: athlete.stats || [],
+          didNotPlay: athlete.didNotPlay,
+          reason: athlete.reason,
+        })),
+      })),
+    }));
+
     const header = data.header || {};
     const competition = header.competitions?.[0] || {};
     const status = competition.status || {};
 
     return Response.json({
       plays,
-      leaders,
+      teamStats,
+      players,
       status: {
         type: status.type?.name,
         detail: status.type?.detail,
