@@ -38,20 +38,18 @@ export default function StartBattle() {
   const [seekExpired, setSeekExpired] = useState(false);
 
   const seekTimerRef = useRef(null);
+  const pollRef = useRef(null);
   const expiresAtRef = useRef(null);
+  const createdBattleRef = useRef(null);
 
   useEffect(() => {
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) { router.push('/login'); return; }
       setUser(session.user);
-
       const { data: profileData } = await supabase
-        .from('profiles')
-        .select('username, full_name')
-        .eq('id', session.user.id)
-        .maybeSingle();
-
+        .from('profiles').select('username, full_name')
+        .eq('id', session.user.id).maybeSingle();
       setProfile(profileData);
     }
     init();
@@ -60,26 +58,29 @@ export default function StartBattle() {
   useEffect(() => {
     if (step !== 3 || !createdBattle) return;
 
+    createdBattleRef.current = createdBattle;
     expiresAtRef.current = new Date(createdBattle.expires_at).getTime();
 
-    // Calculate time left from expires_at every second
-    // This works correctly even when tab is backgrounded because
-    // we always diff against the real expiry time, not a counter
     function tick() {
       const left = Math.max(0, Math.floor((expiresAtRef.current - Date.now()) / 1000));
       setSeekTimeLeft(left);
-
       if (left <= 0) {
         clearInterval(seekTimerRef.current);
-        supabase.from('battles').update({ status: 'expired' }).eq('id', createdBattle.id);
+        supabase.from('battles').update({ status: 'expired' }).eq('id', createdBattleRef.current.id);
         setSeekExpired(true);
       }
     }
 
-    tick(); // run immediately
-    seekTimerRef.current = setInterval(tick, 1000);
+    // Recalculate when tab becomes visible again
+    function handleVisibility() {
+      if (document.visibilityState === 'visible') tick();
+    }
 
-    // Watch for someone accepting (status → live)
+    tick();
+    seekTimerRef.current = setInterval(tick, 1000);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Realtime watch
     const channel = supabase
       .channel(`seeking-watch-${createdBattle.id}`)
       .on('postgres_changes', {
@@ -88,6 +89,7 @@ export default function StartBattle() {
       }, (payload) => {
         if (payload.new.status === 'live') {
           clearInterval(seekTimerRef.current);
+          clearInterval(pollRef.current);
           setBattleAccepted(true);
           setAcceptedBy(payload.new.player2_username || '');
           setTimeout(() => router.push(`/battle/room/${createdBattle.id}`), 2500);
@@ -95,18 +97,14 @@ export default function StartBattle() {
       })
       .subscribe();
 
-    // Also poll every 5 seconds as a fallback in case realtime misses it
-    // (important for mobile Safari which can drop WebSocket connections)
-    const pollRef = setInterval(async () => {
+    // Poll every 5s as fallback for mobile Safari
+    pollRef.current = setInterval(async () => {
       const { data } = await supabase
-        .from('battles')
-        .select('status, player2_username')
-        .eq('id', createdBattle.id)
-        .maybeSingle();
-
+        .from('battles').select('status, player2_username')
+        .eq('id', createdBattleRef.current.id).maybeSingle();
       if (data?.status === 'live') {
         clearInterval(seekTimerRef.current);
-        clearInterval(pollRef);
+        clearInterval(pollRef.current);
         setBattleAccepted(true);
         setAcceptedBy(data.player2_username || '');
         setTimeout(() => router.push(`/battle/room/${createdBattle.id}`), 2500);
@@ -115,7 +113,8 @@ export default function StartBattle() {
 
     return () => {
       clearInterval(seekTimerRef.current);
-      clearInterval(pollRef);
+      clearInterval(pollRef.current);
+      document.removeEventListener('visibilitychange', handleVisibility);
       supabase.removeChannel(channel);
     };
   }, [step, createdBattle]);
@@ -141,8 +140,7 @@ export default function StartBattle() {
           status: 'seeking',
           expires_at: expiresAt,
         })
-        .select()
-        .single();
+        .select().single();
 
       if (battleError) throw new Error(battleError.message);
 
@@ -155,10 +153,7 @@ export default function StartBattle() {
       const roomData = await roomRes.json();
       if (roomData.error) throw new Error(roomData.error);
 
-      await supabase
-        .from('battles')
-        .update({ room_url: roomData.url })
-        .eq('id', battle.id);
+      await supabase.from('battles').update({ room_url: roomData.url }).eq('id', battle.id);
 
       setCreatedBattle({ ...battle, room_url: roomData.url, expires_at: expiresAt });
       setStep(3);
@@ -189,14 +184,12 @@ export default function StartBattle() {
           <p className={styles.sub}>Pick a topic, choose your stance, and challenge someone to debate you live.</p>
         </div>
 
-        {/* Step 1 */}
         {step === 1 && (
           <div className={styles.stepWrap}>
             <div className={styles.stepLabel}>Step 1 of 2 — Pick your topic</div>
             <div className={styles.topicGrid}>
               {TOPICS.map((t, i) => (
-                <button
-                  key={i}
+                <button key={i}
                   className={`${styles.topicBtn} ${selectedTopic === t ? styles.topicSelected : ''}`}
                   onClick={() => { setSelectedTopic(t); setCustomTopic(''); }}
                 >
@@ -213,44 +206,27 @@ export default function StartBattle() {
               </button>
             </div>
             {selectedTopic === 'custom' && (
-              <textarea
-                className={styles.customInput}
-                placeholder="Write your debate topic here..."
-                value={customTopic}
-                onChange={e => setCustomTopic(e.target.value)}
-                maxLength={200}
-                rows={3}
-                autoFocus
-              />
+              <textarea className={styles.customInput} placeholder="Write your debate topic here..."
+                value={customTopic} onChange={e => setCustomTopic(e.target.value)} maxLength={200} rows={3} autoFocus />
             )}
-            <button
-              className={styles.nextBtn}
-              onClick={() => setStep(2)}
-              disabled={!selectedTopic || (selectedTopic === 'custom' && !customTopic.trim())}
-            >
+            <button className={styles.nextBtn} onClick={() => setStep(2)}
+              disabled={!selectedTopic || (selectedTopic === 'custom' && !customTopic.trim())}>
               Next: Choose your stance →
             </button>
           </div>
         )}
 
-        {/* Step 2 */}
         {step === 2 && (
           <div className={styles.stepWrap}>
             <div className={styles.stepLabel}>Step 2 of 2 — Choose your stance</div>
             <div className={styles.topicDisplay}>"{topic}"</div>
             <div className={styles.stanceGrid}>
-              <button
-                className={`${styles.stanceBtn} ${styles.stanceBtnFor} ${stance === 'for' ? styles.stanceSelected : ''}`}
-                onClick={() => setStance('for')}
-              >
+              <button className={`${styles.stanceBtn} ${styles.stanceBtnFor} ${stance === 'for' ? styles.stanceSelected : ''}`} onClick={() => setStance('for')}>
                 <span className={styles.stanceIcon}>✊</span>
                 <span className={styles.stanceLabel}>I'm FOR this</span>
                 <span className={styles.stanceSub}>I'll argue in favor of this statement</span>
               </button>
-              <button
-                className={`${styles.stanceBtn} ${styles.stanceBtnAgainst} ${stance === 'against' ? styles.stanceSelected : ''}`}
-                onClick={() => setStance('against')}
-              >
+              <button className={`${styles.stanceBtn} ${styles.stanceBtnAgainst} ${stance === 'against' ? styles.stanceSelected : ''}`} onClick={() => setStance('against')}>
                 <span className={styles.stanceIcon}>🚫</span>
                 <span className={styles.stanceLabel}>I'm AGAINST this</span>
                 <span className={styles.stanceSub}>I'll argue against this statement</span>
@@ -259,18 +235,13 @@ export default function StartBattle() {
             {error && <div className={styles.errorMsg}>{error}</div>}
             <div className={styles.stepActions}>
               <button className={styles.backStepBtn} onClick={() => setStep(1)}>← Back</button>
-              <button
-                className={styles.nextBtn}
-                onClick={createBattle}
-                disabled={!stance || creating}
-              >
+              <button className={styles.nextBtn} onClick={createBattle} disabled={!stance || creating}>
                 {creating ? 'Creating your battle room...' : '⚔️ Post Challenge →'}
               </button>
             </div>
           </div>
         )}
 
-        {/* Step 3: Waiting */}
         {step === 3 && createdBattle && (
           <div className={styles.stepWrap}>
             {battleAccepted ? (
@@ -278,8 +249,7 @@ export default function StartBattle() {
                 <div className={styles.acceptedIcon}>🔥</div>
                 <h2 className={styles.acceptedTitle}>Challenge accepted!</h2>
                 <p className={styles.acceptedSub}>
-                  {acceptedBy ? `@${acceptedBy}` : 'Your opponent'} is ready to battle.
-                  Taking you to the room now...
+                  {acceptedBy ? `@${acceptedBy}` : 'Your opponent'} is ready to battle. Taking you to the room now...
                 </p>
                 <div className={styles.acceptedSpinner}></div>
               </div>
@@ -304,24 +274,17 @@ export default function StartBattle() {
                   Your stance: <strong>{stance === 'for' ? 'FOR ✊' : 'AGAINST 🚫'}</strong>
                 </div>
                 <div className={styles.countdownWrap}>
-                  <div className={styles.countdownTime} style={{ color: timerColor }}>
-                    {formatTime(seekTimeLeft)}
-                  </div>
+                  <div className={styles.countdownTime} style={{ color: timerColor }}>{formatTime(seekTimeLeft)}</div>
                   <div className={styles.countdownLabel}>until challenge expires</div>
                   <div className={styles.countdownTrack}>
-                    <div
-                      className={styles.countdownFill}
-                      style={{ width: `${timerPct}%`, background: timerColor }}
-                    />
+                    <div className={styles.countdownFill} style={{ width: `${timerPct}%`, background: timerColor }} />
                   </div>
                 </div>
                 <div className={styles.seekingInfo}>
                   Your challenge is live on the <Link href="/battle" className={styles.seekingLink}>battles page</Link>.
                   Anyone can accept it while this timer runs.
                 </div>
-                <button className={styles.cancelBtn} onClick={cancelChallenge}>
-                  Cancel challenge
-                </button>
+                <button className={styles.cancelBtn} onClick={cancelChallenge}>Cancel challenge</button>
               </>
             )}
           </div>

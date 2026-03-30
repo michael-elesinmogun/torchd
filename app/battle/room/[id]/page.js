@@ -35,6 +35,8 @@ export default function BattleRoom({ params }) {
   const [battleEnded, setBattleEnded] = useState(false);
   const [winner, setWinner] = useState(null);
 
+  // Store round start time so timer works even when tab is backgrounded
+  const roundStartTimeRef = useRef(null);
   const roundTimerRef = useRef(null);
   const currentRoundRef = useRef(0);
   const callFrameRef = useRef(null);
@@ -91,7 +93,6 @@ export default function BattleRoom({ params }) {
 
       setLoading(false);
 
-      // Realtime subscriptions
       supabase.channel(`votes-${id}`)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'votes', filter: `battle_id=eq.${id}` }, () => loadVotes())
         .subscribe();
@@ -138,8 +139,26 @@ export default function BattleRoom({ params }) {
     }
 
     init();
+
+    // Recalculate timer when tab becomes visible again
+    function handleVisibility() {
+      if (document.visibilityState === 'visible' && roundStartTimeRef.current && currentRoundRef.current > 0) {
+        const elapsed = Math.floor((Date.now() - roundStartTimeRef.current) / 1000);
+        const remaining = Math.max(0, ROUND_DURATION - elapsed);
+        setRoundTimeLeft(remaining);
+        if (remaining === 0) {
+          clearInterval(roundTimerRef.current);
+          const next = currentRoundRef.current + 1;
+          if (next > TOTAL_ROUNDS) declareWinner();
+          else startRound(next);
+        }
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility);
+
     return () => {
       clearInterval(roundTimerRef.current);
+      document.removeEventListener('visibilitychange', handleVisibility);
       if (callFrameRef.current) {
         try { callFrameRef.current.destroy(); } catch {}
         callFrameRef.current = null;
@@ -156,21 +175,22 @@ export default function BattleRoom({ params }) {
   function startRound(round) {
     clearInterval(roundTimerRef.current);
     currentRoundRef.current = round;
+    roundStartTimeRef.current = Date.now();
     setCurrentRound(round);
     setRoundTimeLeft(ROUND_DURATION);
     enforceMicForRound(round);
 
     roundTimerRef.current = setInterval(() => {
-      setRoundTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(roundTimerRef.current);
-          const next = currentRoundRef.current + 1;
-          if (next > TOTAL_ROUNDS) declareWinner();
-          else startRound(next);
-          return 0;
-        }
-        return prev - 1;
-      });
+      const elapsed = Math.floor((Date.now() - roundStartTimeRef.current) / 1000);
+      const remaining = Math.max(0, ROUND_DURATION - elapsed);
+      setRoundTimeLeft(remaining);
+
+      if (remaining === 0) {
+        clearInterval(roundTimerRef.current);
+        const next = currentRoundRef.current + 1;
+        if (next > TOTAL_ROUNDS) declareWinner();
+        else startRound(next);
+      }
     }, 1000);
   }
 
@@ -214,13 +234,56 @@ export default function BattleRoom({ params }) {
     }
   }
 
-  // ── Video ─────────────────────────────────────────────────────────────────────
+  // ── Daily.co video ────────────────────────────────────────────────────────────
 
-  function openVideo() {
-    // Always open Daily room directly — works on all devices including iOS Safari
-    if (battleRef.current?.room_url) {
-      window.open(battleRef.current.room_url, '_blank');
-      setVideoJoined(true);
+  async function joinVideo() {
+    const battleData = battleRef.current;
+    if (!battleData?.room_url) return;
+
+    // Destroy any existing frame
+    if (callFrameRef.current) {
+      try { callFrameRef.current.destroy(); } catch {}
+      callFrameRef.current = null;
+    }
+
+    try {
+      const container = document.getElementById('daily-container');
+      if (!container) return;
+
+      // Use Daily's prebuilt UI — handles iOS Safari camera permissions natively
+      const frame = DailyIframe.createFrame(container, {
+        iframeStyle: {
+          width: '100%',
+          height: '100%',
+          border: 'none',
+          borderRadius: '14px',
+        },
+        showLeaveButton: true,       // Daily handles leave internally
+        showFullscreenButton: true,
+        showParticipantsBar: false,
+      });
+
+      callFrameRef.current = frame;
+
+      frame.on('joined-meeting', () => setVideoJoined(true));
+      frame.on('participant-joined', () => setParticipantCount(p => p + 1));
+      frame.on('participant-left', () => setParticipantCount(p => Math.max(0, p - 1)));
+      frame.on('left-meeting', () => {
+        // User clicked Leave inside Daily — mark battle ended
+        setVideoJoined(false);
+        if (battleRef.current && profileRef.current && (
+          battleRef.current.player1_username === profileRef.current.username ||
+          battleRef.current.player2_username === profileRef.current.username
+        )) {
+          supabase.from('battles').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', id);
+        }
+        try { callFrameRef.current?.destroy(); } catch {}
+        callFrameRef.current = null;
+      });
+
+      await frame.join({ url: battleData.room_url });
+    } catch (err) {
+      console.error('Daily join error:', err);
     }
   }
 
@@ -266,6 +329,7 @@ export default function BattleRoom({ params }) {
   const p2Pct = 100 - p1Pct;
   const isPlayer = user && (battle.player1_username === profile?.username || battle.player2_username === profile?.username);
   const isPlayer1 = profile?.username === battle.player1_username;
+  const bothInRoom = !!battle?.player2_username && participantCount >= 1;
   const shareLink = typeof window !== 'undefined' ? window.location.href : '';
   const roundConfig = currentRound > 0 ? ROUND_CONFIG[currentRound] : null;
   const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -323,8 +387,42 @@ export default function BattleRoom({ params }) {
             </div>
           )}
 
-          {/* Video section */}
-          {!videoJoined ? (
+          {/* Daily container — always mounted */}
+          <div
+            id="daily-container"
+            style={{
+              width: '100%', aspectRatio: '16/9',
+              background: '#000', borderRadius: '14px', overflow: 'hidden',
+              display: videoJoined ? 'block' : 'none',
+            }}
+          />
+
+          {/* Controls shown after joining */}
+          {videoJoined && (
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              {isPlayer1 && bothInRoom && currentRound === 0 && !battleEnded && (
+                <button onClick={handleStartBattle} style={{
+                  background: '#10B981', border: 'none', borderRadius: '100px',
+                  padding: '10px 24px', color: 'white',
+                  fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
+                }}>
+                  ▶ Start Battle
+                </button>
+              )}
+              {!isPlayer1 && bothInRoom && currentRound === 0 && !battleEnded && (
+                <div style={{
+                  background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)',
+                  borderRadius: '100px', padding: '10px 20px',
+                  fontSize: '13px', color: '#60A5FA', fontWeight: 600,
+                }}>
+                  ⏳ Waiting for Player 1 to start...
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Join prompt */}
+          {!videoJoined && (
             <div className={styles.joinVideoWrap}>
               <div className={styles.joinVideoIcon}>⚔️</div>
               <div className={styles.joinVideoTitle}>
@@ -332,51 +430,14 @@ export default function BattleRoom({ params }) {
               </div>
               <p className={styles.joinVideoSub}>
                 {battle.player2_username
-                  ? 'Tap Join Room to open the video call in a new tab.'
+                  ? 'Tap Join Room to go live and start the debate.'
                   : 'Share the link below while you wait.'}
               </p>
               {battle.room_url && (
-                <button className={styles.joinVideoBtn} onClick={openVideo}>
+                <button className={styles.joinVideoBtn} onClick={joinVideo}>
                   🎥 Join Room
                 </button>
               )}
-            </div>
-          ) : (
-            <div style={{
-              background: '#0f1623', border: '1px solid rgba(59,130,246,0.2)',
-              borderRadius: '14px', padding: '1.5rem', textAlign: 'center',
-            }}>
-              <div style={{ fontSize: '32px', marginBottom: '0.75rem' }}>🎥</div>
-              <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: '16px', color: '#EEF2FF', marginBottom: '6px' }}>
-                You're in the video call
-              </div>
-              <p style={{ fontSize: '13px', color: '#6B7A9E', marginBottom: '1.25rem' }}>
-                The call opened in a new tab. Come back here to vote and chat.
-              </p>
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                <button
-                  onClick={openVideo}
-                  style={{
-                    background: '#3B82F6', border: 'none', borderRadius: '10px',
-                    padding: '10px 20px', color: 'white',
-                    fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
-                  }}
-                >
-                  Rejoin call →
-                </button>
-                {isPlayer1 && battle.player2_username && currentRound === 0 && !battleEnded && (
-                  <button
-                    onClick={handleStartBattle}
-                    style={{
-                      background: '#10B981', border: 'none', borderRadius: '10px',
-                      padding: '10px 20px', color: 'white',
-                      fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
-                    }}
-                  >
-                    ▶ Start Battle
-                  </button>
-                )}
-              </div>
             </div>
           )}
 
