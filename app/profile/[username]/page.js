@@ -1,4 +1,4 @@
-// TORCHD_PROFILE_V4
+// TORCHD_PROFILE_V5
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
@@ -75,7 +75,7 @@ export default function Profile({ params }) {
   const [editingSports, setEditingSports] = useState(false);
   const [savingSports, setSavingSports] = useState(false);
 
-  const [activeTab, setActiveTab] = useState('history');
+  const [activeTab, setActiveTab] = useState('followers');
 
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
@@ -85,8 +85,6 @@ export default function Profile({ params }) {
   const [listsLoading, setListsLoading] = useState(true);
   const [followLoading, setFollowLoading] = useState(false);
 
-  const [battles, setBattles] = useState([]);
-  const [battlesLoading, setBattlesLoading] = useState(true);
   const [photoUrl, setPhotoUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -181,16 +179,6 @@ export default function Profile({ params }) {
       }
 
       setListsLoading(false);
-
-      const { data: battleData } = await supabase
-        .from('battles')
-        .select('*')
-        .or(`player1_username.eq.${username},player2_username.eq.${username}`)
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      setBattles(battleData || []);
-      setBattlesLoading(false);
       setLoading(false);
     }
     fetchData();
@@ -421,118 +409,17 @@ export default function Profile({ params }) {
             </div>
           </div>
 
-          {/* MAIN CONTENT — tabs first, onboarding below */}
           <div className={styles.mainContent}>
 
-            {/* TABS — now at the very top */}
+            {/* Followers / Following tabs only */}
             <div className={styles.tabs}>
-              {['history', 'topics', 'followers', 'following'].map(tab => (
-                <button key={tab} className={`${styles.tab} ${activeTab === tab ? styles.tabActive : ''}`} onClick={() => setActiveTab(tab)}>
-                  {tab === 'followers' ? `Followers (${followerCount})` : tab === 'following' ? `Following (${followingCount})` : tab.charAt(0).toUpperCase() + tab.slice(1)}
-                </button>
-              ))}
+              <button className={`${styles.tab} ${activeTab === 'followers' ? styles.tabActive : ''}`} onClick={() => setActiveTab('followers')}>
+                Followers ({followerCount})
+              </button>
+              <button className={`${styles.tab} ${activeTab === 'following' ? styles.tabActive : ''}`} onClick={() => setActiveTab('following')}>
+                Following ({followingCount})
+              </button>
             </div>
-
-            {activeTab === 'history' && (
-              battlesLoading ? (
-                <div className={styles.emptyState}><div style={{ color: '#6B7A9E', fontSize: '14px' }}>Loading battles...</div></div>
-              ) : battles.length === 0 ? (
-                <>
-                  {/* Show onboarding only on history tab when no battles */}
-                  {isOwner && (
-                    <div className={styles.onboardingSection}>
-                      <div className={styles.checklistCard}>
-                        <div className={styles.checklistHeader}>
-                          <div><div className={styles.checklistTitle}>Complete your profile</div><div className={styles.checklistSub}>{completedCount} of {totalCount} done</div></div>
-                          <div className={styles.checklistPct}>{progressPct}%</div>
-                        </div>
-                        <div className={styles.progressTrack}><div className={styles.progressFill} style={{ width: `${progressPct}%` }}></div></div>
-                        <div className={styles.checklistItems}>
-                          {[
-                            { key: 'addBio', title: 'Add a bio', sub: 'Tell the world your take' },
-                            { key: 'pickTeams', title: 'Pick your favorite teams', sub: 'So we can match you with the right opponents' },
-                            { key: 'firstBattle', title: 'Start your first battle', sub: 'Prove your takes are built different' },
-                          ].map(item => (
-                            <div key={item.key} className={`${styles.checklistItem} ${checklist[item.key] ? styles.checklistDone : ''}`}>
-                              <div className={`${styles.checkmark} ${checklist[item.key] ? styles.checkmarkDone : ''}`}>{checklist[item.key] ? '✓' : ''}</div>
-                              <div className={styles.checklistItemText}>
-                                <div className={styles.checklistItemTitle}>{item.title}</div>
-                                <div className={styles.checklistItemSub}>{item.sub}</div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className={styles.firstBattleCard}>
-                        <div className={styles.firstBattleIcon}>⚔️</div>
-                        <div className={styles.firstBattleTitle}>Start your first battle</div>
-                        <p className={styles.firstBattleBody}>You haven't debated yet. Pick a topic, get matched with someone who disagrees, and let the crowd decide who wins.</p>
-                        <Link href="/battle" className={styles.firstBattleBtn}>Find me an opponent →</Link>
-                      </div>
-
-                      <div className={styles.suggestedCard}>
-                        <div className={styles.suggestedTitle}>🔥 Suggested topics for you</div>
-                        <p className={styles.suggestedSub}>Based on your interest in {favSports.join(' & ') || 'sports'}</p>
-                        <div className={styles.topicsList}>
-                          {suggestedTopics.map((topic, i) => (
-                            <Link href="/battle" key={i} className={styles.topicRow}>
-                              <div className={styles.topicText}>"{topic}"</div>
-                              <div className={styles.topicDebateBtn}>Debate this →</div>
-                            </Link>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  {!isOwner && (
-                    <div className={styles.emptyState}>
-                      <div className={styles.emptyIcon}>⚔️</div>
-                      <div className={styles.emptyTitle}>No battles yet</div>
-                      <p className={styles.emptyBody}>This debater hasn't started any battles yet.</p>
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className={styles.battleHistory}>
-                  {battles.map(battle => {
-                    const isPlayer1 = battle.player1_username === username;
-                    const opponent = isPlayer1 ? battle.player2_username : battle.player1_username;
-                    const myStance = isPlayer1 ? battle.player1_stance : battle.player2_stance;
-                    const won = battle.winner === username;
-                    const lost = battle.winner && battle.winner !== username;
-                    return (
-                      <div key={battle.id} className={styles.battleCard}>
-                        <div className={styles.battleCardTop}>
-                          <div className={`${styles.battleResult} ${won ? styles.battleWon : lost ? styles.battleLost : styles.battlePending}`}>
-                            {!battle.winner ? '🔴 LIVE' : won ? '✓ WIN' : '✗ LOSS'}
-                          </div>
-                          <div className={styles.battleDate}>
-                            {new Date(battle.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                          </div>
-                        </div>
-                        <div className={styles.battleTopic}>"{battle.topic}"</div>
-                        {myStance && <div className={styles.battleStance}>{myStance}</div>}
-                        {opponent && (
-                          <div className={styles.battleOpponent}>
-                            vs <Link href={`/profile/${opponent}`} className={styles.battleOpponentLink}>@{opponent}</Link>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )
-            )}
-
-            {activeTab === 'topics' && (
-              <div className={styles.emptyState}>
-                <div className={styles.emptyIcon}>🔥</div>
-                <div className={styles.emptyTitle}>No favorite topics yet</div>
-                <p className={styles.emptyBody}>Topics you debate most will appear here automatically.</p>
-                <Link href="/battle" className={styles.emptyBtn}>Start debating →</Link>
-              </div>
-            )}
 
             {activeTab === 'followers' && (
               listsLoading ? (
@@ -570,6 +457,54 @@ export default function Profile({ params }) {
                   ))}
                 </div>
               )
+            )}
+
+            {/* Onboarding — shown below the lists for owners */}
+            {isOwner && (
+              <div className={styles.onboardingSection} style={{ marginTop: '1.5rem' }}>
+                <div className={styles.checklistCard}>
+                  <div className={styles.checklistHeader}>
+                    <div><div className={styles.checklistTitle}>Complete your profile</div><div className={styles.checklistSub}>{completedCount} of {totalCount} done</div></div>
+                    <div className={styles.checklistPct}>{progressPct}%</div>
+                  </div>
+                  <div className={styles.progressTrack}><div className={styles.progressFill} style={{ width: `${progressPct}%` }}></div></div>
+                  <div className={styles.checklistItems}>
+                    {[
+                      { key: 'addBio', title: 'Add a bio', sub: 'Tell the world your take' },
+                      { key: 'pickTeams', title: 'Pick your favorite teams', sub: 'So we can match you with the right opponents' },
+                      { key: 'firstBattle', title: 'Start your first battle', sub: 'Prove your takes are built different' },
+                    ].map(item => (
+                      <div key={item.key} className={`${styles.checklistItem} ${checklist[item.key] ? styles.checklistDone : ''}`}>
+                        <div className={`${styles.checkmark} ${checklist[item.key] ? styles.checkmarkDone : ''}`}>{checklist[item.key] ? '✓' : ''}</div>
+                        <div className={styles.checklistItemText}>
+                          <div className={styles.checklistItemTitle}>{item.title}</div>
+                          <div className={styles.checklistItemSub}>{item.sub}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className={styles.firstBattleCard}>
+                  <div className={styles.firstBattleIcon}>⚔️</div>
+                  <div className={styles.firstBattleTitle}>Start your first battle</div>
+                  <p className={styles.firstBattleBody}>You haven't debated yet. Pick a topic, get matched with someone who disagrees, and let the crowd decide who wins.</p>
+                  <Link href="/battle" className={styles.firstBattleBtn}>Find me an opponent →</Link>
+                </div>
+
+                <div className={styles.suggestedCard}>
+                  <div className={styles.suggestedTitle}>🔥 Suggested topics for you</div>
+                  <p className={styles.suggestedSub}>Based on your interest in {favSports.join(' & ') || 'sports'}</p>
+                  <div className={styles.topicsList}>
+                    {suggestedTopics.map((topic, i) => (
+                      <Link href="/battle" key={i} className={styles.topicRow}>
+                        <div className={styles.topicText}>"{topic}"</div>
+                        <div className={styles.topicDebateBtn}>Debate this →</div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
             )}
 
           </div>
