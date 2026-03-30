@@ -24,6 +24,28 @@ const SUGGESTED_TOPICS = {
 
 const AVATAR_COLORS = ['#3B82F6','#10B981','#F59E0B','#8B5CF6','#EF4444','#06B6D4','#EC4899','#F97316'];
 
+// Defined OUTSIDE the parent so React doesn't treat it as a new component on every render
+function UserCard({ u, index, styles }) {
+  const bg = AVATAR_COLORS[index % AVATAR_COLORS.length];
+  const initials = u.full_name
+    ? u.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+    : u.username.slice(0, 2).toUpperCase();
+
+  return (
+    <Link href={`/profile/${u.username}`} className={styles.followListItem}>
+      <div className={styles.followListAv} style={{ background: bg }}>
+        {u.avatar_url
+          ? <img src={u.avatar_url} alt={u.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+          : initials}
+      </div>
+      <div>
+        <div className={styles.followListName}>{u.full_name || u.username}</div>
+        <div className={styles.followListHandle} style={{ fontSize: '12px', color: '#6B7A9E' }}>@{u.username}</div>
+      </div>
+    </Link>
+  );
+}
+
 export default function Profile({ params }) {
   const { username } = React.use(params);
   const router = useRouter();
@@ -60,9 +82,9 @@ export default function Profile({ params }) {
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
   const [followingCount, setFollowingCount] = useState(0);
-  // Now stores full profile objects: { username, full_name, avatar_url }
   const [followerList, setFollowerList] = useState([]);
   const [followingList, setFollowingList] = useState([]);
+  const [listsLoading, setListsLoading] = useState(true);
   const [followLoading, setFollowLoading] = useState(false);
 
   const [battles, setBattles] = useState([]);
@@ -75,6 +97,7 @@ export default function Profile({ params }) {
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
+      setListsLoading(true);
 
       const { data: { session } } = await supabase.auth.getSession();
       const currentUser = session?.user;
@@ -105,14 +128,13 @@ export default function Profile({ params }) {
         const sportMap = { nba: 'NBA', nfl: 'NFL', soccer: 'Soccer', mlb: 'MLB', nhl: 'NHL', all: 'NBA' };
         const mappedSport = sportMap[profileData.sport?.toLowerCase()];
         if (mappedSport) setFavSports([mappedSport]);
-
         setChecklist({ addBio: !!profileData.bio, pickTeams: !!profileData.sport, firstBattle: false });
       } else {
         setDisplayName(username.split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
         setInitials(username.slice(0, 2).toUpperCase());
       }
 
-      // Fetch followers — get follower_id list, then look up their profiles
+      // Fetch followers — get IDs then look up profiles
       const { data: followersRaw } = await supabase
         .from('follows')
         .select('follower_id')
@@ -131,7 +153,7 @@ export default function Profile({ params }) {
         setFollowerList([]);
       }
 
-      // Fetch following — already stores username directly
+      // Fetch following — look up profiles by username
       if (profileData?.id) {
         const { data: followingRaw } = await supabase
           .from('follows')
@@ -152,7 +174,9 @@ export default function Profile({ params }) {
         }
       }
 
-      // Check if current user is following this profile
+      setListsLoading(false);
+
+      // Check if current user follows this profile
       if (currentUser) {
         const { data: existingFollow } = await supabase
           .from('follows')
@@ -188,7 +212,6 @@ export default function Profile({ params }) {
     if (isFollowing) {
       setIsFollowing(false);
       setFollowerCount(c => c - 1);
-      setFollowerList(prev => prev.filter(f => f.id !== user.id));
       await supabase.from('follows').delete()
         .eq('follower_id', user.id)
         .eq('following_username', username);
@@ -197,7 +220,6 @@ export default function Profile({ params }) {
       setFollowerCount(c => c + 1);
       await supabase.from('follows').insert({ follower_id: user.id, following_username: username });
     }
-
     setFollowLoading(false);
   }
 
@@ -254,28 +276,6 @@ export default function Profile({ params }) {
   function toggleTeam(team) { setFavTeams(prev => prev.includes(team) ? prev.filter(t => t !== team) : [...prev, team]); }
   function shareProfile() { navigator.clipboard.writeText(window.location.href).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }); }
 
-  function getInitials(u) {
-    if (u.full_name) return u.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
-    return u.username.slice(0, 2).toUpperCase();
-  }
-
-  function UserCard({ u, index }) {
-    const bg = AVATAR_COLORS[index % AVATAR_COLORS.length];
-    return (
-      <Link href={`/profile/${u.username}`} className={styles.followListItem}>
-        <div className={styles.followListAv} style={{ background: bg }}>
-          {u.avatar_url
-            ? <img src={u.avatar_url} alt={u.username} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-            : getInitials(u)}
-        </div>
-        <div>
-          <div className={styles.followListName}>{u.full_name || u.username}</div>
-          <div className={styles.followListHandle}>@{u.username}</div>
-        </div>
-      </Link>
-    );
-  }
-
   const completedCount = Object.values(checklist).filter(Boolean).length;
   const totalCount = Object.keys(checklist).length;
   const progressPct = Math.round((completedCount / totalCount) * 100);
@@ -303,8 +303,7 @@ export default function Profile({ params }) {
                 <div className={styles.avatarContainer} onClick={() => isOwner && fileInputRef.current?.click()}>
                   {photoUrl
                     ? <img src={photoUrl} alt="Profile" className={styles.avatarImg} />
-                    : <div className={styles.avatar}>{initials}</div>
-                  }
+                    : <div className={styles.avatar}>{initials}</div>}
                   {isOwner && <div className={styles.avatarOverlay}>{uploading ? '⏳' : '📷'}</div>}
                 </div>
                 {isOwner && <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePhotoUpload} />}
@@ -487,9 +486,7 @@ export default function Profile({ params }) {
 
             {activeTab === 'history' && (
               battlesLoading ? (
-                <div className={styles.emptyState}>
-                  <div style={{ color: '#6B7A9E', fontSize: '14px' }}>Loading battles...</div>
-                </div>
+                <div className={styles.emptyState}><div style={{ color: '#6B7A9E', fontSize: '14px' }}>Loading battles...</div></div>
               ) : battles.length === 0 ? (
                 <div className={styles.emptyState}>
                   <div className={styles.emptyIcon}>⚔️</div>
@@ -539,7 +536,9 @@ export default function Profile({ params }) {
             )}
 
             {activeTab === 'followers' && (
-              followerList.length === 0 ? (
+              listsLoading ? (
+                <div className={styles.emptyState}><div style={{ color: '#6B7A9E', fontSize: '14px' }}>Loading...</div></div>
+              ) : followerList.length === 0 ? (
                 <div className={styles.emptyState}>
                   <div className={styles.emptyIcon}>👥</div>
                   <div className={styles.emptyTitle}>No followers yet</div>
@@ -548,13 +547,17 @@ export default function Profile({ params }) {
                 </div>
               ) : (
                 <div className={styles.followList}>
-                  {followerList.map((u, i) => <UserCard key={u.username} u={u} index={i} />)}
+                  {followerList.map((u, i) => (
+                    <UserCard key={u.username} u={u} index={i} styles={styles} />
+                  ))}
                 </div>
               )
             )}
 
             {activeTab === 'following' && (
-              followingList.length === 0 ? (
+              listsLoading ? (
+                <div className={styles.emptyState}><div style={{ color: '#6B7A9E', fontSize: '14px' }}>Loading...</div></div>
+              ) : followingList.length === 0 ? (
                 <div className={styles.emptyState}>
                   <div className={styles.emptyIcon}>👀</div>
                   <div className={styles.emptyTitle}>Not following anyone yet</div>
@@ -563,7 +566,9 @@ export default function Profile({ params }) {
                 </div>
               ) : (
                 <div className={styles.followList}>
-                  {followingList.map((u, i) => <UserCard key={u.username} u={u} index={i} />)}
+                  {followingList.map((u, i) => (
+                    <UserCard key={u.username} u={u} index={i} styles={styles} />
+                  ))}
                 </div>
               )
             )}
