@@ -15,7 +15,6 @@ const ICE_SERVERS = {
 const ROUND_DURATION = 120; // 2 minutes per round
 const TOTAL_ROUNDS = 3;
 
-// Round config: who can speak
 const ROUND_CONFIG = {
   1: { label: 'Round 1', desc: 'Player 1 speaks · Player 2 muted', speaker: 'player1' },
   2: { label: 'Round 2', desc: 'Player 2 speaks · Player 1 muted', speaker: 'player2' },
@@ -41,8 +40,7 @@ export default function BattleRoom({ params }) {
   const [camOn, setCamOn] = useState(true);
   const [connectionStatus, setConnectionStatus] = useState('');
 
-  // Round system
-  const [currentRound, setCurrentRound] = useState(0); // 0 = not started
+  const [currentRound, setCurrentRound] = useState(0);
   const [roundTimeLeft, setRoundTimeLeft] = useState(ROUND_DURATION);
   const [battleEnded, setBattleEnded] = useState(false);
   const [winner, setWinner] = useState(null);
@@ -58,6 +56,7 @@ export default function BattleRoom({ params }) {
   const profileRef = useRef(null);
   const battleRef = useRef(null);
   const votesRef = useRef({ player1: 0, player2: 0 });
+  const remoteConnectedRef = useRef(false);
 
   useEffect(() => {
     async function init() {
@@ -85,7 +84,6 @@ export default function BattleRoom({ params }) {
       setBattle(battleData);
       battleRef.current = battleData;
 
-      // If battle already ended, show winner
       if (battleData.status === 'ended' && battleData.winner) {
         setBattleEnded(true);
         setWinner(battleData.winner);
@@ -118,7 +116,6 @@ export default function BattleRoom({ params }) {
 
       setLoading(false);
 
-      // Vote realtime
       const voteChannel = supabase
         .channel(`votes-${id}`)
         .on('postgres_changes', {
@@ -127,7 +124,6 @@ export default function BattleRoom({ params }) {
         }, () => loadVotes())
         .subscribe();
 
-      // Battle status realtime — catches winner updates from other clients
       const battleChannel = supabase
         .channel(`battle-status-${id}`)
         .on('postgres_changes', {
@@ -145,7 +141,6 @@ export default function BattleRoom({ params }) {
         })
         .subscribe();
 
-      // Chat realtime
       const chatChannel = supabase
         .channel(`battle-chat-${id}`)
         .on('postgres_changes', {
@@ -196,7 +191,7 @@ export default function BattleRoom({ params }) {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // ── Round timer ─────────────────────────────────────────────────────────────
+  // ── Round timer ──────────────────────────────────────────────────────────────
 
   function startRound(round) {
     clearInterval(roundTimerRef.current);
@@ -227,13 +222,13 @@ export default function BattleRoom({ params }) {
     const battleData = battleRef.current;
     if (!profileData || !battleData || !localStreamRef.current) return;
 
-    const isPlayer1 = battleData.player1_username === profileData.username;
+    const isP1 = battleData.player1_username === profileData.username;
     const config = ROUND_CONFIG[round];
 
     let shouldHaveMic = true;
-    if (config.speaker === 'player1') shouldHaveMic = isPlayer1;
-    else if (config.speaker === 'player2') shouldHaveMic = !isPlayer1;
-    else shouldHaveMic = true; // round 3 both speak
+    if (config.speaker === 'player1') shouldHaveMic = isP1;
+    else if (config.speaker === 'player2') shouldHaveMic = !isP1;
+    else shouldHaveMic = true;
 
     localStreamRef.current.getAudioTracks().forEach(t => { t.enabled = shouldHaveMic; });
     setMicOn(shouldHaveMic);
@@ -293,6 +288,7 @@ export default function BattleRoom({ params }) {
 
     pc.ontrack = (event) => {
       if (remoteVideoRef.current) remoteVideoRef.current.srcObject = event.streams[0];
+      remoteConnectedRef.current = true;
       setRemoteConnected(true);
       setConnectionStatus('Connected!');
     };
@@ -308,8 +304,15 @@ export default function BattleRoom({ params }) {
 
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
-      if (state === 'connected') { setConnectionStatus('Connected!'); setRemoteConnected(true); }
-      else if (state === 'disconnected' || state === 'failed') { setConnectionStatus('Opponent disconnected'); setRemoteConnected(false); }
+      if (state === 'connected') {
+        remoteConnectedRef.current = true;
+        setConnectionStatus('Connected!');
+        setRemoteConnected(true);
+      } else if (state === 'disconnected' || state === 'failed') {
+        remoteConnectedRef.current = false;
+        setConnectionStatus('Opponent disconnected');
+        setRemoteConnected(false);
+      }
     };
 
     return pc;
@@ -368,7 +371,6 @@ export default function BattleRoom({ params }) {
           }
         })
         .on('broadcast', { event: 'start-round' }, ({ payload }) => {
-          // Sync round start across both players
           startRound(payload.round);
         })
         .subscribe(async (status) => {
@@ -384,7 +386,9 @@ export default function BattleRoom({ params }) {
   }
 
   function handleStartBattle() {
-    // Player 1 triggers the start — broadcasts round 1 to both players
+    // Hard guard — both players must be connected and present
+    if (!remoteConnectedRef.current || !battleRef.current?.player2_username) return;
+
     signalingChannelRef.current?.send({
       type: 'broadcast', event: 'start-round', payload: { round: 1 },
     });
@@ -402,6 +406,7 @@ export default function BattleRoom({ params }) {
     cleanupWebRTC();
     setVideoJoined(false);
     setRemoteConnected(false);
+    remoteConnectedRef.current = false;
     setMicOn(true);
     setCamOn(true);
     setConnectionStatus('');
@@ -451,6 +456,7 @@ export default function BattleRoom({ params }) {
   const p2Pct = 100 - p1Pct;
   const isPlayer = user && (battle.player1_username === profile?.username || battle.player2_username === profile?.username);
   const isPlayer1 = profile?.username === battle.player1_username;
+  const bothConnected = remoteConnected && !!battle?.player2_username;
   const shareLink = typeof window !== 'undefined' ? window.location.href : '';
   const roundConfig = currentRound > 0 ? ROUND_CONFIG[currentRound] : null;
   const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -498,15 +504,11 @@ export default function BattleRoom({ params }) {
           {/* Winner banner */}
           {battleEnded && (
             <div style={{
-              background: winner === 'tie'
-                ? 'rgba(107,114,128,0.15)'
-                : 'rgba(16,185,129,0.1)',
+              background: winner === 'tie' ? 'rgba(107,114,128,0.15)' : 'rgba(16,185,129,0.1)',
               border: `1px solid ${winner === 'tie' ? 'rgba(107,114,128,0.3)' : 'rgba(16,185,129,0.3)'}`,
               borderRadius: '14px', padding: '1.5rem', textAlign: 'center',
             }}>
-              <div style={{ fontSize: '36px', marginBottom: '0.5rem' }}>
-                {winner === 'tie' ? '🤝' : '🏆'}
-              </div>
+              <div style={{ fontSize: '36px', marginBottom: '0.5rem' }}>{winner === 'tie' ? '🤝' : '🏆'}</div>
               <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: '20px', color: '#EEF2FF', marginBottom: '4px' }}>
                 {winner === 'tie' ? "It's a tie!" : `@${winner} wins!`}
               </div>
@@ -520,22 +522,25 @@ export default function BattleRoom({ params }) {
           {videoJoined ? (
             <div className={styles.videoStage}>
               <video ref={remoteVideoRef} autoPlay playsInline className={styles.remoteVideo} />
+
               {!remoteConnected && (
                 <div className={styles.remoteWaiting}>
                   <div className={styles.remoteWaitingIcon}>⏳</div>
                   <div className={styles.remoteWaitingText}>{connectionStatus || 'Waiting for opponent to join...'}</div>
                 </div>
               )}
+
               <video
                 ref={el => { localVideoRef.current = el; if (el && localStreamRef.current) el.srcObject = localStreamRef.current; }}
                 autoPlay muted playsInline className={styles.localVideo}
               />
-              {connectionStatus && remoteConnected && (
+
+              {connectionStatus && remoteConnected && currentRound === 0 && (
                 <div className={styles.connectionBadge}>🟢 {connectionStatus}</div>
               )}
 
               {/* Muted indicator */}
-              {!micOn && (
+              {!micOn && currentRound > 0 && (
                 <div style={{
                   position: 'absolute', top: '12px', left: '12px',
                   background: 'rgba(239,68,68,0.9)', color: 'white',
@@ -546,9 +551,21 @@ export default function BattleRoom({ params }) {
                 </div>
               )}
 
+              {/* Waiting for opponent to start hint */}
+              {remoteConnected && currentRound === 0 && !isPlayer1 && !battleEnded && (
+                <div style={{
+                  position: 'absolute', top: '12px', left: '12px',
+                  background: 'rgba(59,130,246,0.9)', color: 'white',
+                  fontSize: '11px', fontWeight: 700, borderRadius: '100px',
+                  padding: '4px 12px',
+                }}>
+                  ⏳ Waiting for Player 1 to start the battle...
+                </div>
+              )}
+
               <div className={styles.videoControls}>
-                {/* Start battle button — only Player 1, only when both connected, round not started */}
-                {isPlayer1 && remoteConnected && currentRound === 0 && !battleEnded && (
+                {/* Start Battle — Player 1 only, BOTH players must be connected */}
+                {isPlayer1 && bothConnected && currentRound === 0 && !battleEnded && (
                   <button
                     onClick={handleStartBattle}
                     style={{
@@ -564,13 +581,11 @@ export default function BattleRoom({ params }) {
                 <button
                   className={`${styles.controlBtn} ${micOn ? '' : styles.controlBtnOff}`}
                   onClick={() => {
-                    // Only allow manual mic toggle in round 3 or before battle starts
                     if (currentRound === 3 || currentRound === 0) {
                       localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = !micOn; });
                       setMicOn(m => !m);
                     }
                   }}
-                  title={currentRound > 0 && currentRound < 3 ? 'Mic controlled by round rules' : ''}
                 >
                   {micOn ? '🎤' : '🔇'}
                 </button>
@@ -600,9 +615,7 @@ export default function BattleRoom({ params }) {
                   : 'Share the link below while you wait. Tap Join Room when ready.'}
               </p>
               {battle.room_url && (
-                <button className={styles.joinVideoBtn} onClick={joinVideo}>
-                  🎥 Join Room
-                </button>
+                <button className={styles.joinVideoBtn} onClick={joinVideo}>🎥 Join Room</button>
               )}
             </div>
           )}
