@@ -13,10 +13,10 @@ export default function Battle() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [accepting, setAccepting] = useState(null); // battle id being accepted
+  const [authReady, setAuthReady] = useState(false); // wait for session check
+  const [accepting, setAccepting] = useState(null);
   const [acceptError, setAcceptError] = useState('');
 
-  // Tick every second so countdown timers update live
   const [now, setNow] = useState(Date.now());
   const tickRef = useRef(null);
 
@@ -28,17 +28,19 @@ export default function Battle() {
   useEffect(() => {
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
 
-      if (session?.user) {
+      if (currentUser) {
         const { data: profileData } = await supabase
           .from('profiles')
           .select('username')
-          .eq('id', session.user.id)
+          .eq('id', currentUser.id)
           .maybeSingle();
         setProfile(profileData);
       }
 
+      setAuthReady(true); // session is now known
       await loadBattles();
       setLoading(false);
     }
@@ -47,64 +49,44 @@ export default function Battle() {
 
   async function loadBattles() {
     const nowIso = new Date().toISOString();
-
     const [{ data: challenges }, { data: live }, { data: ended }] = await Promise.all([
-      // Open challenges: seeking + not expired
-      supabase
-        .from('battles')
-        .select('*')
-        .eq('status', 'seeking')
-        .gt('expires_at', nowIso)
-        .order('created_at', { ascending: false })
-        .limit(20),
-
-      // Live now: both players present, actively battling
-      supabase
-        .from('battles')
-        .select('*')
-        .eq('status', 'live')
-        .order('created_at', { ascending: false })
-        .limit(10),
-
-      // Recent results
-      supabase
-        .from('battles')
-        .select('*')
-        .eq('status', 'ended')
-        .not('winner', 'is', null)
-        .order('ended_at', { ascending: false })
-        .limit(5),
+      supabase.from('battles').select('*').eq('status', 'seeking').gt('expires_at', nowIso).order('created_at', { ascending: false }).limit(20),
+      supabase.from('battles').select('*').eq('status', 'live').order('created_at', { ascending: false }).limit(10),
+      supabase.from('battles').select('*').eq('status', 'ended').not('winner', 'is', null).order('ended_at', { ascending: false }).limit(5),
     ]);
-
     setOpenChallenges(challenges || []);
     setLiveBattles(live || []);
     setRecentBattles(ended || []);
   }
 
   async function acceptChallenge(battle) {
+    // Auth guard — only fires after session is confirmed
+    if (!authReady) return;
+
     if (!user || !profile) {
-      router.push('/login');
+      // Store battle id in sessionStorage so we can auto-accept after login
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('pendingAccept', battle.id);
+      }
+      router.push('/login?redirect=/battle');
       return;
     }
+
+    // Can't accept your own challenge
+    if (profile.username === battle.player1_username) return;
 
     setAcceptError('');
     setAccepting(battle.id);
 
     try {
-      // Determine player2's stance (opposite of player1)
       const p1IsFor = battle.player1_stance?.startsWith('FOR');
       const p2Stance = p1IsFor
         ? `AGAINST — ${battle.topic.slice(0, 40)}`
         : `FOR — ${battle.topic.slice(0, 40)}`;
 
-      // Atomic update — only succeeds if still 'seeking'
       const { data, error } = await supabase
         .from('battles')
-        .update({
-          player2_username: profile.username,
-          player2_stance: p2Stance,
-          status: 'live',
-        })
+        .update({ player2_username: profile.username, player2_stance: p2Stance, status: 'live' })
         .eq('id', battle.id)
         .eq('status', 'seeking')
         .select()
@@ -113,19 +95,15 @@ export default function Battle() {
       if (error) throw new Error(error.message);
 
       if (!data) {
-        // Someone else accepted first
         setAcceptError('This challenge was just taken. Browse for another one.');
         setAccepting(null);
         await loadBattles();
         return;
       }
 
-      // Notify player1 via notifications table
+      // Notify player1
       const { data: p1Profile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('username', battle.player1_username)
-        .maybeSingle();
+        .from('profiles').select('id').eq('username', battle.player1_username).maybeSingle();
 
       if (p1Profile) {
         await supabase.from('notifications').insert({
@@ -143,11 +121,20 @@ export default function Battle() {
     }
   }
 
+  // After login redirect back, check if there's a pending accept
+  useEffect(() => {
+    if (!authReady || !user || !profile) return;
+    const pendingId = sessionStorage.getItem('pendingAccept');
+    if (!pendingId) return;
+    sessionStorage.removeItem('pendingAccept');
+    // Find the battle and auto-accept
+    const battle = openChallenges.find(b => b.id === pendingId);
+    if (battle) acceptChallenge(battle);
+  }, [authReady, user, profile, openChallenges]);
+
   function formatTimeLeft(expiresAt) {
     const left = Math.max(0, Math.floor((new Date(expiresAt).getTime() - now) / 1000));
-    const m = Math.floor(left / 60);
-    const s = left % 60;
-    return `${m}:${String(s).padStart(2, '0')}`;
+    return `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
   }
 
   function getTimerColor(expiresAt) {
@@ -178,10 +165,7 @@ export default function Battle() {
         </div>
 
         {acceptError && (
-          <div style={{
-            background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)',
-            borderRadius: '10px', padding: '12px 16px', fontSize: '13px', color: '#F87171',
-          }}>
+          <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', padding: '12px 16px', fontSize: '13px', color: '#F87171' }}>
             {acceptError}
           </div>
         )}
@@ -228,10 +212,8 @@ export default function Battle() {
                         <span style={{
                           fontSize: '11px', fontWeight: 700,
                           color: battle.player1_stance?.startsWith('FOR') ? '#60A5FA' : '#F87171',
-                          background: battle.player1_stance?.startsWith('FOR')
-                            ? 'rgba(59,130,246,0.1)' : 'rgba(239,68,68,0.1)',
-                          border: `1px solid ${battle.player1_stance?.startsWith('FOR')
-                            ? 'rgba(59,130,246,0.22)' : 'rgba(239,68,68,0.22)'}`,
+                          background: battle.player1_stance?.startsWith('FOR') ? 'rgba(59,130,246,0.1)' : 'rgba(239,68,68,0.1)',
+                          border: `1px solid ${battle.player1_stance?.startsWith('FOR') ? 'rgba(59,130,246,0.22)' : 'rgba(239,68,68,0.22)'}`,
                           borderRadius: '100px', padding: '2px 9px',
                         }}>
                           {battle.player1_stance?.startsWith('FOR') ? 'FOR ✊' : 'AGAINST 🚫'}
@@ -244,6 +226,15 @@ export default function Battle() {
                     <div>
                       {isOwn ? (
                         <div className={styles.ownChallengeBadge}>Your challenge</div>
+                      ) : !authReady || (!user && authReady) ? (
+                        // Not logged in — show sign in link instead of button
+                        <Link
+                          href="/login?redirect=/battle"
+                          className={styles.acceptBtn}
+                          style={{ textDecoration: 'none', display: 'inline-block' }}
+                        >
+                          Sign in to accept →
+                        </Link>
                       ) : (
                         <button
                           className={styles.acceptBtn}
@@ -268,7 +259,6 @@ export default function Battle() {
               <span className={styles.liveDot}></span> Live Now
             </div>
           </div>
-
           {loading ? (
             <div className={styles.loadingState}>Loading live battles...</div>
           ) : liveBattles.length === 0 ? (
@@ -282,9 +272,7 @@ export default function Battle() {
               {liveBattles.map(battle => (
                 <Link href={`/battle/room/${battle.id}`} key={battle.id} className={styles.battleCard}>
                   <div className={styles.battleCardLeft}>
-                    <div className={styles.battleLiveBadge}>
-                      <span className={styles.liveDotSmall}></span> LIVE
-                    </div>
+                    <div className={styles.battleLiveBadge}><span className={styles.liveDotSmall}></span> LIVE</div>
                     <div className={styles.battleTopic}>"{battle.topic}"</div>
                     <div className={styles.battlePlayers}>
                       <span className={styles.battlePlayer}>@{battle.player1_username}</span>
@@ -309,12 +297,7 @@ export default function Battle() {
               {recentBattles.map(battle => (
                 <Link href={`/battle/room/${battle.id}`} key={battle.id} className={styles.battleCard}>
                   <div className={styles.battleCardLeft}>
-                    <div style={{
-                      display: 'inline-flex', alignItems: 'center', gap: '6px',
-                      fontSize: '11px', fontWeight: 700, color: '#10B981',
-                      background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.22)',
-                      borderRadius: '100px', padding: '3px 10px', marginBottom: '6px',
-                    }}>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 700, color: '#10B981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.22)', borderRadius: '100px', padding: '3px 10px', marginBottom: '6px' }}>
                       🏆 {battle.winner === 'tie' ? 'TIE' : `@${battle.winner} won`}
                     </div>
                     <div className={styles.battleTopic}>"{battle.topic}"</div>
@@ -352,7 +335,6 @@ export default function Battle() {
           </div>
         </div>
 
-        {/* Bottom CTA */}
         <div className={styles.cta}>
           <h2 className={styles.ctaTitle}>Ready to prove your take?</h2>
           <p className={styles.ctaSub}>Post a challenge in under 60 seconds.</p>
