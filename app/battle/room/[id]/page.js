@@ -17,8 +17,9 @@ const ROUND_CONFIG = {
 
 function isMobileSafari() {
   if (typeof window === 'undefined') return false;
-  const ua = navigator.userAgent;
-  return /iP(hone|od|ad)/.test(ua) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(ua));
+  return /iP(hone|od|ad)/.test(navigator.userAgent) ||
+    navigator.maxTouchPoints > 1 ||
+    window.innerWidth < 768;
 }
 
 export default function BattleRoom({ params }) {
