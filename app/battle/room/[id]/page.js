@@ -14,6 +14,25 @@ const ROUND_CONFIG = {
   3: { label: 'Round 3', desc: 'Open mic — both players speak freely', speaker: 'both' },
 };
 
+// Load Daily script once globally
+let dailyScriptLoaded = false;
+function loadDailyScript() {
+  return new Promise((resolve, reject) => {
+    if (dailyScriptLoaded || window.DailyIframe) {
+      dailyScriptLoaded = true;
+      resolve();
+      return;
+    }
+    // Remove any existing Daily scripts first
+    document.querySelectorAll('script[src*="daily"]').forEach(s => s.remove());
+    const script = document.createElement('script');
+    script.src = 'https://unpkg.com/@daily-co/daily-js';
+    script.onload = () => { dailyScriptLoaded = true; resolve(); };
+    script.onerror = reject;
+    document.head.appendChild(script);
+  });
+}
+
 export default function BattleRoom({ params }) {
   const { id } = use(params);
   const router = useRouter();
@@ -29,8 +48,8 @@ export default function BattleRoom({ params }) {
   const [copied, setCopied] = useState(false);
   const [videoJoined, setVideoJoined] = useState(false);
   const [participantCount, setParticipantCount] = useState(0);
+  const [joinError, setJoinError] = useState('');
 
-  // Round system
   const [currentRound, setCurrentRound] = useState(0);
   const [roundTimeLeft, setRoundTimeLeft] = useState(ROUND_DURATION);
   const [battleEnded, setBattleEnded] = useState(false);
@@ -43,7 +62,7 @@ export default function BattleRoom({ params }) {
   const profileRef = useRef(null);
   const battleRef = useRef(null);
   const votesRef = useRef({ player1: 0, player2: 0 });
-  const isPlayer1Ref = useRef(false);
+  const joiningRef = useRef(false); // prevent double-join
 
   useEffect(() => {
     async function init() {
@@ -53,19 +72,14 @@ export default function BattleRoom({ params }) {
 
       if (currentUser) {
         const { data: profileData } = await supabase
-          .from('profiles')
-          .select('username, full_name')
-          .eq('id', currentUser.id)
-          .maybeSingle();
+          .from('profiles').select('username, full_name')
+          .eq('id', currentUser.id).maybeSingle();
         setProfile(profileData);
         profileRef.current = profileData;
       }
 
       const { data: battleData } = await supabase
-        .from('battles')
-        .select('*')
-        .eq('id', id)
-        .single();
+        .from('battles').select('*').eq('id', id).single();
 
       if (!battleData) { router.push('/battle'); return; }
       setBattle(battleData);
@@ -92,8 +106,7 @@ export default function BattleRoom({ params }) {
       if (currentUser) {
         const { data: existingVote } = await supabase
           .from('votes').select('side')
-          .eq('battle_id', id).eq('user_id', currentUser.id)
-          .maybeSingle();
+          .eq('battle_id', id).eq('user_id', currentUser.id).maybeSingle();
         if (existingVote) setVoted(existingVote.side);
       }
 
@@ -118,7 +131,6 @@ export default function BattleRoom({ params }) {
         })
         .subscribe();
 
-      // Round sync via Supabase broadcast
       const roundChannel = supabase
         .channel(`round-sync-${id}`, { config: { broadcast: { self: false } } })
         .on('broadcast', { event: 'start-round' }, ({ payload }) => {
@@ -161,16 +173,27 @@ export default function BattleRoom({ params }) {
     init();
     return () => {
       clearInterval(roundTimerRef.current);
-      if (callFrameRef.current) {
-        callFrameRef.current.destroy();
-        callFrameRef.current = null;
-      }
+      destroyFrame();
     };
   }, [id]);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  function destroyFrame() {
+    if (callFrameRef.current) {
+      try { callFrameRef.current.destroy(); } catch {}
+      callFrameRef.current = null;
+    }
+    // Also destroy any lingering Daily frames on the page
+    if (window.DailyIframe) {
+      try {
+        const existing = window.DailyIframe.getCallInstance();
+        if (existing) existing.destroy();
+      } catch {}
+    }
+  }
 
   // ── Round system ─────────────────────────────────────────────────────────────
 
@@ -200,29 +223,24 @@ export default function BattleRoom({ params }) {
     const battleData = battleRef.current;
     const profileData = profileRef.current;
     if (!battleData || !profileData) return;
-
     const isP1 = battleData.player1_username === profileData.username;
     const config = ROUND_CONFIG[round];
     let shouldHaveMic = true;
     if (config.speaker === 'player1') shouldHaveMic = isP1;
     else if (config.speaker === 'player2') shouldHaveMic = !isP1;
-
-    callFrameRef.current.setLocalAudio(shouldHaveMic);
+    try { callFrameRef.current.setLocalAudio(shouldHaveMic); } catch {}
   }
 
   async function declareWinner() {
     const v = votesRef.current;
     const battleData = battleRef.current;
     if (!battleData) return;
-
     let winnerUsername = 'tie';
     if (v.player1 > v.player2) winnerUsername = battleData.player1_username;
     else if (v.player2 > v.player1) winnerUsername = battleData.player2_username;
-
     await supabase.from('battles').update({
       status: 'ended', winner: winnerUsername, ended_at: new Date().toISOString(),
     }).eq('id', id);
-
     setBattleEnded(true);
     setWinner(winnerUsername);
   }
@@ -252,13 +270,22 @@ export default function BattleRoom({ params }) {
   // ── Daily.co iframe ──────────────────────────────────────────────────────────
 
   async function joinVideo() {
+    if (joiningRef.current || callFrameRef.current) return; // prevent duplicate
+    joiningRef.current = true;
+    setJoinError('');
+
     try {
       const battleData = battleRef.current;
       const profileData = profileRef.current;
-      const isPlayer1 = battleData.player1_username === profileData?.username;
-      isPlayer1Ref.current = isPlayer1;
 
-      // Update battle status
+      if (!battleData?.room_url) {
+        setJoinError('No room URL found. Please create a new battle.');
+        joiningRef.current = false;
+        return;
+      }
+
+      const isPlayer1 = battleData.player1_username === profileData?.username;
+
       if (!isPlayer1) {
         await supabase.from('battles').update({
           status: 'live', player2_username: profileData?.username,
@@ -266,62 +293,61 @@ export default function BattleRoom({ params }) {
         setBattle(prev => ({ ...prev, status: 'live', player2_username: profileData?.username }));
       }
 
-      // Load Daily.co script dynamically
-      if (!window.DailyIframe) {
-        await new Promise((resolve, reject) => {
-          const script = document.createElement('script');
-          script.src = 'https://unpkg.com/@daily-co/daily-js';
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        });
-      }
+      // Destroy any existing frame first
+      destroyFrame();
 
-      const frame = window.DailyIframe.createFrame(
-        document.getElementById('daily-container'),
-        {
-          iframeStyle: {
-            width: '100%',
-            height: '100%',
-            border: 'none',
-            borderRadius: '14px',
-          },
-          showLeaveButton: false,
-          showFullscreenButton: false,
-        }
-      );
+      // Load Daily script
+      await loadDailyScript();
+
+      const container = document.getElementById('daily-container');
+      if (!container) throw new Error('Container not found');
+
+      const frame = window.DailyIframe.createFrame(container, {
+        iframeStyle: {
+          width: '100%',
+          height: '100%',
+          border: 'none',
+          borderRadius: '14px',
+        },
+        showLeaveButton: false,
+        showFullscreenButton: false,
+        allowMultipleCallInstances: true,
+      });
 
       callFrameRef.current = frame;
 
       frame.on('joined-meeting', () => {
         setVideoJoined(true);
+        joiningRef.current = false;
       });
 
-      frame.on('participant-joined', (e) => {
+      frame.on('participant-joined', () => {
         setParticipantCount(prev => prev + 1);
       });
 
-      frame.on('participant-left', (e) => {
+      frame.on('participant-left', () => {
         setParticipantCount(prev => Math.max(0, prev - 1));
       });
 
-      frame.on('left-meeting', () => {
-        leaveVideo();
+      frame.on('error', (e) => {
+        console.error('Daily error:', e);
+        setJoinError('Video error: ' + (e?.errorMsg || 'unknown'));
+        joiningRef.current = false;
       });
 
       await frame.join({ url: battleData.room_url });
 
     } catch (err) {
       console.error('Daily join error:', err);
-      alert('Could not join video room. Please check your connection.');
+      setJoinError('Could not join video room: ' + err.message);
+      destroyFrame();
+      joiningRef.current = false;
     }
   }
 
   function handleStartBattle() {
     const battleData = battleRef.current;
     if (!battleData?.player2_username || participantCount < 1) return;
-
-    // Broadcast round start to both players via Supabase
     supabase.channel(`round-sync-${id}`).send({
       type: 'broadcast', event: 'start-round', payload: { round: 1 },
     });
@@ -330,16 +356,11 @@ export default function BattleRoom({ params }) {
 
   async function leaveVideo() {
     clearInterval(roundTimerRef.current);
-
-    if (callFrameRef.current) {
-      try { await callFrameRef.current.leave(); } catch {}
-      try { callFrameRef.current.destroy(); } catch {}
-      callFrameRef.current = null;
-    }
-
+    destroyFrame();
     setVideoJoined(false);
     setParticipantCount(0);
     setCurrentRound(0);
+    joiningRef.current = false;
 
     if (battleRef.current && profileRef.current && (
       battleRef.current.player1_username === profileRef.current.username ||
@@ -447,31 +468,25 @@ export default function BattleRoom({ params }) {
             </div>
           )}
 
-          {/* Daily.co video container — always mounted, hidden when not joined */}
+          {/* Daily container — always in DOM */}
           <div
             id="daily-container"
             style={{
               width: '100%', aspectRatio: '16/9',
               background: '#000', borderRadius: '14px', overflow: 'hidden',
               display: videoJoined ? 'block' : 'none',
-              position: 'relative',
             }}
           />
 
-          {/* Controls below Daily iframe */}
+          {/* Video controls */}
           {videoJoined && (
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-              {/* Start Battle — Player 1, both in room, round not started */}
               {isPlayer1 && bothInRoom && currentRound === 0 && !battleEnded && (
-                <button
-                  onClick={handleStartBattle}
-                  style={{
-                    background: '#10B981', border: 'none', borderRadius: '100px',
-                    padding: '10px 24px', color: 'white',
-                    fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px',
-                    cursor: 'pointer',
-                  }}
-                >
+                <button onClick={handleStartBattle} style={{
+                  background: '#10B981', border: 'none', borderRadius: '100px',
+                  padding: '10px 24px', color: 'white',
+                  fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
+                }}>
                   ▶ Start Battle
                 </button>
               )}
@@ -484,15 +499,11 @@ export default function BattleRoom({ params }) {
                   ⏳ Waiting for Player 1 to start...
                 </div>
               )}
-              <button
-                onClick={leaveVideo}
-                style={{
-                  background: '#EF4444', border: 'none', borderRadius: '100px',
-                  padding: '10px 24px', color: 'white',
-                  fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px',
-                  cursor: 'pointer',
-                }}
-              >
+              <button onClick={leaveVideo} style={{
+                background: '#EF4444', border: 'none', borderRadius: '100px',
+                padding: '10px 24px', color: 'white',
+                fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
+              }}>
                 Leave
               </button>
             </div>
@@ -510,6 +521,11 @@ export default function BattleRoom({ params }) {
                   ? 'Tap Join Room to go live and start the debate.'
                   : 'Share the link below while you wait. Tap Join Room when ready.'}
               </p>
+              {joinError && (
+                <div style={{ fontSize: '13px', color: '#F87171', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', padding: '8px 14px' }}>
+                  {joinError}
+                </div>
+              )}
               {battle.room_url && (
                 <button className={styles.joinVideoBtn} onClick={joinVideo}>🎥 Join Room</button>
               )}
@@ -526,7 +542,6 @@ export default function BattleRoom({ params }) {
               <span style={{ color: '#6B7A9E', fontSize: '12px' }}>{total} votes</span>
               <span style={{ color: '#F87171' }}>{p2Pct}% — {battle.player2_username || 'Player 2'}</span>
             </div>
-
             {!voted && user && !isPlayer && !battleEnded && (
               <div className={styles.voteButtons}>
                 <button className={`${styles.voteBtn} ${styles.voteBtnBlue}`} onClick={() => castVote('player1')}>
@@ -537,7 +552,6 @@ export default function BattleRoom({ params }) {
                 </button>
               </div>
             )}
-
             {voted && <div className={styles.voteCast}>✓ Vote cast — {voted === 'player1' ? battle.player1_username : battle.player2_username}</div>}
             {isPlayer && !battleEnded && <div className={styles.playerNotice}>You're in this battle — you can't vote on your own debate</div>}
             {!user && <div className={styles.loginPrompt}><Link href="/login" className={styles.loginLink}>Sign in</Link> to vote</div>}
