@@ -9,15 +9,24 @@ export async function GET(request) {
     nhl: 'https://site.api.espn.com/apis/site/v2/sports/hockey/nhl/scoreboard',
   };
 
-  const url = endpoints[sport];
-  if (!url) {
+  const base = endpoints[sport];
+  if (!base) {
     return Response.json({ error: 'Invalid sport' }, { status: 400 });
   }
+
+  // Force today's date for MLB (and all sports) so ESPN doesn't return
+  // a different week's games. Format: YYYYMMDD
+  const today = new Date();
+  const dateStr = today.getFullYear().toString() +
+    String(today.getMonth() + 1).padStart(2, '0') +
+    String(today.getDate()).padStart(2, '0');
+
+  const url = `${base}?dates=${dateStr}`;
 
   try {
     const res = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0' },
-      next: { revalidate: 30 }, // cache for 30 seconds
+      next: { revalidate: 30 },
     });
 
     if (!res.ok) {

@@ -82,6 +82,9 @@ export default function NavBar() {
     { href: '/search', label: '🔍 Search' },
   ];
 
+  // Logo links to /lobby if logged in, otherwise /
+  const logoHref = user ? '/lobby' : '/';
+
   return (
     <>
       <nav style={{
@@ -94,7 +97,7 @@ export default function NavBar() {
       }}>
 
         {/* Logo */}
-        <Link href="/" style={{
+        <Link href={logoHref} style={{
           fontFamily: 'Syne, sans-serif', fontSize: '22px', fontWeight: 800,
           color: '#3B82F6', textDecoration: 'none', letterSpacing: '-0.5px',
           display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0,
@@ -132,7 +135,6 @@ export default function NavBar() {
             <div style={{ width: '80px', height: '32px' }}></div>
           ) : user ? (
             <>
-              {/* Profile link — hidden on mobile, shown in hamburger */}
               <Link href={`/profile/${profileSlug || 'profile'}`} style={{
                 display: 'flex', alignItems: 'center', gap: '8px',
                 textDecoration: 'none', padding: '6px 12px', borderRadius: '8px',
@@ -204,7 +206,7 @@ export default function NavBar() {
             className="nav-hamburger"
             aria-label="Toggle menu"
             style={{
-              display: 'none', // shown via CSS below
+              display: 'none',
               background: 'none', border: '1px solid rgba(255,255,255,0.065)',
               borderRadius: '8px', padding: '7px 10px', cursor: 'pointer',
               color: '#EEF2FF', fontSize: '18px', lineHeight: 1,
@@ -278,7 +280,6 @@ export default function NavBar() {
         </div>
       )}
 
-      {/* Inline styles for responsive behavior */}
       <style>{`
         .nav-desktop-links { display: flex !important; }
         .nav-signout-btn { display: block !important; }

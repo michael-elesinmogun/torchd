@@ -83,7 +83,7 @@ export default function StartBattle() {
       // 3. Save room URL to battle
       await supabase
         .from('battles')
-        .update({ room_url: roomData.url, status: 'live' })
+        .update({ room_url: roomData.url, status: 'waiting' })
         .eq('id', battle.id);
 
       setCreatedBattle({ ...battle, room_url: roomData.url });

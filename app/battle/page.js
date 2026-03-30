@@ -17,7 +17,7 @@ export default function Battle() {
       const { data } = await supabase
         .from('battles')
         .select('*')
-        .eq('status', 'live')
+        .in('status', ['waiting', 'live'])
         .order('created_at', { ascending: false })
         .limit(10);
 
@@ -77,7 +77,8 @@ export default function Battle() {
                 <Link href={`/battle/room/${battle.id}`} key={battle.id} className={styles.battleCard}>
                   <div className={styles.battleCardLeft}>
                     <div className={styles.battleLiveBadge}>
-                      <span className={styles.liveDotSmall}></span> LIVE
+                      <span className={styles.liveDotSmall}></span>
+                      {battle.status === 'live' ? 'LIVE' : 'WAITING FOR OPPONENT'}
                     </div>
                     <div className={styles.battleTopic}>"{battle.topic}"</div>
                     <div className={styles.battlePlayers}>
