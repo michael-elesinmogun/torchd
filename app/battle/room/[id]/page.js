@@ -261,9 +261,8 @@ export default function BattleRoom({ params }) {
   // ── Daily.co ──────────────────────────────────────────────────────────────────
 
   async function joinVideo() {
-    if (joiningRef.current || callFrameRef.current) return;
-    joiningRef.current = true;
-    setJoinError('');
+    if (callFrameRef.current) return;
+        joiningRef.current = false; // reset on mobile retries
 
     const battleData = battleRef.current;
 
