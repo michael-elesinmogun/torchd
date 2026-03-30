@@ -15,6 +15,12 @@ const ROUND_CONFIG = {
   3: { label: 'Round 3', desc: 'Open mic — both players speak freely', speaker: 'both' },
 };
 
+function isMobileSafari() {
+  if (typeof window === 'undefined') return false;
+  const ua = navigator.userAgent;
+  return /iP(hone|od|ad)/.test(ua) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(ua));
+}
+
 export default function BattleRoom({ params }) {
   const { id } = use(params);
   const router = useRouter();
@@ -31,6 +37,7 @@ export default function BattleRoom({ params }) {
   const [videoJoined, setVideoJoined] = useState(false);
   const [participantCount, setParticipantCount] = useState(0);
   const [joinError, setJoinError] = useState('');
+  const [isMobile, setIsMobile] = useState(false);
 
   const [currentRound, setCurrentRound] = useState(0);
   const [roundTimeLeft, setRoundTimeLeft] = useState(ROUND_DURATION);
@@ -44,7 +51,11 @@ export default function BattleRoom({ params }) {
   const profileRef = useRef(null);
   const battleRef = useRef(null);
   const votesRef = useRef({ player1: 0, player2: 0 });
-  const joiningRef = useRef(false); // prevent double-join
+  const joiningRef = useRef(false);
+
+  useEffect(() => {
+    setIsMobile(isMobileSafari());
+  }, []);
 
   useEffect(() => {
     async function init() {
@@ -168,7 +179,6 @@ export default function BattleRoom({ params }) {
       try { callFrameRef.current.destroy(); } catch {}
       callFrameRef.current = null;
     }
-    // Also destroy any lingering Daily frames
     try {
       const existing = DailyIframe.getCallInstance();
       if (existing) existing.destroy();
@@ -247,35 +257,40 @@ export default function BattleRoom({ params }) {
     }
   }
 
-  // ── Daily.co iframe ──────────────────────────────────────────────────────────
+  // ── Daily.co ──────────────────────────────────────────────────────────────────
 
   async function joinVideo() {
-    if (joiningRef.current || callFrameRef.current) return; // prevent duplicate
+    if (joiningRef.current || callFrameRef.current) return;
     joiningRef.current = true;
     setJoinError('');
 
+    const battleData = battleRef.current;
+
+    if (!battleData?.room_url) {
+      setJoinError('No room URL found. Please create a new battle.');
+      joiningRef.current = false;
+      return;
+    }
+
+    // Mobile Safari: open Daily room directly in browser tab
+    // iOS blocks camera access in cross-origin iframes
+    if (isMobile) {
+      setVideoJoined(true); // show "you're in the call" UI
+      joiningRef.current = false;
+      // Open Daily room in same tab — user comes back with back button
+      window.location.href = battleData.room_url;
+      return;
+    }
+
+    // Desktop: use embedded iframe as before
     try {
-      const battleData = battleRef.current;
-
-      if (!battleData?.room_url) {
-        setJoinError('No room URL found. Please create a new battle.');
-        joiningRef.current = false;
-        return;
-      }
-
-      // Destroy any existing frame first
       destroyFrame();
 
       const container = document.getElementById('daily-container');
       if (!container) throw new Error('Container not found');
 
       const frame = DailyIframe.createFrame(container, {
-        iframeStyle: {
-          width: '100%',
-          height: '100%',
-          border: 'none',
-          borderRadius: '14px',
-        },
+        iframeStyle: { width: '100%', height: '100%', border: 'none', borderRadius: '14px' },
         showLeaveButton: false,
         showFullscreenButton: false,
         allowMultipleCallInstances: true,
@@ -283,21 +298,10 @@ export default function BattleRoom({ params }) {
 
       callFrameRef.current = frame;
 
-      frame.on('joined-meeting', () => {
-        setVideoJoined(true);
-        joiningRef.current = false;
-      });
-
-      frame.on('participant-joined', () => {
-        setParticipantCount(prev => prev + 1);
-      });
-
-      frame.on('participant-left', () => {
-        setParticipantCount(prev => Math.max(0, prev - 1));
-      });
-
+      frame.on('joined-meeting', () => { setVideoJoined(true); joiningRef.current = false; });
+      frame.on('participant-joined', () => setParticipantCount(prev => prev + 1));
+      frame.on('participant-left', () => setParticipantCount(prev => Math.max(0, prev - 1)));
       frame.on('error', (e) => {
-        console.error('Daily error:', e);
         setJoinError('Video error: ' + (e?.errorMsg || 'unknown'));
         joiningRef.current = false;
       });
@@ -305,7 +309,6 @@ export default function BattleRoom({ params }) {
       await frame.join({ url: battleData.room_url });
 
     } catch (err) {
-      console.error('Daily join error:', err);
       setJoinError('Could not join video room: ' + err.message);
       destroyFrame();
       joiningRef.current = false;
@@ -381,7 +384,6 @@ export default function BattleRoom({ params }) {
   return (
     <main className={styles.main}>
       <div className={styles.layout}>
-
         <div className={styles.stage}>
 
           {/* Topic bar */}
@@ -409,10 +411,7 @@ export default function BattleRoom({ params }) {
                 </div>
                 <div style={{ fontSize: '12px', color: '#6B7A9E', marginTop: '2px' }}>{roundConfig.desc}</div>
               </div>
-              <div style={{
-                fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: '24px',
-                color: roundTimeLeft <= 10 ? '#EF4444' : '#3B82F6',
-              }}>
+              <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: '24px', color: roundTimeLeft <= 10 ? '#EF4444' : '#3B82F6' }}>
                 {formatTime(roundTimeLeft)}
               </div>
             </div>
@@ -435,18 +434,48 @@ export default function BattleRoom({ params }) {
             </div>
           )}
 
-          {/* Daily container — always in DOM */}
-          <div
-            id="daily-container"
-            style={{
-              width: '100%', aspectRatio: '16/9',
-              background: '#000', borderRadius: '14px', overflow: 'hidden',
-              display: videoJoined ? 'block' : 'none',
-            }}
-          />
+          {/* Daily container — desktop only */}
+          {!isMobile && (
+            <div
+              id="daily-container"
+              style={{
+                width: '100%', aspectRatio: '16/9',
+                background: '#000', borderRadius: '14px', overflow: 'hidden',
+                display: videoJoined ? 'block' : 'none',
+              }}
+            />
+          )}
 
-          {/* Video controls */}
-          {videoJoined && (
+          {/* Mobile: show "you're in the call" card after opening Daily */}
+          {isMobile && videoJoined && (
+            <div style={{
+              background: '#0f1623', border: '1px solid rgba(16,185,129,0.3)',
+              borderRadius: '14px', padding: '1.5rem', textAlign: 'center',
+            }}>
+              <div style={{ fontSize: '32px', marginBottom: '0.5rem' }}>📱</div>
+              <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: '16px', color: '#EEF2FF', marginBottom: '6px' }}>
+                You're in the video call
+              </div>
+              <p style={{ fontSize: '13px', color: '#6B7A9E', marginBottom: '1rem' }}>
+                The Daily.co room opened in your browser. Come back here to vote and chat.
+              </p>
+              <a
+                href={battle.room_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-block', background: '#3B82F6', color: 'white',
+                  borderRadius: '10px', padding: '10px 20px', textDecoration: 'none',
+                  fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px',
+                }}
+              >
+                Rejoin video call →
+              </a>
+            </div>
+          )}
+
+          {/* Video controls — desktop */}
+          {!isMobile && videoJoined && (
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
               {isPlayer1 && bothInRoom && currentRound === 0 && !battleEnded && (
                 <button onClick={handleStartBattle} style={{
@@ -484,9 +513,11 @@ export default function BattleRoom({ params }) {
                 {battle.player2_username ? 'Your opponent is ready' : 'Waiting for opponent'}
               </div>
               <p className={styles.joinVideoSub}>
-                {battle.player2_username
-                  ? 'Tap Join Room to go live and start the debate.'
-                  : 'Share the link below while you wait. Tap Join Room when ready.'}
+                {isMobile
+                  ? 'Tap Join Room to open the video call. Come back to this page to vote and chat.'
+                  : battle.player2_username
+                    ? 'Tap Join Room to go live and start the debate.'
+                    : 'Share the link below while you wait. Tap Join Room when ready.'}
               </p>
               {joinError && (
                 <div style={{ fontSize: '13px', color: '#F87171', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', padding: '8px 14px' }}>
@@ -494,7 +525,9 @@ export default function BattleRoom({ params }) {
                 </div>
               )}
               {battle.room_url && (
-                <button className={styles.joinVideoBtn} onClick={joinVideo}>🎥 Join Room</button>
+                <button className={styles.joinVideoBtn} onClick={joinVideo}>
+                  🎥 Join Room {isMobile ? '(opens video)' : ''}
+                </button>
               )}
             </div>
           )}
@@ -524,7 +557,7 @@ export default function BattleRoom({ params }) {
             {!user && <div className={styles.loginPrompt}><Link href="/login" className={styles.loginLink}>Sign in</Link> to vote</div>}
           </div>
 
-          {/* Waiting card — shown if someone navigates directly to a seeking battle */}
+          {/* Waiting card */}
           {(battle.status === 'seeking' || !battle.player2_username) && !battleEnded && (
             <div className={styles.waitingCard}>
               <div className={styles.waitingTitle}>⏳ Waiting for opponent</div>
