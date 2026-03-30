@@ -13,7 +13,7 @@ export default function Battle() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [authReady, setAuthReady] = useState(false); // wait for session check
+  const [authReady, setAuthReady] = useState(false);
   const [accepting, setAccepting] = useState(null);
   const [acceptError, setAcceptError] = useState('');
 
@@ -40,11 +40,30 @@ export default function Battle() {
         setProfile(profileData);
       }
 
-      setAuthReady(true); // session is now known
+      setAuthReady(true);
       await loadBattles();
       setLoading(false);
     }
     init();
+
+    // Also listen for auth state changes (handles mobile session restore)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      if (currentUser) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('username')
+          .eq('id', currentUser.id)
+          .maybeSingle();
+        setProfile(profileData);
+      } else {
+        setProfile(null);
+      }
+      setAuthReady(true);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   async function loadBattles() {
@@ -60,15 +79,22 @@ export default function Battle() {
   }
 
   async function acceptChallenge(battle) {
-    // Auth guard — only fires after session is confirmed
-    if (!authReady) return;
+    // Not ready yet
+    if (!authReady) {
+      setAcceptError('Still loading, please try again in a second.');
+      return;
+    }
 
-    if (!user || !profile) {
-      // Store battle id in sessionStorage so we can auto-accept after login
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('pendingAccept', battle.id);
-      }
+    // Not logged in
+    if (!user) {
       router.push('/login?redirect=/battle');
+      return;
+    }
+
+    // Logged in but profile not loaded yet
+    if (!profile) {
+      setAcceptError('Profile not loaded yet, please wait a moment and try again.');
+      setAccepting(null);
       return;
     }
 
@@ -121,17 +147,6 @@ export default function Battle() {
     }
   }
 
-  // After login redirect back, check if there's a pending accept
-  useEffect(() => {
-    if (!authReady || !user || !profile) return;
-    const pendingId = sessionStorage.getItem('pendingAccept');
-    if (!pendingId) return;
-    sessionStorage.removeItem('pendingAccept');
-    // Find the battle and auto-accept
-    const battle = openChallenges.find(b => b.id === pendingId);
-    if (battle) acceptChallenge(battle);
-  }, [authReady, user, profile, openChallenges]);
-
   function formatTimeLeft(expiresAt) {
     const left = Math.max(0, Math.floor((new Date(expiresAt).getTime() - now) / 1000));
     return `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
@@ -159,13 +174,13 @@ export default function Battle() {
             <p className={styles.heroSub}>Pick a topic, choose your stance, and go head-to-head on camera with someone who disagrees. Real people. Real takes. Live votes.</p>
             <div className={styles.heroActions}>
               <Link href="/battle/start" className={styles.startBtn}>⚔️ Post a Challenge</Link>
-              {!user && <Link href="/signup" className={styles.signupBtn}>Create free account →</Link>}
+              {authReady && !user && <Link href="/signup" className={styles.signupBtn}>Create free account →</Link>}
             </div>
           </div>
         </div>
 
         {acceptError && (
-          <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', padding: '12px 16px', fontSize: '13px', color: '#F87171' }}>
+          <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', padding: '12px 16px', fontSize: '13px', color: '#F87171', margin: '0 1.5rem' }}>
             {acceptError}
           </div>
         )}
@@ -226,8 +241,7 @@ export default function Battle() {
                     <div>
                       {isOwn ? (
                         <div className={styles.ownChallengeBadge}>Your challenge</div>
-                      ) : !authReady || (!user && authReady) ? (
-                        // Not logged in — show sign in link instead of button
+                      ) : authReady && !user ? (
                         <Link
                           href="/login?redirect=/battle"
                           className={styles.acceptBtn}
