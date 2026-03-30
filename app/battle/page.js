@@ -5,7 +5,8 @@ import { supabase } from '../supabase';
 import styles from './battle.module.css';
 
 export default function Battle() {
-  const [battles, setBattles] = useState([]);
+  const [liveBattles, setLiveBattles] = useState([]);
+  const [recentBattles, setRecentBattles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
 
@@ -14,14 +15,25 @@ export default function Battle() {
       const { data: { session } } = await supabase.auth.getSession();
       setUser(session?.user ?? null);
 
-      const { data } = await supabase
+      // Live / waiting battles
+      const { data: live } = await supabase
         .from('battles')
         .select('*')
         .in('status', ['waiting', 'live'])
         .order('created_at', { ascending: false })
         .limit(10);
 
-      setBattles(data || []);
+      // Recently ended battles with a winner
+      const { data: ended } = await supabase
+        .from('battles')
+        .select('*')
+        .eq('status', 'ended')
+        .not('winner', 'is', null)
+        .order('ended_at', { ascending: false })
+        .limit(5);
+
+      setLiveBattles(live || []);
+      setRecentBattles(ended || []);
       setLoading(false);
     }
     init();
@@ -41,14 +53,8 @@ export default function Battle() {
             <h1 className={styles.heroTitle}>Debate live.<br />Let the crowd decide.</h1>
             <p className={styles.heroSub}>Pick a topic, choose your stance, and go head-to-head on camera with someone who disagrees. Real people. Real takes. Live votes.</p>
             <div className={styles.heroActions}>
-              <Link href="/battle/start" className={styles.startBtn}>
-                ⚔️ Start a Battle
-              </Link>
-              {!user && (
-                <Link href="/signup" className={styles.signupBtn}>
-                  Create free account →
-                </Link>
-              )}
+              <Link href="/battle/start" className={styles.startBtn}>⚔️ Start a Battle</Link>
+              {!user && <Link href="/signup" className={styles.signupBtn}>Create free account →</Link>}
             </div>
           </div>
         </div>
@@ -64,7 +70,7 @@ export default function Battle() {
 
           {loading ? (
             <div className={styles.loadingState}>Loading live battles...</div>
-          ) : battles.length === 0 ? (
+          ) : liveBattles.length === 0 ? (
             <div className={styles.emptyState}>
               <div className={styles.emptyIcon}>⚔️</div>
               <div className={styles.emptyTitle}>No live battles right now</div>
@@ -73,7 +79,7 @@ export default function Battle() {
             </div>
           ) : (
             <div className={styles.battlesList}>
-              {battles.map(battle => (
+              {liveBattles.map(battle => (
                 <Link href={`/battle/room/${battle.id}`} key={battle.id} className={styles.battleCard}>
                   <div className={styles.battleCardLeft}>
                     <div className={styles.battleLiveBadge}>
@@ -82,17 +88,11 @@ export default function Battle() {
                     </div>
                     <div className={styles.battleTopic}>"{battle.topic}"</div>
                     <div className={styles.battlePlayers}>
-                      {battle.player1_username && (
-                        <span className={styles.battlePlayer}>@{battle.player1_username}</span>
-                      )}
-                      {battle.player1_username && battle.player2_username && (
-                        <span className={styles.battleVs}>vs</span>
-                      )}
-                      {battle.player2_username ? (
-                        <span className={styles.battlePlayer}>@{battle.player2_username}</span>
-                      ) : (
-                        <span className={styles.battleWaiting}>Waiting for opponent...</span>
-                      )}
+                      {battle.player1_username && <span className={styles.battlePlayer}>@{battle.player1_username}</span>}
+                      {battle.player1_username && battle.player2_username && <span className={styles.battleVs}>vs</span>}
+                      {battle.player2_username
+                        ? <span className={styles.battlePlayer}>@{battle.player2_username}</span>
+                        : <span className={styles.battleWaiting}>Waiting for opponent...</span>}
                     </div>
                   </div>
                   <div className={styles.watchBtn}>Watch →</div>
@@ -101,6 +101,38 @@ export default function Battle() {
             </div>
           )}
         </div>
+
+        {/* Recent results */}
+        {recentBattles.length > 0 && (
+          <div className={styles.section}>
+            <div className={styles.sectionHeader}>
+              <div className={styles.sectionTitle}>🏆 Recent results</div>
+            </div>
+            <div className={styles.battlesList}>
+              {recentBattles.map(battle => (
+                <Link href={`/battle/room/${battle.id}`} key={battle.id} className={styles.battleCard}>
+                  <div className={styles.battleCardLeft}>
+                    <div style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '6px',
+                      fontSize: '11px', fontWeight: 700, color: '#10B981',
+                      background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.22)',
+                      borderRadius: '100px', padding: '3px 10px', marginBottom: '6px',
+                    }}>
+                      🏆 {battle.winner === 'tie' ? "TIE" : `@${battle.winner} won`}
+                    </div>
+                    <div className={styles.battleTopic}>"{battle.topic}"</div>
+                    <div className={styles.battlePlayers}>
+                      {battle.player1_username && <span className={styles.battlePlayer}>@{battle.player1_username}</span>}
+                      {battle.player1_username && battle.player2_username && <span className={styles.battleVs}>vs</span>}
+                      {battle.player2_username && <span className={styles.battlePlayer}>@{battle.player2_username}</span>}
+                    </div>
+                  </div>
+                  <div className={styles.watchBtn}>Replay →</div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* How it works */}
         <div className={styles.section}>
@@ -111,8 +143,8 @@ export default function Battle() {
             {[
               { num: '1', title: 'Pick a topic', body: 'Choose from hot sports debates or write your own.' },
               { num: '2', title: 'Choose your stance', body: 'Are you FOR or AGAINST? Own your take.' },
-              { num: '3', title: 'Go live', body: 'Share your room link. Your opponent joins, cameras on, debate starts.' },
-              { num: '4', title: 'Let the crowd vote', body: 'Live viewers vote on who makes the better argument. Best takes win.' },
+              { num: '3', title: '3 rounds, 2 minutes each', body: 'Round 1 you speak, Round 2 they speak, Round 3 open mic.' },
+              { num: '4', title: 'Let the crowd vote', body: 'Live viewers vote on who makes the better argument. Most votes wins.' },
             ].map((step, i) => (
               <div key={i} className={styles.howCard}>
                 <div className={styles.howNum}>{step.num}</div>
