@@ -15,7 +15,7 @@ const ROUND_CONFIG = {
   3: { label: 'Round 3', desc: 'Open mic — both players speak freely', speaker: 'both' },
 };
 
-// Module-level frame tracker — persists across React re-renders and strict mode double-invocations
+// Module-level frame tracker — persists across React re-renders
 let globalDailyFrame = null;
 
 export default function BattleRoom({ params }) {
@@ -164,8 +164,6 @@ export default function BattleRoom({ params }) {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // ── Round system ─────────────────────────────────────────────────────────────
-
   function startRound(round) {
     clearInterval(roundTimerRef.current);
     currentRoundRef.current = round;
@@ -227,13 +225,11 @@ export default function BattleRoom({ params }) {
     }
   }
 
-  // ── Daily.co video ────────────────────────────────────────────────────────────
-
   async function joinVideo() {
     const battleData = battleRef.current;
     if (!battleData?.room_url) return;
 
-    // Destroy any existing frame — both module-level and ref
+    // Destroy any existing frame
     if (globalDailyFrame) {
       try { globalDailyFrame.destroy(); } catch {}
       globalDailyFrame = null;
@@ -243,9 +239,17 @@ export default function BattleRoom({ params }) {
       callFrameRef.current = null;
     }
 
+    // Small delay to ensure container is in the DOM and has dimensions
+    await new Promise(resolve => setTimeout(resolve, 100));
+
     try {
       const container = document.getElementById('daily-container');
-      if (!container) return;
+      if (!container) {
+        console.error('Daily container not found');
+        return;
+      }
+
+      console.log('Container dimensions:', container.offsetWidth, container.offsetHeight);
 
       const frame = DailyIframe.createFrame(container, {
         iframeStyle: { width: '100%', height: '100%', border: 'none', borderRadius: '14px' },
@@ -257,9 +261,13 @@ export default function BattleRoom({ params }) {
       globalDailyFrame = frame;
       callFrameRef.current = frame;
 
-      frame.on('joined-meeting', () => setVideoJoined(true));
+      frame.on('joined-meeting', () => {
+        console.log('Joined Daily meeting');
+        setVideoJoined(true);
+      });
       frame.on('participant-joined', () => setParticipantCount(p => p + 1));
       frame.on('participant-left', () => setParticipantCount(p => Math.max(0, p - 1)));
+      frame.on('error', (e) => console.error('Daily frame error:', e));
       frame.on('left-meeting', () => {
         setVideoJoined(false);
         setParticipantCount(0);
@@ -274,6 +282,7 @@ export default function BattleRoom({ params }) {
         callFrameRef.current = null;
       });
 
+      console.log('Joining Daily room:', battleData.room_url);
       await frame.join({ url: battleData.room_url });
     } catch (err) {
       console.error('Daily join error:', err);
@@ -329,6 +338,28 @@ export default function BattleRoom({ params }) {
 
   return (
     <main className={styles.main}>
+      {/*
+        Daily container rendered here at the ROOT level — outside all conditional renders.
+        When not joined: positioned off-screen at -9999px so it has real dimensions.
+        When joined: positioned normally and visible.
+        This ensures Daily can always find and measure the container.
+      */}
+      <div
+        id="daily-container"
+        style={{
+          position: videoJoined ? 'relative' : 'fixed',
+          top: videoJoined ? 'auto' : '-9999px',
+          left: videoJoined ? 'auto' : '-9999px',
+          width: videoJoined ? '100%' : '800px',
+          height: videoJoined ? 'auto' : '450px',
+          aspectRatio: '16/9',
+          background: '#000',
+          borderRadius: '14px',
+          overflow: 'hidden',
+          zIndex: videoJoined ? 'auto' : -1,
+        }}
+      />
+
       <div className={styles.layout}>
         <div className={styles.stage}>
 
@@ -380,24 +411,12 @@ export default function BattleRoom({ params }) {
             </div>
           )}
 
-          {/*
-            Daily container — always rendered with real dimensions.
-            Uses visibility:hidden instead of display:none so Daily
-            can measure the container and render the iframe correctly.
-          */}
-          <div
-            id="daily-container"
-            style={{
-              width: '100%',
-              aspectRatio: '16/9',
-              background: '#000',
-              borderRadius: '14px',
-              overflow: 'hidden',
-              visibility: videoJoined ? 'visible' : 'hidden',
-              height: videoJoined ? 'auto' : '0',
-              marginBottom: videoJoined ? '0' : '-1rem',
-            }}
-          />
+          {/* Video area — shows daily-container inline when joined */}
+          {videoJoined && (
+            <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: '14px', overflow: 'hidden', background: '#000' }}>
+              {/* Container is moved here visually via position:relative above */}
+            </div>
+          )}
 
           {/* Controls after joining */}
           {videoJoined && (
