@@ -49,30 +49,22 @@ export default function StartBattle() {
       if (!session?.user) { router.push('/login'); return; }
       setUser(session.user);
 
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('username, full_name')
-        .eq('id', session.user.id)
-        .maybeSingle();
+      const { data: profileData } = await supabase
+        .from('profiles').select('username, full_name').eq('id', session.user.id).maybeSingle();
 
       if (profileData?.username) {
         setProfile(profileData);
       } else {
         const fullName = session.user.user_metadata?.full_name || '';
         const email = session.user.email || '';
-        const fallbackUsername = fullName
-          ? fullName.toLowerCase().replace(/\s+/g, '')
-          : email.split('@')[0];
-
+        const fallbackUsername = fullName ? fullName.toLowerCase().replace(/\s+/g, '') : email.split('@')[0];
         const { data: newProfile } = await supabase
           .from('profiles')
           .upsert({ id: session.user.id, username: fallbackUsername, full_name: fullName }, { onConflict: 'id' })
           .select().maybeSingle();
-
         if (newProfile) setProfile(newProfile);
         else setError('Could not load your profile. Please go to Settings and set a username.');
       }
-
       setProfileLoading(false);
     }
     init();
@@ -144,7 +136,7 @@ export default function StartBattle() {
   async function createBattle() {
     if (!topic.trim() || !stance) return;
     if (!profile?.username) {
-      setError('Your profile is still loading or missing a username. Please refresh and try again.');
+      setError('Your profile is still loading. Please refresh and try again.');
       return;
     }
 
@@ -169,7 +161,7 @@ export default function StartBattle() {
 
       if (battleError) throw new Error(battleError.message);
 
-      // Create 100ms room — returns { roomId, roomName }
+      // Generate Jitsi room URL — no API needed
       const roomRes = await fetch('/api/create-room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -179,10 +171,10 @@ export default function StartBattle() {
       const roomData = await roomRes.json();
       if (roomData.error) throw new Error(roomData.error);
 
-      // Save room_id (100ms) to battles table
-      await supabase.from('battles').update({ room_id: roomData.roomId }).eq('id', battle.id);
+      // Save room_url
+      await supabase.from('battles').update({ room_url: roomData.roomUrl }).eq('id', battle.id);
 
-      setCreatedBattle({ ...battle, room_id: roomData.roomId, expires_at: expiresAt });
+      setCreatedBattle({ ...battle, room_url: roomData.roomUrl, expires_at: expiresAt });
       setStep(3);
     } catch (err) {
       setError(err.message);
@@ -204,7 +196,6 @@ export default function StartBattle() {
   return (
     <main className={styles.main}>
       <div className={styles.page}>
-
         <div className={styles.header}>
           <Link href="/battle" className={styles.backBtn}>← Back</Link>
           <h1 className={styles.title}>Start a Battle</h1>
@@ -269,7 +260,7 @@ export default function StartBattle() {
               <button className={styles.backStepBtn} onClick={() => setStep(1)}>← Back</button>
               <button className={styles.nextBtn} onClick={createBattle}
                 disabled={!stance || creating || !profile?.username || profileLoading}>
-                {profileLoading ? 'Loading profile...' : creating ? 'Creating your battle room...' : '⚔️ Post Challenge →'}
+                {profileLoading ? 'Loading profile...' : creating ? 'Creating room...' : '⚔️ Post Challenge →'}
               </button>
             </div>
           </div>
@@ -322,7 +313,6 @@ export default function StartBattle() {
             )}
           </div>
         )}
-
       </div>
     </main>
   );

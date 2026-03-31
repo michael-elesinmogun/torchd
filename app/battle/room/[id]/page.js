@@ -30,19 +30,12 @@ export default function BattleRoom({ params }) {
   const [messages, setMessages] = useState([]);
   const [copied, setCopied] = useState(false);
   const [videoJoined, setVideoJoined] = useState(false);
-  const [videoError, setVideoError] = useState('');
   const [currentRound, setCurrentRound] = useState(0);
   const [roundTimeLeft, setRoundTimeLeft] = useState(ROUND_DURATION);
   const [battleEnded, setBattleEnded] = useState(false);
   const [winner, setWinner] = useState(null);
-  const [isMicOn, setIsMicOn] = useState(true);
-  const [isCamOn, setIsCamOn] = useState(true);
-  const [peers, setPeers] = useState([]);
 
-  const hmsActionsRef = useRef(null);
-  const hmsStoreRef = useRef(null);
-  const localVideoRef = useRef(null);
-  const remoteVideoRef = useRef(null);
+  const jitsiApiRef = useRef(null);
   const roundStartTimeRef = useRef(null);
   const roundTimerRef = useRef(null);
   const currentRoundRef = useRef(0);
@@ -156,8 +149,9 @@ export default function BattleRoom({ params }) {
     return () => {
       clearInterval(roundTimerRef.current);
       document.removeEventListener('visibilitychange', handleVisibility);
-      if (hmsActionsRef.current) {
-        try { hmsActionsRef.current.leave(); } catch {}
+      if (jitsiApiRef.current) {
+        try { jitsiApiRef.current.dispose(); } catch {}
+        jitsiApiRef.current = null;
       }
     };
   }, [id]);
@@ -166,26 +160,12 @@ export default function BattleRoom({ params }) {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Attach video tracks when peers change
-  useEffect(() => {
-    if (!hmsActionsRef.current || !videoJoined) return;
-    peers.forEach(peer => {
-      if (peer.isLocal && peer.videoTrack && localVideoRef.current) {
-        hmsActionsRef.current.attachVideo(peer.videoTrack, localVideoRef.current).catch(() => {});
-      }
-      if (!peer.isLocal && peer.videoTrack && remoteVideoRef.current) {
-        hmsActionsRef.current.attachVideo(peer.videoTrack, remoteVideoRef.current).catch(() => {});
-      }
-    });
-  }, [peers, videoJoined]);
-
   function startRound(round) {
     clearInterval(roundTimerRef.current);
     currentRoundRef.current = round;
     roundStartTimeRef.current = Date.now();
     setCurrentRound(round);
     setRoundTimeLeft(ROUND_DURATION);
-    enforceMicForRound(round);
 
     roundTimerRef.current = setInterval(() => {
       const elapsed = Math.floor((Date.now() - roundStartTimeRef.current) / 1000);
@@ -198,17 +178,6 @@ export default function BattleRoom({ params }) {
         else startRound(next);
       }
     }, 1000);
-  }
-
-  async function enforceMicForRound(round) {
-    if (!hmsActionsRef.current) return;
-    const isP1 = battleRef.current?.player1_username === profileRef.current?.username;
-    const { speaker } = ROUND_CONFIG[round];
-    const shouldHaveMic = speaker === 'both' || (speaker === 'player1' && isP1) || (speaker === 'player2' && !isP1);
-    try {
-      await hmsActionsRef.current.setLocalAudioEnabled(shouldHaveMic);
-      setIsMicOn(shouldHaveMic);
-    } catch {}
   }
 
   async function declareWinner() {
@@ -243,92 +212,111 @@ export default function BattleRoom({ params }) {
     }
   }
 
-  async function joinVideo() {
+  function joinVideo() {
     const battleData = battleRef.current;
     const profileData = profileRef.current;
+    if (!battleData?.room_url) return;
 
-    if (!battleData?.room_id) {
-      setVideoError('No room found. Please create a new battle.');
-      return;
-    }
-    if (!profileData?.username) {
-      setVideoError('Profile not loaded. Please refresh.');
-      return;
-    }
+    // Extract room name from URL
+    const roomName = battleData.room_url.replace('https://meet.jit.si/', '');
+    const displayName = profileData?.username || 'Debater';
 
-    setVideoError('');
+    // Load Jitsi External API script
+    const script = document.createElement('script');
+    script.src = 'https://8x8.vc/vpaas-magic-cookie-free-trial/external_api.js';
+    script.async = true;
+    script.onload = () => {
+      const container = document.getElementById('jitsi-container');
+      if (!container || !window.JitsiMeetExternalAPI) return;
 
-    try {
-      const { HMSReactiveStore, selectPeers } = await import('@100mslive/hms-video-store');
-
-      if (hmsActionsRef.current) {
-        try { await hmsActionsRef.current.leave(); } catch {}
+      if (jitsiApiRef.current) {
+        try { jitsiApiRef.current.dispose(); } catch {}
       }
 
-      const hmsInstance = new HMSReactiveStore();
-      const hmsStore = hmsInstance.getStore();
-      const hmsActions = hmsInstance.getActions();
-      hmsActionsRef.current = hmsActions;
-      hmsStoreRef.current = hmsStore;
-
-      const tokenRes = await fetch('/api/hms-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          roomId: battleData.room_id,
-          userId: profileData.username,
-          role: 'host',
-        }),
-      });
-      const { token, error: tokenError } = await tokenRes.json();
-      if (tokenError) throw new Error(tokenError);
-
-      await hmsActions.join({
-        userName: profileData.username,
-        authToken: token,
-        settings: { isAudioMuted: false, isVideoMuted: false },
-        rememberDeviceSelection: true,
+      const api = new window.JitsiMeetExternalAPI('meet.jit.si', {
+        roomName,
+        parentNode: container,
+        width: '100%',
+        height: '100%',
+        userInfo: { displayName },
+        configOverwrite: {
+          startWithAudioMuted: false,
+          startWithVideoMuted: false,
+          prejoinPageEnabled: false,
+          disableDeepLinking: true,
+        },
+        interfaceConfigOverwrite: {
+          SHOW_JITSI_WATERMARK: false,
+          SHOW_WATERMARK_FOR_GUESTS: false,
+          TOOLBAR_BUTTONS: ['microphone', 'camera', 'hangup', 'fullscreen'],
+        },
       });
 
+      jitsiApiRef.current = api;
       setVideoJoined(true);
 
-      hmsStore.subscribe((allPeers) => {
-        if (allPeers) setPeers([...allPeers]);
-      }, selectPeers);
+      api.addEventListener('videoConferenceLeft', () => {
+        setVideoJoined(false);
+        if (battleRef.current && profileRef.current && (
+          battleRef.current.player1_username === profileRef.current.username ||
+          battleRef.current.player2_username === profileRef.current.username
+        )) {
+          supabase.from('battles').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', id);
+        }
+      });
+    };
 
-    } catch (err) {
-      console.error('100ms join error:', err);
-      setVideoError('Could not join: ' + err.message);
+    // Use public Jitsi instead if 8x8 fails
+    script.onerror = () => {
+      const fallbackScript = document.createElement('script');
+      fallbackScript.src = 'https://meet.jit.si/external_api.js';
+      fallbackScript.async = true;
+      fallbackScript.onload = () => initJitsi(roomName, displayName);
+      document.head.appendChild(fallbackScript);
+    };
+
+    document.head.appendChild(script);
+  }
+
+  function initJitsi(roomName, displayName) {
+    const container = document.getElementById('jitsi-container');
+    if (!container || !window.JitsiMeetExternalAPI) return;
+
+    if (jitsiApiRef.current) {
+      try { jitsiApiRef.current.dispose(); } catch {}
+    }
+
+    const api = new window.JitsiMeetExternalAPI('meet.jit.si', {
+      roomName,
+      parentNode: container,
+      width: '100%',
+      height: '100%',
+      userInfo: { displayName },
+      configOverwrite: {
+        startWithAudioMuted: false,
+        startWithVideoMuted: false,
+        prejoinPageEnabled: false,
+        disableDeepLinking: true,
+      },
+      interfaceConfigOverwrite: {
+        SHOW_JITSI_WATERMARK: false,
+        SHOW_WATERMARK_FOR_GUESTS: false,
+        TOOLBAR_BUTTONS: ['microphone', 'camera', 'hangup', 'fullscreen'],
+      },
+    });
+
+    jitsiApiRef.current = api;
+    setVideoJoined(true);
+
+    api.addEventListener('videoConferenceLeft', () => {
       setVideoJoined(false);
-    }
-  }
-
-  async function leaveVideo() {
-    if (hmsActionsRef.current) {
-      try { await hmsActionsRef.current.leave(); } catch {}
-      hmsActionsRef.current = null;
-    }
-    setVideoJoined(false);
-    setPeers([]);
-
-    if (battleRef.current && profileRef.current && (
-      battleRef.current.player1_username === profileRef.current.username ||
-      battleRef.current.player2_username === profileRef.current.username
-    )) {
-      supabase.from('battles').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', id);
-    }
-  }
-
-  async function toggleMic() {
-    if (!hmsActionsRef.current) return;
-    await hmsActionsRef.current.setLocalAudioEnabled(!isMicOn);
-    setIsMicOn(m => !m);
-  }
-
-  async function toggleCam() {
-    if (!hmsActionsRef.current) return;
-    await hmsActionsRef.current.setLocalVideoEnabled(!isCamOn);
-    setIsCamOn(c => !c);
+      if (battleRef.current && profileRef.current && (
+        battleRef.current.player1_username === profileRef.current.username ||
+        battleRef.current.player2_username === profileRef.current.username
+      )) {
+        supabase.from('battles').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', id);
+      }
+    });
   }
 
   function handleStartBattle() {
@@ -373,8 +361,6 @@ export default function BattleRoom({ params }) {
   const p2Pct = 100 - p1Pct;
   const isPlayer = user && (battle.player1_username === profile?.username || battle.player2_username === profile?.username);
   const isPlayer1 = profile?.username === battle.player1_username;
-  const remotePeer = peers.find(p => !p.isLocal);
-  const bothInRoom = !!battle?.player2_username && !!remotePeer;
   const shareLink = typeof window !== 'undefined' ? window.location.href : '';
   const roundConfig = currentRound > 0 ? ROUND_CONFIG[currentRound] : null;
   const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -432,79 +418,40 @@ export default function BattleRoom({ params }) {
             </div>
           )}
 
-          {/* Video */}
-          {videoJoined ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{
-                width: '100%', aspectRatio: '16/9', background: '#000',
-                borderRadius: '14px', overflow: 'hidden', position: 'relative',
-              }}>
-                <video
-                  ref={remoteVideoRef}
-                  autoPlay playsInline
-                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: remotePeer ? 'block' : 'none' }}
-                />
-                {!remotePeer && (
-                  <div style={{
-                    position: 'absolute', inset: 0, display: 'flex',
-                    flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    color: '#6B7A9E', fontSize: '14px', gap: '8px',
-                  }}>
-                    <div style={{ fontSize: '32px' }}>⏳</div>
-                    Waiting for opponent...
-                  </div>
-                )}
-                <video
-                  ref={localVideoRef}
-                  autoPlay muted playsInline
-                  style={{
-                    position: 'absolute', bottom: '70px', right: '12px',
-                    width: '28%', maxWidth: '180px', aspectRatio: '16/9',
-                    objectFit: 'cover', borderRadius: '10px',
-                    border: '2px solid rgba(255,255,255,0.15)',
-                    transform: 'scaleX(-1)',
-                  }}
-                />
+          {/* Jitsi container — always in DOM */}
+          <div
+            id="jitsi-container"
+            style={{
+              width: '100%',
+              aspectRatio: '16/9',
+              borderRadius: '14px',
+              overflow: 'hidden',
+              background: '#000',
+              display: videoJoined ? 'block' : 'none',
+            }}
+          />
+
+          {/* Controls after joining */}
+          {videoJoined && (
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+              {isPlayer1 && battle.player2_username && currentRound === 0 && !battleEnded && (
+                <button onClick={handleStartBattle} style={{
+                  background: '#10B981', border: 'none', borderRadius: '100px',
+                  padding: '10px 24px', color: 'white',
+                  fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
+                }}>▶ Start Battle</button>
+              )}
+              {!isPlayer1 && battle.player2_username && currentRound === 0 && !battleEnded && (
                 <div style={{
-                  position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
-                  display: 'flex', gap: '10px', alignItems: 'center',
-                  background: 'rgba(0,0,0,0.7)', borderRadius: '100px',
-                  padding: '8px 16px', backdropFilter: 'blur(10px)',
-                }}>
-                  <button onClick={toggleMic} style={{
-                    width: '40px', height: '40px', borderRadius: '50%', border: 'none',
-                    background: isMicOn ? 'rgba(255,255,255,0.15)' : 'rgba(239,68,68,0.5)',
-                    fontSize: '18px', cursor: 'pointer',
-                  }}>{isMicOn ? '🎤' : '🔇'}</button>
-                  <button onClick={toggleCam} style={{
-                    width: '40px', height: '40px', borderRadius: '50%', border: 'none',
-                    background: isCamOn ? 'rgba(255,255,255,0.15)' : 'rgba(239,68,68,0.5)',
-                    fontSize: '18px', cursor: 'pointer',
-                  }}>{isCamOn ? '📹' : '🚫'}</button>
-                  <button onClick={leaveVideo} style={{
-                    background: '#EF4444', border: 'none', borderRadius: '100px',
-                    padding: '8px 18px', color: 'white',
-                    fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
-                  }}>Leave</button>
-                </div>
-              </div>
-              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                {isPlayer1 && bothInRoom && currentRound === 0 && !battleEnded && (
-                  <button onClick={handleStartBattle} style={{
-                    background: '#10B981', border: 'none', borderRadius: '100px',
-                    padding: '10px 24px', color: 'white',
-                    fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
-                  }}>▶ Start Battle</button>
-                )}
-                {!isPlayer1 && bothInRoom && currentRound === 0 && !battleEnded && (
-                  <div style={{
-                    background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)',
-                    borderRadius: '100px', padding: '10px 20px', fontSize: '13px', color: '#60A5FA', fontWeight: 600,
-                  }}>⏳ Waiting for Player 1 to start...</div>
-                )}
-              </div>
+                  background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)',
+                  borderRadius: '100px', padding: '10px 20px', fontSize: '13px', color: '#60A5FA', fontWeight: 600,
+                }}>⏳ Waiting for Player 1 to start...</div>
+              )}
             </div>
-          ) : (
+          )}
+
+          {/* Join prompt */}
+          {!videoJoined && (
             <div className={styles.joinVideoWrap}>
               <div className={styles.joinVideoIcon}>⚔️</div>
               <div className={styles.joinVideoTitle}>
@@ -515,12 +462,7 @@ export default function BattleRoom({ params }) {
                   ? 'Tap Join Room to go live and start the debate.'
                   : 'Share the link below while you wait.'}
               </p>
-              {videoError && (
-                <div style={{ fontSize: '13px', color: '#F87171', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', padding: '8px 14px' }}>
-                  {videoError}
-                </div>
-              )}
-              {battle.room_id && (
+              {battle.room_url && (
                 <button className={styles.joinVideoBtn} onClick={joinVideo}>🎥 Join Room</button>
               )}
             </div>
