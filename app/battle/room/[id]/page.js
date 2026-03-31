@@ -1,11 +1,11 @@
 'use client';
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect, useRef, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '../../../supabase';
 import styles from './room.module.css';
-
-export const dynamic = 'force-dynamic';
 
 const ROUND_DURATION = 120;
 const TOTAL_ROUNDS = 3;
@@ -166,6 +166,19 @@ export default function BattleRoom({ params }) {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Attach video tracks when peers change
+  useEffect(() => {
+    if (!hmsActionsRef.current || !videoJoined) return;
+    peers.forEach(peer => {
+      if (peer.isLocal && peer.videoTrack && localVideoRef.current) {
+        hmsActionsRef.current.attachVideo(peer.videoTrack, localVideoRef.current).catch(() => {});
+      }
+      if (!peer.isLocal && peer.videoTrack && remoteVideoRef.current) {
+        hmsActionsRef.current.attachVideo(peer.videoTrack, remoteVideoRef.current).catch(() => {});
+      }
+    });
+  }, [peers, videoJoined]);
+
   function startRound(round) {
     clearInterval(roundTimerRef.current);
     currentRoundRef.current = round;
@@ -246,10 +259,8 @@ export default function BattleRoom({ params }) {
     setVideoError('');
 
     try {
-      // Dynamically import to avoid SSR issues
-      const { HMSReactiveStore, selectPeers, selectIsConnectedToRoom, selectLocalPeer, selectVideoTrackByID } = await import('@100mslive/hms-video-store');
+      const { HMSReactiveStore, selectPeers } = await import('@100mslive/hms-video-store');
 
-      // Clean up existing instance
       if (hmsActionsRef.current) {
         try { await hmsActionsRef.current.leave(); } catch {}
       }
@@ -260,7 +271,6 @@ export default function BattleRoom({ params }) {
       hmsActionsRef.current = hmsActions;
       hmsStoreRef.current = hmsStore;
 
-      // Get token
       const tokenRes = await fetch('/api/hms-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -273,7 +283,6 @@ export default function BattleRoom({ params }) {
       const { token, error: tokenError } = await tokenRes.json();
       if (tokenError) throw new Error(tokenError);
 
-      // Join room
       await hmsActions.join({
         userName: profileData.username,
         authToken: token,
@@ -283,22 +292,8 @@ export default function BattleRoom({ params }) {
 
       setVideoJoined(true);
 
-      // Subscribe to peer updates
       hmsStore.subscribe((allPeers) => {
-        if (!allPeers) return;
-        setPeers([...allPeers]);
-
-        // Attach video tracks
-        allPeers.forEach(async (peer) => {
-          if (peer.videoTrack) {
-            const trackEl = peer.isLocal ? localVideoRef.current : remoteVideoRef.current;
-            if (trackEl) {
-              try {
-                await hmsActions.attachVideo(peer.videoTrack, trackEl);
-              } catch {}
-            }
-          }
-        });
+        if (allPeers) setPeers([...allPeers]);
       }, selectPeers);
 
     } catch (err) {
@@ -444,7 +439,6 @@ export default function BattleRoom({ params }) {
                 width: '100%', aspectRatio: '16/9', background: '#000',
                 borderRadius: '14px', overflow: 'hidden', position: 'relative',
               }}>
-                {/* Remote video */}
                 <video
                   ref={remoteVideoRef}
                   autoPlay playsInline
@@ -460,8 +454,6 @@ export default function BattleRoom({ params }) {
                     Waiting for opponent...
                   </div>
                 )}
-
-                {/* Local PiP */}
                 <video
                   ref={localVideoRef}
                   autoPlay muted playsInline
@@ -473,8 +465,6 @@ export default function BattleRoom({ params }) {
                     transform: 'scaleX(-1)',
                   }}
                 />
-
-                {/* Controls overlay */}
                 <div style={{
                   position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
                   display: 'flex', gap: '10px', alignItems: 'center',
@@ -498,7 +488,6 @@ export default function BattleRoom({ params }) {
                   }}>Leave</button>
                 </div>
               </div>
-
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
                 {isPlayer1 && bothInRoom && currentRound === 0 && !battleEnded && (
                   <button onClick={handleStartBattle} style={{
