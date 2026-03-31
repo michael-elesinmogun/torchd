@@ -17,7 +17,6 @@ export default function NavBar() {
 
   useEffect(() => { setMenuOpen(false); setNotifOpen(false); }, [pathname]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     function handleClick(e) {
       if (notifRef.current && !notifRef.current.contains(e.target)) {
@@ -38,33 +37,20 @@ export default function NavBar() {
 
       if (currentUser) {
         const { data: profile } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('id', currentUser.id)
-          .single();
+          .from('profiles').select('username').eq('id', currentUser.id).single();
 
         if (profile?.username) {
           setProfileSlug(profile.username);
         } else {
           const fullName = currentUser.user_metadata?.full_name || '';
-          setProfileSlug(
-            fullName
-              ? fullName.toLowerCase().replace(/\s+/g, '')
-              : currentUser.email?.split('@')[0] || 'profile'
-          );
+          setProfileSlug(fullName ? fullName.toLowerCase().replace(/\s+/g, '') : currentUser.email?.split('@')[0] || 'profile');
         }
 
         await loadNotifications(currentUser.id);
 
-        // Realtime — new notifications pop in instantly
         notifChannel = supabase
           .channel(`notifications-${currentUser.id}`)
-          .on('postgres_changes', {
-            event: 'INSERT',
-            schema: 'public',
-            table: 'notifications',
-            filter: `user_id=eq.${currentUser.id}`,
-          }, (payload) => {
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${currentUser.id}` }, (payload) => {
             setNotifications(prev => [payload.new, ...prev]);
             setUnreadCount(c => c + 1);
           })
@@ -79,14 +65,8 @@ export default function NavBar() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       if (session?.user) {
-        supabase
-          .from('profiles')
-          .select('username')
-          .eq('id', session.user.id)
-          .single()
-          .then(({ data: profile }) => {
-            if (profile?.username) setProfileSlug(profile.username);
-          });
+        supabase.from('profiles').select('username').eq('id', session.user.id).single()
+          .then(({ data: profile }) => { if (profile?.username) setProfileSlug(profile.username); });
         loadNotifications(session.user.id);
       } else {
         setProfileSlug(null);
@@ -103,12 +83,8 @@ export default function NavBar() {
 
   async function loadNotifications(userId) {
     const { data } = await supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(20);
-
+      .from('notifications').select('*').eq('user_id', userId)
+      .order('created_at', { ascending: false }).limit(20);
     if (data) {
       setNotifications(data);
       setUnreadCount(data.filter(n => !n.read).length);
@@ -118,8 +94,6 @@ export default function NavBar() {
   async function openNotifications() {
     const opening = !notifOpen;
     setNotifOpen(opening);
-
-    // Mark all unread as read when opening
     if (opening && unreadCount > 0) {
       const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
       if (unreadIds.length > 0) {
@@ -128,6 +102,21 @@ export default function NavBar() {
         setUnreadCount(0);
       }
     }
+  }
+
+  async function markAllRead() {
+    const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
+    if (unreadIds.length === 0) return;
+    await supabase.from('notifications').update({ read: true }).in('id', unreadIds);
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    setUnreadCount(0);
+  }
+
+  async function clearAllNotifications() {
+    if (!user) return;
+    await supabase.from('notifications').delete().eq('user_id', user.id);
+    setNotifications([]);
+    setUnreadCount(0);
   }
 
   function timeAgo(dateStr) {
@@ -143,6 +132,7 @@ export default function NavBar() {
   function notifIcon(type) {
     if (type === 'new_follower') return '👤';
     if (type === 'battle_request') return '⚔️';
+    if (type === 'battle_accepted') return '⚔️';
     if (type === 'battle_result') return '🏆';
     return '🔔';
   }
@@ -179,7 +169,6 @@ export default function NavBar() {
         fontFamily: 'DM Sans, sans-serif',
       }}>
 
-        {/* Logo */}
         <Link href={logoHref} style={{
           fontFamily: 'Syne, sans-serif', fontSize: '22px', fontWeight: 800,
           color: '#3B82F6', textDecoration: 'none', letterSpacing: '-0.5px',
@@ -188,23 +177,12 @@ export default function NavBar() {
           🔥 Torchd
         </Link>
 
-        {/* Desktop nav links */}
-        <ul style={{
-          display: 'flex', alignItems: 'center', gap: '0.25rem',
-          listStyle: 'none', margin: 0, padding: 0,
-        }} className="nav-desktop-links">
-          {[
-            { href: '/battle', label: 'Battle Mode' },
-            { href: '/lobby', label: 'Game Lobby' },
-            { href: '/leaderboard', label: 'Leaderboard' },
-          ].map(link => (
+        <ul style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', listStyle: 'none', margin: 0, padding: 0 }} className="nav-desktop-links">
+          {[{ href: '/battle', label: 'Battle Mode' }, { href: '/lobby', label: 'Game Lobby' }, { href: '/leaderboard', label: 'Leaderboard' }].map(link => (
             <li key={link.href}>
-              <Link href={link.href} style={{
-                fontSize: '14px', color: '#6B7A9E', textDecoration: 'none',
-                padding: '6px 12px', borderRadius: '8px', transition: 'all 0.2s',
-              }}
-              onMouseEnter={e => { e.target.style.color = '#EEF2FF'; e.target.style.background = '#151e2e'; }}
-              onMouseLeave={e => { e.target.style.color = '#6B7A9E'; e.target.style.background = 'transparent'; }}
+              <Link href={link.href} style={{ fontSize: '14px', color: '#6B7A9E', textDecoration: 'none', padding: '6px 12px', borderRadius: '8px', transition: 'all 0.2s' }}
+                onMouseEnter={e => { e.target.style.color = '#EEF2FF'; e.target.style.background = '#151e2e'; }}
+                onMouseLeave={e => { e.target.style.color = '#6B7A9E'; e.target.style.background = 'transparent'; }}
               >
                 {link.label}
               </Link>
@@ -212,7 +190,6 @@ export default function NavBar() {
           ))}
         </ul>
 
-        {/* Right side */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
           {loading ? (
             <div style={{ width: '80px', height: '32px' }}></div>
@@ -220,15 +197,12 @@ export default function NavBar() {
             <>
               {/* Bell */}
               <div ref={notifRef} style={{ position: 'relative' }}>
-                <button
-                  onClick={openNotifications}
-                  style={{
-                    position: 'relative', background: 'none',
-                    border: '1px solid rgba(255,255,255,0.065)', borderRadius: '8px',
-                    padding: '6px 10px', cursor: 'pointer', fontSize: '18px', lineHeight: 1,
-                    display: 'flex', alignItems: 'center', transition: 'all 0.2s',
-                    color: '#EEF2FF',
-                  }}
+                <button onClick={openNotifications} style={{
+                  position: 'relative', background: 'none',
+                  border: '1px solid rgba(255,255,255,0.065)', borderRadius: '8px',
+                  padding: '6px 10px', cursor: 'pointer', fontSize: '18px', lineHeight: 1,
+                  display: 'flex', alignItems: 'center', transition: 'all 0.2s', color: '#EEF2FF',
+                }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.22)'; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.065)'; }}
                 >
@@ -239,15 +213,13 @@ export default function NavBar() {
                       background: '#EF4444', color: 'white', fontSize: '10px',
                       fontWeight: 700, borderRadius: '100px', minWidth: '18px',
                       height: '18px', display: 'flex', alignItems: 'center',
-                      justifyContent: 'center', padding: '0 4px',
-                      fontFamily: 'Syne, sans-serif',
+                      justifyContent: 'center', padding: '0 4px', fontFamily: 'Syne, sans-serif',
                     }}>
                       {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                   )}
                 </button>
 
-                {/* Dropdown */}
                 {notifOpen && (
                   <div style={{
                     position: 'absolute', top: 'calc(100% + 10px)', right: 0,
@@ -257,15 +229,32 @@ export default function NavBar() {
                   }}>
                     {/* Header */}
                     <div style={{
-                      padding: '14px 16px', borderBottom: '1px solid rgba(255,255,255,0.065)',
+                      padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.065)',
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
                     }}>
                       <span style={{ fontSize: '13px', fontWeight: 700, fontFamily: 'Syne, sans-serif', color: '#EEF2FF' }}>
                         Notifications
                       </span>
-                      <span style={{ fontSize: '11px', color: '#6B7A9E' }}>
-                        {notifications.length === 0 ? '' : unreadCount === 0 ? 'All caught up ✓' : `${unreadCount} unread`}
-                      </span>
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        {unreadCount > 0 && (
+                          <button onClick={markAllRead} style={{
+                            fontSize: '11px', color: '#60A5FA', background: 'none',
+                            border: 'none', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
+                            padding: '2px 6px', borderRadius: '4px',
+                          }}>
+                            Mark all read
+                          </button>
+                        )}
+                        {notifications.length > 0 && (
+                          <button onClick={clearAllNotifications} style={{
+                            fontSize: '11px', color: '#6B7A9E', background: 'none',
+                            border: 'none', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
+                            padding: '2px 6px', borderRadius: '4px',
+                          }}>
+                            Clear all
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {/* List */}
@@ -293,15 +282,13 @@ export default function NavBar() {
                             <div style={{ fontSize: '13px', color: '#EEF2FF', lineHeight: 1.5 }}>
                               {n.from_username ? (
                                 <>
-                                  <Link
-                                    href={`/profile/${n.from_username}`}
-                                    onClick={() => setNotifOpen(false)}
-                                    style={{ color: '#60A5FA', fontWeight: 600, textDecoration: 'none' }}
-                                  >
+                                  <Link href={`/profile/${n.from_username}`} onClick={() => setNotifOpen(false)}
+                                    style={{ color: '#60A5FA', fontWeight: 600, textDecoration: 'none' }}>
                                     @{n.from_username}
                                   </Link>
                                   {' '}
-                                  {n.type === 'new_follower' ? 'started following you' : n.message}
+                                  {n.type === 'new_follower' ? 'started following you' :
+                                   n.type === 'battle_accepted' ? 'accepted your battle challenge' : n.message}
                                 </>
                               ) : n.message}
                             </div>
@@ -329,8 +316,8 @@ export default function NavBar() {
                 border: '1px solid rgba(255,255,255,0.065)', color: '#EEF2FF',
                 fontSize: '14px', transition: 'all 0.2s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.3)'; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.065)'; }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.3)'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.065)'; }}
               >
                 <div style={{
                   width: '26px', height: '26px', borderRadius: '50%',
@@ -346,11 +333,10 @@ export default function NavBar() {
               <button onClick={handleSignOut} className="nav-signout-btn" style={{
                 fontSize: '14px', color: '#6B7A9E', background: 'none',
                 border: '1px solid rgba(255,255,255,0.065)', borderRadius: '8px',
-                padding: '7px 16px', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
-                transition: 'all 0.2s',
+                padding: '7px 16px', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', transition: 'all 0.2s',
               }}
-              onMouseEnter={e => { e.target.style.color = '#EEF2FF'; }}
-              onMouseLeave={e => { e.target.style.color = '#6B7A9E'; }}
+                onMouseEnter={e => { e.target.style.color = '#EEF2FF'; }}
+                onMouseLeave={e => { e.target.style.color = '#6B7A9E'; }}
               >
                 Sign out
               </button>
@@ -361,52 +347,35 @@ export default function NavBar() {
                 fontSize: '14px', color: '#6B7A9E', background: 'none',
                 border: '1px solid rgba(255,255,255,0.065)', borderRadius: '8px',
                 padding: '7px 16px', textDecoration: 'none', transition: 'all 0.2s',
-              }}>
-                Sign in
-              </Link>
+              }}>Sign in</Link>
               <Link href="/signup" style={{
                 fontSize: '14px', fontWeight: 700, fontFamily: 'Syne, sans-serif',
                 color: '#EEF2FF', background: '#3B82F6', borderRadius: '8px',
                 padding: '8px 18px', textDecoration: 'none', transition: 'all 0.2s',
-              }}>
-                Join →
-              </Link>
+              }}>Join →</Link>
             </>
           )}
 
-          {/* Search */}
           <Link href="/search" className="nav-search-icon" style={{
-            fontSize: '18px', textDecoration: 'none',
-            padding: '6px 10px', borderRadius: '8px',
-            border: '1px solid rgba(255,255,255,0.065)',
-            transition: 'all 0.2s', lineHeight: 1,
+            fontSize: '18px', textDecoration: 'none', padding: '6px 10px', borderRadius: '8px',
+            border: '1px solid rgba(255,255,255,0.065)', transition: 'all 0.2s', lineHeight: 1,
             display: 'flex', alignItems: 'center',
           }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.22)'; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.065)'; }}
-          >
-            🔍
-          </Link>
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(59,130,246,0.22)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.065)'; }}
+          >🔍</Link>
 
-          {/* Hamburger */}
-          <button
-            onClick={() => setMenuOpen(o => !o)}
-            className="nav-hamburger"
-            aria-label="Toggle menu"
+          <button onClick={() => setMenuOpen(o => !o)} className="nav-hamburger" aria-label="Toggle menu"
             style={{
-              display: 'none',
-              background: 'none', border: '1px solid rgba(255,255,255,0.065)',
+              display: 'none', background: 'none', border: '1px solid rgba(255,255,255,0.065)',
               borderRadius: '8px', padding: '7px 10px', cursor: 'pointer',
               color: '#EEF2FF', fontSize: '18px', lineHeight: 1,
-            }}
-          >
+            }}>
             {menuOpen ? '✕' : '☰'}
           </button>
         </div>
-
       </nav>
 
-      {/* Mobile menu */}
       {menuOpen && (
         <div style={{
           position: 'fixed', top: '62px', left: 0, right: 0, zIndex: 199,
@@ -418,37 +387,25 @@ export default function NavBar() {
             <Link key={link.href} href={link.href} style={{
               fontSize: '15px', color: '#EEF2FF', textDecoration: 'none',
               padding: '12px 16px', borderRadius: '10px',
-              background: '#0f1623', border: '1px solid rgba(255,255,255,0.065)',
-              fontWeight: 500,
-            }}>
-              {link.label}
-            </Link>
+              background: '#0f1623', border: '1px solid rgba(255,255,255,0.065)', fontWeight: 500,
+            }}>{link.label}</Link>
           ))}
-
           <div style={{ height: '1px', background: 'rgba(255,255,255,0.065)', margin: '0.25rem 0' }}></div>
-
           {user ? (
             <>
               <Link href={`/profile/${profileSlug || 'profile'}`} style={{
                 fontSize: '15px', color: '#60A5FA', textDecoration: 'none',
                 padding: '12px 16px', borderRadius: '10px',
-                background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
-                fontWeight: 600,
-              }}>
-                👤 My Profile (@{profileSlug})
-              </Link>
+                background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', fontWeight: 600,
+              }}>👤 My Profile (@{profileSlug})</Link>
               <div style={{
-                fontSize: '15px', color: '#EEF2FF', padding: '12px 16px',
-                borderRadius: '10px', background: '#0f1623',
-                border: '1px solid rgba(255,255,255,0.065)',
+                fontSize: '15px', color: '#EEF2FF', padding: '12px 16px', borderRadius: '10px',
+                background: '#0f1623', border: '1px solid rgba(255,255,255,0.065)',
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               }}>
                 <span>🔔 Notifications</span>
                 {unreadCount > 0 && (
-                  <span style={{
-                    background: '#EF4444', color: 'white', fontSize: '11px',
-                    fontWeight: 700, borderRadius: '100px', padding: '2px 8px',
-                  }}>
+                  <span style={{ background: '#EF4444', color: 'white', fontSize: '11px', fontWeight: 700, borderRadius: '100px', padding: '2px 8px' }}>
                     {unreadCount}
                   </span>
                 )}
@@ -456,11 +413,8 @@ export default function NavBar() {
               <button onClick={handleSignOut} style={{
                 fontSize: '15px', color: '#6B7A9E', background: 'none',
                 border: '1px solid rgba(255,255,255,0.065)', borderRadius: '10px',
-                padding: '12px 16px', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
-                textAlign: 'left',
-              }}>
-                Sign out
-              </button>
+                padding: '12px 16px', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif', textAlign: 'left',
+              }}>Sign out</button>
             </>
           ) : (
             <>
@@ -468,16 +422,12 @@ export default function NavBar() {
                 fontSize: '15px', color: '#EEF2FF', textDecoration: 'none',
                 padding: '12px 16px', borderRadius: '10px',
                 background: '#0f1623', border: '1px solid rgba(255,255,255,0.065)',
-              }}>
-                Sign in
-              </Link>
+              }}>Sign in</Link>
               <Link href="/signup" style={{
                 fontSize: '15px', fontWeight: 700, fontFamily: 'Syne, sans-serif',
                 color: '#EEF2FF', background: '#3B82F6', borderRadius: '10px',
                 padding: '12px 16px', textDecoration: 'none', textAlign: 'center',
-              }}>
-                Create Account →
-              </Link>
+              }}>Create Account →</Link>
             </>
           )}
         </div>
@@ -490,7 +440,6 @@ export default function NavBar() {
         .nav-hamburger { display: none !important; }
         .nav-name-label { display: inline !important; }
         .nav-search-icon { display: flex !important; }
-
         @media (max-width: 768px) {
           .nav-desktop-links { display: none !important; }
           .nav-signout-btn { display: none !important; }

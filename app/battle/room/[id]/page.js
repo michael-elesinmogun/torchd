@@ -35,7 +35,6 @@ export default function BattleRoom({ params }) {
   const [battleEnded, setBattleEnded] = useState(false);
   const [winner, setWinner] = useState(null);
 
-  // Store round start time so timer works even when tab is backgrounded
   const roundStartTimeRef = useRef(null);
   const roundTimerRef = useRef(null);
   const currentRoundRef = useRef(0);
@@ -53,8 +52,7 @@ export default function BattleRoom({ params }) {
 
       if (currentUser) {
         const { data: profileData } = await supabase
-          .from('profiles').select('username, full_name')
-          .eq('id', currentUser.id).maybeSingle();
+          .from('profiles').select('username, full_name').eq('id', currentUser.id).maybeSingle();
         setProfile(profileData);
         profileRef.current = profileData;
       }
@@ -72,22 +70,15 @@ export default function BattleRoom({ params }) {
         setCurrentRound(TOTAL_ROUNDS);
       }
 
-      const { data: voteData } = await supabase
-        .from('votes').select('side').eq('battle_id', id);
-
+      const { data: voteData } = await supabase.from('votes').select('side').eq('battle_id', id);
       if (voteData) {
-        const v = {
-          player1: voteData.filter(v => v.side === 'player1').length,
-          player2: voteData.filter(v => v.side === 'player2').length,
-        };
+        const v = { player1: voteData.filter(v => v.side === 'player1').length, player2: voteData.filter(v => v.side === 'player2').length };
         setVotes(v);
         votesRef.current = v;
       }
 
       if (currentUser) {
-        const { data: existingVote } = await supabase
-          .from('votes').select('side')
-          .eq('battle_id', id).eq('user_id', currentUser.id).maybeSingle();
+        const { data: existingVote } = await supabase.from('votes').select('side').eq('battle_id', id).eq('user_id', currentUser.id).maybeSingle();
         if (existingVote) setVoted(existingVote.side);
       }
 
@@ -140,7 +131,6 @@ export default function BattleRoom({ params }) {
 
     init();
 
-    // Recalculate timer when tab becomes visible again
     function handleVisibility() {
       if (document.visibilityState === 'visible' && roundStartTimeRef.current && currentRoundRef.current > 0) {
         const elapsed = Math.floor((Date.now() - roundStartTimeRef.current) / 1000);
@@ -170,8 +160,6 @@ export default function BattleRoom({ params }) {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // ── Round system ─────────────────────────────────────────────────────────────
-
   function startRound(round) {
     clearInterval(roundTimerRef.current);
     currentRoundRef.current = round;
@@ -184,7 +172,6 @@ export default function BattleRoom({ params }) {
       const elapsed = Math.floor((Date.now() - roundStartTimeRef.current) / 1000);
       const remaining = Math.max(0, ROUND_DURATION - elapsed);
       setRoundTimeLeft(remaining);
-
       if (remaining === 0) {
         clearInterval(roundTimerRef.current);
         const next = currentRoundRef.current + 1;
@@ -234,13 +221,10 @@ export default function BattleRoom({ params }) {
     }
   }
 
-  // ── Daily.co video ────────────────────────────────────────────────────────────
-
   async function joinVideo() {
     const battleData = battleRef.current;
     if (!battleData?.room_url) return;
 
-    // Destroy any existing frame
     if (callFrameRef.current) {
       try { callFrameRef.current.destroy(); } catch {}
       callFrameRef.current = null;
@@ -250,15 +234,11 @@ export default function BattleRoom({ params }) {
       const container = document.getElementById('daily-container');
       if (!container) return;
 
-      // Use Daily's prebuilt UI — handles iOS Safari camera permissions natively
+      // CRITICAL: Container must be visible with dimensions before createFrame
+      // We render it at full size always, just hidden behind the join prompt
       const frame = DailyIframe.createFrame(container, {
-        iframeStyle: {
-          width: '100%',
-          height: '100%',
-          border: 'none',
-          borderRadius: '14px',
-        },
-        showLeaveButton: true,       // Daily handles leave internally
+        iframeStyle: { width: '100%', height: '100%', border: 'none', borderRadius: '14px' },
+        showLeaveButton: true,
         showFullscreenButton: true,
         showParticipantsBar: false,
       });
@@ -269,8 +249,8 @@ export default function BattleRoom({ params }) {
       frame.on('participant-joined', () => setParticipantCount(p => p + 1));
       frame.on('participant-left', () => setParticipantCount(p => Math.max(0, p - 1)));
       frame.on('left-meeting', () => {
-        // User clicked Leave inside Daily — mark battle ended
         setVideoJoined(false);
+        setParticipantCount(0);
         if (battleRef.current && profileRef.current && (
           battleRef.current.player1_username === profileRef.current.username ||
           battleRef.current.player2_username === profileRef.current.username
@@ -387,13 +367,24 @@ export default function BattleRoom({ params }) {
             </div>
           )}
 
-          {/* Daily container — always mounted */}
+          {/* 
+            CRITICAL FIX: Daily container is ALWAYS rendered at full size.
+            Hidden via opacity+pointer-events, NOT display:none or height:0.
+            Daily needs the container to have real dimensions when createFrame is called.
+          */}
           <div
             id="daily-container"
             style={{
-              width: '100%', aspectRatio: '16/9',
-              background: '#000', borderRadius: '14px', overflow: 'hidden',
-              display: videoJoined ? 'block' : 'none',
+              width: '100%',
+              aspectRatio: '16/9',
+              background: '#000',
+              borderRadius: '14px',
+              overflow: 'hidden',
+              opacity: videoJoined ? 1 : 0,
+              pointerEvents: videoJoined ? 'auto' : 'none',
+              position: videoJoined ? 'relative' : 'absolute',
+              height: videoJoined ? 'auto' : '1px',
+              visibility: videoJoined ? 'visible' : 'hidden',
             }}
           />
 
@@ -405,23 +396,18 @@ export default function BattleRoom({ params }) {
                   background: '#10B981', border: 'none', borderRadius: '100px',
                   padding: '10px 24px', color: 'white',
                   fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
-                }}>
-                  ▶ Start Battle
-                </button>
+                }}>▶ Start Battle</button>
               )}
               {!isPlayer1 && bothInRoom && currentRound === 0 && !battleEnded && (
                 <div style={{
                   background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)',
-                  borderRadius: '100px', padding: '10px 20px',
-                  fontSize: '13px', color: '#60A5FA', fontWeight: 600,
-                }}>
-                  ⏳ Waiting for Player 1 to start...
-                </div>
+                  borderRadius: '100px', padding: '10px 20px', fontSize: '13px', color: '#60A5FA', fontWeight: 600,
+                }}>⏳ Waiting for Player 1 to start...</div>
               )}
             </div>
           )}
 
-          {/* Join prompt */}
+          {/* Join prompt — shown until joined */}
           {!videoJoined && (
             <div className={styles.joinVideoWrap}>
               <div className={styles.joinVideoIcon}>⚔️</div>
@@ -434,9 +420,7 @@ export default function BattleRoom({ params }) {
                   : 'Share the link below while you wait.'}
               </p>
               {battle.room_url && (
-                <button className={styles.joinVideoBtn} onClick={joinVideo}>
-                  🎥 Join Room
-                </button>
+                <button className={styles.joinVideoBtn} onClick={joinVideo}>🎥 Join Room</button>
               )}
             </div>
           )}
@@ -480,7 +464,7 @@ export default function BattleRoom({ params }) {
 
         </div>
 
-        {/* Sidebar chat */}
+        {/* Sidebar */}
         <div className={styles.sidebar}>
           <div className={styles.sidebarTitle}>Live Chat</div>
           <div className={styles.chatMessages}>
