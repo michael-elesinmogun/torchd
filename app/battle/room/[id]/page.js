@@ -15,6 +15,9 @@ const ROUND_CONFIG = {
   3: { label: 'Round 3', desc: 'Open mic — both players speak freely', speaker: 'both' },
 };
 
+// Module-level frame tracker — persists across React re-renders and strict mode double-invocations
+let globalDailyFrame = null;
+
 export default function BattleRoom({ params }) {
   const { id } = use(params);
   const router = useRouter();
@@ -149,16 +152,19 @@ export default function BattleRoom({ params }) {
     return () => {
       clearInterval(roundTimerRef.current);
       document.removeEventListener('visibilitychange', handleVisibility);
-      if (callFrameRef.current) {
-        try { callFrameRef.current.destroy(); } catch {}
-        callFrameRef.current = null;
+      if (globalDailyFrame) {
+        try { globalDailyFrame.destroy(); } catch {}
+        globalDailyFrame = null;
       }
+      callFrameRef.current = null;
     };
   }, [id]);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // ── Round system ─────────────────────────────────────────────────────────────
 
   function startRound(round) {
     clearInterval(roundTimerRef.current);
@@ -221,10 +227,17 @@ export default function BattleRoom({ params }) {
     }
   }
 
+  // ── Daily.co video ────────────────────────────────────────────────────────────
+
   async function joinVideo() {
     const battleData = battleRef.current;
     if (!battleData?.room_url) return;
 
+    // Destroy any existing frame — both module-level and ref
+    if (globalDailyFrame) {
+      try { globalDailyFrame.destroy(); } catch {}
+      globalDailyFrame = null;
+    }
     if (callFrameRef.current) {
       try { callFrameRef.current.destroy(); } catch {}
       callFrameRef.current = null;
@@ -234,8 +247,6 @@ export default function BattleRoom({ params }) {
       const container = document.getElementById('daily-container');
       if (!container) return;
 
-      // CRITICAL: Container must be visible with dimensions before createFrame
-      // We render it at full size always, just hidden behind the join prompt
       const frame = DailyIframe.createFrame(container, {
         iframeStyle: { width: '100%', height: '100%', border: 'none', borderRadius: '14px' },
         showLeaveButton: true,
@@ -243,6 +254,7 @@ export default function BattleRoom({ params }) {
         showParticipantsBar: false,
       });
 
+      globalDailyFrame = frame;
       callFrameRef.current = frame;
 
       frame.on('joined-meeting', () => setVideoJoined(true));
@@ -257,7 +269,8 @@ export default function BattleRoom({ params }) {
         )) {
           supabase.from('battles').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', id);
         }
-        try { callFrameRef.current?.destroy(); } catch {}
+        try { globalDailyFrame?.destroy(); } catch {}
+        globalDailyFrame = null;
         callFrameRef.current = null;
       });
 
@@ -367,10 +380,10 @@ export default function BattleRoom({ params }) {
             </div>
           )}
 
-          {/* 
-            CRITICAL FIX: Daily container is ALWAYS rendered at full size.
-            Hidden via opacity+pointer-events, NOT display:none or height:0.
-            Daily needs the container to have real dimensions when createFrame is called.
+          {/*
+            Daily container — always rendered with real dimensions.
+            Uses visibility:hidden instead of display:none so Daily
+            can measure the container and render the iframe correctly.
           */}
           <div
             id="daily-container"
@@ -380,15 +393,13 @@ export default function BattleRoom({ params }) {
               background: '#000',
               borderRadius: '14px',
               overflow: 'hidden',
-              opacity: videoJoined ? 1 : 0,
-              pointerEvents: videoJoined ? 'auto' : 'none',
-              position: videoJoined ? 'relative' : 'absolute',
-              height: videoJoined ? 'auto' : '1px',
               visibility: videoJoined ? 'visible' : 'hidden',
+              height: videoJoined ? 'auto' : '0',
+              marginBottom: videoJoined ? '0' : '-1rem',
             }}
           />
 
-          {/* Controls shown after joining */}
+          {/* Controls after joining */}
           {videoJoined && (
             <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
               {isPlayer1 && bothInRoom && currentRound === 0 && !battleEnded && (
@@ -407,7 +418,7 @@ export default function BattleRoom({ params }) {
             </div>
           )}
 
-          {/* Join prompt — shown until joined */}
+          {/* Join prompt */}
           {!videoJoined && (
             <div className={styles.joinVideoWrap}>
               <div className={styles.joinVideoIcon}>⚔️</div>
