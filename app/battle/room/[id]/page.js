@@ -33,17 +33,14 @@ export default function BattleRoom({ params }) {
   const [roundTimeLeft, setRoundTimeLeft] = useState(ROUND_DURATION);
   const [battleEnded, setBattleEnded] = useState(false);
   const [winner, setWinner] = useState(null);
-
-  // 100ms state
-  const [localVideoTrack, setLocalVideoTrack] = useState(null);
-  const [localAudioTrack, setLocalAudioTrack] = useState(null);
-  const [remotePeers, setRemotePeers] = useState([]);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCamOn, setIsCamOn] = useState(true);
+  const [peers, setPeers] = useState([]);
 
-  const hmsClientRef = useRef(null);
+  const hmsActionsRef = useRef(null);
+  const hmsStoreRef = useRef(null);
   const localVideoRef = useRef(null);
-  const remoteVideoRefs = useRef({});
+  const remoteVideoRef = useRef(null);
   const roundStartTimeRef = useRef(null);
   const roundTimerRef = useRef(null);
   const currentRoundRef = useRef(0);
@@ -157,34 +154,15 @@ export default function BattleRoom({ params }) {
     return () => {
       clearInterval(roundTimerRef.current);
       document.removeEventListener('visibilitychange', handleVisibility);
-      leaveVideo();
+      if (hmsActionsRef.current) {
+        try { hmsActionsRef.current.leave(); } catch {}
+      }
     };
   }, [id]);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // Attach local video stream to video element
-  useEffect(() => {
-    if (localVideoTrack && localVideoRef.current) {
-      localVideoTrack.attach(localVideoRef.current);
-    }
-    return () => {
-      if (localVideoTrack) {
-        try { localVideoTrack.detach(); } catch {}
-      }
-    };
-  }, [localVideoTrack]);
-
-  // Attach remote video streams
-  useEffect(() => {
-    remotePeers.forEach(peer => {
-      if (peer.videoTrack && remoteVideoRefs.current[peer.id]) {
-        peer.videoTrack.attach(remoteVideoRefs.current[peer.id]);
-      }
-    });
-  }, [remotePeers]);
 
   function startRound(round) {
     clearInterval(roundTimerRef.current);
@@ -208,12 +186,12 @@ export default function BattleRoom({ params }) {
   }
 
   async function enforceMicForRound(round) {
-    if (!hmsClientRef.current) return;
+    if (!hmsActionsRef.current) return;
     const isP1 = battleRef.current?.player1_username === profileRef.current?.username;
     const { speaker } = ROUND_CONFIG[round];
     const shouldHaveMic = speaker === 'both' || (speaker === 'player1' && isP1) || (speaker === 'player2' && !isP1);
     try {
-      await hmsClientRef.current.setLocalAudioEnabled(shouldHaveMic);
+      await hmsActionsRef.current.setLocalAudioEnabled(shouldHaveMic);
       setIsMicOn(shouldHaveMic);
     } catch {}
   }
@@ -250,28 +228,37 @@ export default function BattleRoom({ params }) {
     }
   }
 
-  // ── 100ms video ───────────────────────────────────────────────────────────────
-
   async function joinVideo() {
     const battleData = battleRef.current;
     const profileData = profileRef.current;
-    if (!battleData?.room_id || !profileData?.username) {
-      setVideoError('Room not ready. Please try again.');
+
+    if (!battleData?.room_id) {
+      setVideoError('No room found. Please create a new battle.');
+      return;
+    }
+    if (!profileData?.username) {
+      setVideoError('Profile not loaded. Please refresh.');
       return;
     }
 
     setVideoError('');
 
     try {
-      // Dynamically import 100ms SDK
-      const { HMSReactiveStore, selectIsConnectedToRoom, selectLocalPeer, selectPeers } = await import('@100mslive/hms-video-store');
+      // Dynamically import to avoid SSR issues
+      const { HMSReactiveStore, selectPeers, selectIsConnectedToRoom, selectLocalPeer, selectVideoTrackByID } = await import('@100mslive/hms-video-store');
 
-      const hms = new HMSReactiveStore();
-      const hmsStore = hms.getStore();
-      const hmsActions = hms.getActions();
-      hmsClientRef.current = hmsActions;
+      // Clean up existing instance
+      if (hmsActionsRef.current) {
+        try { await hmsActionsRef.current.leave(); } catch {}
+      }
 
-      // Get auth token
+      const hmsInstance = new HMSReactiveStore();
+      const hmsStore = hmsInstance.getStore();
+      const hmsActions = hmsInstance.getActions();
+      hmsActionsRef.current = hmsActions;
+      hmsStoreRef.current = hmsStore;
+
+      // Get token
       const tokenRes = await fetch('/api/hms-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -284,48 +271,48 @@ export default function BattleRoom({ params }) {
       const { token, error: tokenError } = await tokenRes.json();
       if (tokenError) throw new Error(tokenError);
 
-      // Subscribe to store updates
-      hmsStore.subscribe((isConnected) => {
-        if (isConnected) setVideoJoined(true);
-      }, selectIsConnectedToRoom);
-
-      hmsStore.subscribe((peers) => {
-        if (!peers) return;
-        const remote = peers.filter(p => !p.isLocal);
-        setRemotePeers(remote.map(p => ({
-          id: p.id,
-          name: p.name,
-          videoTrack: hmsStore.getState(state => state.tracks[p.videoTrack]),
-          audioTrack: hmsStore.getState(state => state.tracks[p.audioTrack]),
-        })));
-      }, selectPeers);
-
-      hmsStore.subscribe((localPeer) => {
-        if (!localPeer) return;
-        const videoTrack = hmsStore.getState(state => state.tracks[localPeer.videoTrack]);
-        if (videoTrack) setLocalVideoTrack(videoTrack);
-      }, selectLocalPeer);
-
+      // Join room
       await hmsActions.join({
         userName: profileData.username,
         authToken: token,
         settings: { isAudioMuted: false, isVideoMuted: false },
+        rememberDeviceSelection: true,
       });
+
+      setVideoJoined(true);
+
+      // Subscribe to peer updates
+      hmsStore.subscribe((allPeers) => {
+        if (!allPeers) return;
+        setPeers([...allPeers]);
+
+        // Attach video tracks
+        allPeers.forEach(async (peer) => {
+          if (peer.videoTrack) {
+            const trackEl = peer.isLocal ? localVideoRef.current : remoteVideoRef.current;
+            if (trackEl) {
+              try {
+                await hmsActions.attachVideo(peer.videoTrack, trackEl);
+              } catch {}
+            }
+          }
+        });
+      }, selectPeers);
 
     } catch (err) {
       console.error('100ms join error:', err);
-      setVideoError('Could not join video room: ' + err.message);
+      setVideoError('Could not join: ' + err.message);
+      setVideoJoined(false);
     }
   }
 
   async function leaveVideo() {
-    if (hmsClientRef.current) {
-      try { await hmsClientRef.current.leave(); } catch {}
-      hmsClientRef.current = null;
+    if (hmsActionsRef.current) {
+      try { await hmsActionsRef.current.leave(); } catch {}
+      hmsActionsRef.current = null;
     }
     setVideoJoined(false);
-    setLocalVideoTrack(null);
-    setRemotePeers([]);
+    setPeers([]);
 
     if (battleRef.current && profileRef.current && (
       battleRef.current.player1_username === profileRef.current.username ||
@@ -336,14 +323,14 @@ export default function BattleRoom({ params }) {
   }
 
   async function toggleMic() {
-    if (!hmsClientRef.current) return;
-    await hmsClientRef.current.setLocalAudioEnabled(!isMicOn);
+    if (!hmsActionsRef.current) return;
+    await hmsActionsRef.current.setLocalAudioEnabled(!isMicOn);
     setIsMicOn(m => !m);
   }
 
   async function toggleCam() {
-    if (!hmsClientRef.current) return;
-    await hmsClientRef.current.setLocalVideoEnabled(!isCamOn);
+    if (!hmsActionsRef.current) return;
+    await hmsActionsRef.current.setLocalVideoEnabled(!isCamOn);
     setIsCamOn(c => !c);
   }
 
@@ -389,7 +376,8 @@ export default function BattleRoom({ params }) {
   const p2Pct = 100 - p1Pct;
   const isPlayer = user && (battle.player1_username === profile?.username || battle.player2_username === profile?.username);
   const isPlayer1 = profile?.username === battle.player1_username;
-  const bothInRoom = !!battle?.player2_username && remotePeers.length >= 1;
+  const remotePeer = peers.find(p => !p.isLocal);
+  const bothInRoom = !!battle?.player2_username && !!remotePeer;
   const shareLink = typeof window !== 'undefined' ? window.location.href : '';
   const roundConfig = currentRound > 0 ? ROUND_CONFIG[currentRound] : null;
   const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -447,32 +435,31 @@ export default function BattleRoom({ params }) {
             </div>
           )}
 
-          {/* Video — 100ms native video elements */}
+          {/* Video */}
           {videoJoined ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {/* Remote video (opponent) */}
               <div style={{
                 width: '100%', aspectRatio: '16/9', background: '#000',
                 borderRadius: '14px', overflow: 'hidden', position: 'relative',
               }}>
-                {remotePeers.length > 0 ? (
-                  <video
-                    ref={el => { if (el) remoteVideoRefs.current[remotePeers[0].id] = el; }}
-                    autoPlay playsInline
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                ) : (
+                {/* Remote video */}
+                <video
+                  ref={remoteVideoRef}
+                  autoPlay playsInline
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: remotePeer ? 'block' : 'none' }}
+                />
+                {!remotePeer && (
                   <div style={{
                     position: 'absolute', inset: 0, display: 'flex',
                     flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
                     color: '#6B7A9E', fontSize: '14px', gap: '8px',
                   }}>
                     <div style={{ fontSize: '32px' }}>⏳</div>
-                    Waiting for opponent to join...
+                    Waiting for opponent...
                   </div>
                 )}
 
-                {/* Local video PiP */}
+                {/* Local PiP */}
                 <video
                   ref={localVideoRef}
                   autoPlay muted playsInline
@@ -485,7 +472,7 @@ export default function BattleRoom({ params }) {
                   }}
                 />
 
-                {/* Controls */}
+                {/* Controls overlay */}
                 <div style={{
                   position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
                   display: 'flex', gap: '10px', alignItems: 'center',
@@ -510,7 +497,6 @@ export default function BattleRoom({ params }) {
                 </div>
               </div>
 
-              {/* Start Battle / waiting indicator */}
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
                 {isPlayer1 && bothInRoom && currentRound === 0 && !battleEnded && (
                   <button onClick={handleStartBattle} style={{
