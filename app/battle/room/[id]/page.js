@@ -42,6 +42,7 @@ export default function BattleRoom({ params }) {
   const roundTimerRef = useRef(null);
   const currentRoundRef = useRef(0);
   const callFrameRef = useRef(null);
+  const containerRef = useRef(null);
   const chatBottomRef = useRef(null);
   const profileRef = useRef(null);
   const battleRef = useRef(null);
@@ -239,17 +240,13 @@ export default function BattleRoom({ params }) {
       callFrameRef.current = null;
     }
 
-    // Small delay to ensure container is in the DOM and has dimensions
-    await new Promise(resolve => setTimeout(resolve, 100));
-
     try {
-      const container = document.getElementById('daily-container');
+      // Use the ref directly — guaranteed to exist
+      const container = containerRef.current;
       if (!container) {
-        console.error('Daily container not found');
+        console.error('Daily container ref not found');
         return;
       }
-
-      console.log('Container dimensions:', container.offsetWidth, container.offsetHeight);
 
       const frame = DailyIframe.createFrame(container, {
         iframeStyle: { width: '100%', height: '100%', border: 'none', borderRadius: '14px' },
@@ -261,13 +258,9 @@ export default function BattleRoom({ params }) {
       globalDailyFrame = frame;
       callFrameRef.current = frame;
 
-      frame.on('joined-meeting', () => {
-        console.log('Joined Daily meeting');
-        setVideoJoined(true);
-      });
+      frame.on('joined-meeting', () => setVideoJoined(true));
       frame.on('participant-joined', () => setParticipantCount(p => p + 1));
       frame.on('participant-left', () => setParticipantCount(p => Math.max(0, p - 1)));
-      frame.on('error', (e) => console.error('Daily frame error:', e));
       frame.on('left-meeting', () => {
         setVideoJoined(false);
         setParticipantCount(0);
@@ -282,7 +275,6 @@ export default function BattleRoom({ params }) {
         callFrameRef.current = null;
       });
 
-      console.log('Joining Daily room:', battleData.room_url);
       await frame.join({ url: battleData.room_url });
     } catch (err) {
       console.error('Daily join error:', err);
@@ -338,28 +330,6 @@ export default function BattleRoom({ params }) {
 
   return (
     <main className={styles.main}>
-      {/*
-        Daily container rendered here at the ROOT level — outside all conditional renders.
-        When not joined: positioned off-screen at -9999px so it has real dimensions.
-        When joined: positioned normally and visible.
-        This ensures Daily can always find and measure the container.
-      */}
-      <div
-        id="daily-container"
-        style={{
-          position: videoJoined ? 'relative' : 'fixed',
-          top: videoJoined ? 'auto' : '-9999px',
-          left: videoJoined ? 'auto' : '-9999px',
-          width: videoJoined ? '100%' : '800px',
-          height: videoJoined ? 'auto' : '450px',
-          aspectRatio: '16/9',
-          background: '#000',
-          borderRadius: '14px',
-          overflow: 'hidden',
-          zIndex: videoJoined ? 'auto' : -1,
-        }}
-      />
-
       <div className={styles.layout}>
         <div className={styles.stage}>
 
@@ -411,12 +381,24 @@ export default function BattleRoom({ params }) {
             </div>
           )}
 
-          {/* Video area — shows daily-container inline when joined */}
-          {videoJoined && (
-            <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: '14px', overflow: 'hidden', background: '#000' }}>
-              {/* Container is moved here visually via position:relative above */}
-            </div>
-          )}
+          {/*
+            Video container — always rendered with a ref.
+            Uses a wrapper to control visibility so the inner div
+            always has real dimensions for Daily to render into.
+          */}
+          <div style={{
+            width: '100%',
+            aspectRatio: '16/9',
+            borderRadius: '14px',
+            overflow: 'hidden',
+            background: '#000',
+            display: videoJoined ? 'block' : 'none',
+          }}>
+            <div
+              ref={containerRef}
+              style={{ width: '100%', height: '100%' }}
+            />
+          </div>
 
           {/* Controls after joining */}
           {videoJoined && (
