@@ -5,6 +5,8 @@ import Link from 'next/link';
 import { supabase } from '../../../supabase';
 import styles from './room.module.css';
 
+export const dynamic = 'force-dynamic';
+
 const ROUND_DURATION = 120;
 const TOTAL_ROUNDS = 3;
 
