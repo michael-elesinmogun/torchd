@@ -259,7 +259,7 @@ export default function BattleRoom({ params }) {
       const container = document.getElementById('jitsi-container');
       if (!container) return;
 
-      const api = new window.JitsiMeetExternalAPI('meet.jit.si', {
+      const api = new window.JitsiMeetExternalAPI('jitsi.riot.im', {
         ...jitsiConfig,
         parentNode: container,
       });
@@ -287,7 +287,7 @@ export default function BattleRoom({ params }) {
       initJitsi();
     } else {
       const script = document.createElement('script');
-      script.src = 'https://meet.jit.si/external_api.js';
+      script.src = 'https://jitsi.riot.im/external_api.js';
       script.async = true;
       script.onload = initJitsi;
       script.onerror = () => console.error('Failed to load Jitsi script');

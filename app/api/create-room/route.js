@@ -6,7 +6,7 @@ export async function POST(request) {
 
     // Jitsi needs no API key — just a unique room name
     const roomName = `torchd${battleId.replace(/-/g, '').slice(0, 12)}`;
-    const roomUrl = `https://meet.jit.si/${roomName}`;
+    const roomUrl = `https://jitsi.riot.im/${roomName}`;
 
     return NextResponse.json({ roomUrl, roomName });
   } catch (err) {
