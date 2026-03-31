@@ -1,38 +1,28 @@
 import { NextResponse } from 'next/server';
 import crypto from 'crypto';
 
-function generateHmsToken(accessKey, secret, type = 'management') {
-  const header = { alg: 'HS256', typ: 'JWT' };
+function makeJwt(accessKey, secret, extraPayload = {}) {
   const now = Math.floor(Date.now() / 1000);
-  const payload = {
+
+  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
+
+  const payload = btoa(JSON.stringify({
     access_key: accessKey,
-    type,
     version: 2,
     iat: now,
     nbf: now,
     exp: now + 86400,
-  };
+    ...extraPayload,
+  })).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 
-  const encode = (obj) =>
-    Buffer.from(JSON.stringify(obj))
-      .toString('base64')
-      .replace(/=/g, '')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_');
-
-  const headerB64 = encode(header);
-  const payloadB64 = encode(payload);
-  const signingInput = `${headerB64}.${payloadB64}`;
-
-  const signature = crypto
+  const sig = crypto
     .createHmac('sha256', secret)
-    .update(signingInput)
+    .update(`${header}.${payload}`)
     .digest('base64')
-    .replace(/=/g, '')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_');
+    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
 
-  return `${signingInput}.${signature}`;
+  return `${header}.${payload}.${sig}`;
 }
 
 export async function POST(request) {
@@ -48,12 +38,14 @@ export async function POST(request) {
     }
 
     if (!templateId) {
-      return NextResponse.json({ error: 'HMS_TEMPLATE_ID not configured' }, { status: 500 });
+      return NextResponse.json({ error: 'HMS_TEMPLATE_ID not set in env vars' }, { status: 500 });
     }
 
-    const mgmtToken = generateHmsToken(accessKey, secret, 'management');
+    const mgmtToken = makeJwt(accessKey, secret, { type: 'management' });
 
-    // Create room via 100ms API
+    console.log('Creating 100ms room for battle:', battleId);
+    console.log('Template ID:', templateId);
+
     const roomRes = await fetch('https://api.100ms.live/v2/rooms', {
       method: 'POST',
       headers: {
@@ -61,17 +53,20 @@ export async function POST(request) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        name: `torchd-battle-${battleId}`,
+        name: `torchd-${battleId.slice(0, 20)}`,
         description: topic || 'Torchd Battle',
         template_id: templateId,
       }),
     });
 
     const roomData = await roomRes.json();
+    console.log('100ms room response:', JSON.stringify(roomData));
 
     if (!roomRes.ok) {
-      console.error('100ms room creation error:', roomData);
-      return NextResponse.json({ error: roomData.message || 'Failed to create room' }, { status: 500 });
+      return NextResponse.json({
+        error: roomData.message || roomData.error || 'Failed to create room',
+        details: roomData,
+      }, { status: 500 });
     }
 
     return NextResponse.json({ roomId: roomData.id, roomName: roomData.name });
