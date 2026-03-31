@@ -1,49 +1,75 @@
+import { NextResponse } from 'next/server';
+
 export async function POST(request) {
-  const { battleId, topic } = await request.json();
-
-  const apiKey = process.env.DAILY_API_KEY;
-
-  if (!apiKey) {
-    return Response.json({ error: 'Daily API key not configured' }, { status: 500 });
-  }
-
   try {
-    // Create a Daily room for this battle
-    const response = await fetch('https://api.daily.co/v1/rooms', {
+    const { battleId, topic } = await request.json();
+
+    const accessKey = process.env.HMS_ACCESS_KEY;
+    const secret = process.env.HMS_SECRET;
+
+    if (!accessKey || !secret) {
+      return NextResponse.json({ error: '100ms credentials not configured' }, { status: 500 });
+    }
+
+    // Generate management token for 100ms API
+    const crypto = await import('crypto');
+
+    function base64url(obj) {
+      return Buffer.from(JSON.stringify(obj))
+        .toString('base64')
+        .replace(/=/g, '')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_');
+    }
+
+    const now = Math.floor(Date.now() / 1000);
+    const header = { alg: 'HS256', typ: 'JWT' };
+    const payload = {
+      access_key: accessKey,
+      type: 'management',
+      version: 2,
+      iat: now,
+      nbf: now,
+      exp: now + 86400,
+    };
+
+    const headerB64 = base64url(header);
+    const payloadB64 = base64url(payload);
+    const signingInput = `${headerB64}.${payloadB64}`;
+    const signature = crypto
+      .createHmac('sha256', secret)
+      .update(signingInput)
+      .digest('base64')
+      .replace(/=/g, '')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_');
+
+    const mgmtToken = `${signingInput}.${signature}`;
+
+    // Create a room via 100ms API
+    const roomRes = await fetch('https://api.100ms.live/v2/rooms', {
       method: 'POST',
       headers: {
+        'Authorization': `Bearer ${mgmtToken}`,
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         name: `torchd-battle-${battleId}`,
-        properties: {
-          max_participants: 10,
-          enable_chat: false,
-          enable_screenshare: false,
-          start_video_off: false,
-          start_audio_off: false,
-          exp: Math.floor(Date.now() / 1000) + 60 * 60 * 3, // expires in 3 hours
-        },
+        description: topic || 'Torchd Battle',
+        template_id: process.env.HMS_TEMPLATE_ID || undefined,
       }),
     });
 
-    const data = await response.json();
+    const roomData = await roomRes.json();
 
-    if (!response.ok) {
-      // Room may already exist — try to fetch it
-      if (data.error === 'invalid-request-error') {
-        const getResponse = await fetch(`https://api.daily.co/v1/rooms/torchd-battle-${battleId}`, {
-          headers: { 'Authorization': `Bearer ${apiKey}` },
-        });
-        const existingRoom = await getResponse.json();
-        return Response.json({ url: existingRoom.url, name: existingRoom.name });
-      }
-      return Response.json({ error: data.error }, { status: 400 });
+    if (!roomRes.ok) {
+      console.error('100ms room creation error:', roomData);
+      return NextResponse.json({ error: roomData.message || 'Failed to create room' }, { status: 500 });
     }
 
-    return Response.json({ url: data.url, name: data.name });
+    return NextResponse.json({ roomId: roomData.id, roomName: roomData.name });
   } catch (err) {
-    return Response.json({ error: err.message }, { status: 500 });
+    console.error('Create room error:', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }

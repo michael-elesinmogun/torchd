@@ -2,7 +2,6 @@
 import { useState, useEffect, useRef, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import DailyIframe from '@daily-co/daily-js';
 import { supabase } from '../../../supabase';
 import styles from './room.module.css';
 
@@ -14,8 +13,6 @@ const ROUND_CONFIG = {
   2: { label: 'Round 2', desc: 'Player 2 speaks · Player 1 muted', speaker: 'player2' },
   3: { label: 'Round 3', desc: 'Open mic — both players speak freely', speaker: 'both' },
 };
-
-let globalDailyFrame = null;
 
 export default function BattleRoom({ params }) {
   const { id } = use(params);
@@ -31,17 +28,25 @@ export default function BattleRoom({ params }) {
   const [messages, setMessages] = useState([]);
   const [copied, setCopied] = useState(false);
   const [videoJoined, setVideoJoined] = useState(false);
-  const [participantCount, setParticipantCount] = useState(0);
+  const [videoError, setVideoError] = useState('');
   const [currentRound, setCurrentRound] = useState(0);
   const [roundTimeLeft, setRoundTimeLeft] = useState(ROUND_DURATION);
   const [battleEnded, setBattleEnded] = useState(false);
   const [winner, setWinner] = useState(null);
 
+  // 100ms state
+  const [localVideoTrack, setLocalVideoTrack] = useState(null);
+  const [localAudioTrack, setLocalAudioTrack] = useState(null);
+  const [remotePeers, setRemotePeers] = useState([]);
+  const [isMicOn, setIsMicOn] = useState(true);
+  const [isCamOn, setIsCamOn] = useState(true);
+
+  const hmsClientRef = useRef(null);
+  const localVideoRef = useRef(null);
+  const remoteVideoRefs = useRef({});
   const roundStartTimeRef = useRef(null);
   const roundTimerRef = useRef(null);
   const currentRoundRef = useRef(0);
-  const callFrameRef = useRef(null);
-  const containerRef = useRef(null);
   const chatBottomRef = useRef(null);
   const profileRef = useRef(null);
   const battleRef = useRef(null);
@@ -152,17 +157,34 @@ export default function BattleRoom({ params }) {
     return () => {
       clearInterval(roundTimerRef.current);
       document.removeEventListener('visibilitychange', handleVisibility);
-      if (globalDailyFrame) {
-        try { globalDailyFrame.destroy(); } catch {}
-        globalDailyFrame = null;
-      }
-      callFrameRef.current = null;
+      leaveVideo();
     };
   }, [id]);
 
   useEffect(() => {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Attach local video stream to video element
+  useEffect(() => {
+    if (localVideoTrack && localVideoRef.current) {
+      localVideoTrack.attach(localVideoRef.current);
+    }
+    return () => {
+      if (localVideoTrack) {
+        try { localVideoTrack.detach(); } catch {}
+      }
+    };
+  }, [localVideoTrack]);
+
+  // Attach remote video streams
+  useEffect(() => {
+    remotePeers.forEach(peer => {
+      if (peer.videoTrack && remoteVideoRefs.current[peer.id]) {
+        peer.videoTrack.attach(remoteVideoRefs.current[peer.id]);
+      }
+    });
+  }, [remotePeers]);
 
   function startRound(round) {
     clearInterval(roundTimerRef.current);
@@ -185,12 +207,15 @@ export default function BattleRoom({ params }) {
     }, 1000);
   }
 
-  function enforceMicForRound(round) {
-    if (!callFrameRef.current) return;
+  async function enforceMicForRound(round) {
+    if (!hmsClientRef.current) return;
     const isP1 = battleRef.current?.player1_username === profileRef.current?.username;
     const { speaker } = ROUND_CONFIG[round];
     const shouldHaveMic = speaker === 'both' || (speaker === 'player1' && isP1) || (speaker === 'player2' && !isP1);
-    try { callFrameRef.current.setLocalAudio(shouldHaveMic); } catch {}
+    try {
+      await hmsClientRef.current.setLocalAudioEnabled(shouldHaveMic);
+      setIsMicOn(shouldHaveMic);
+    } catch {}
   }
 
   async function declareWinner() {
@@ -225,54 +250,101 @@ export default function BattleRoom({ params }) {
     }
   }
 
+  // ── 100ms video ───────────────────────────────────────────────────────────────
+
   async function joinVideo() {
     const battleData = battleRef.current;
-    if (!battleData?.room_url) return;
-
-    // Use Daily's own API to find and destroy any existing instance
-    try {
-      const existing = DailyIframe.getCallInstance();
-      if (existing) await existing.destroy();
-    } catch {}
-
-    globalDailyFrame = null;
-    callFrameRef.current = null;
-
-    try {
-      const container = containerRef.current;
-      if (!container) return;
-
-      const frame = DailyIframe.createFrame(container, {
-        iframeStyle: { width: '100%', height: '100%', border: 'none', borderRadius: '14px' },
-        showLeaveButton: true,
-        showFullscreenButton: true,
-        showParticipantsBar: false,
-      });
-
-      globalDailyFrame = frame;
-      callFrameRef.current = frame;
-
-      frame.on('joined-meeting', () => setVideoJoined(true));
-      frame.on('participant-joined', () => setParticipantCount(p => p + 1));
-      frame.on('participant-left', () => setParticipantCount(p => Math.max(0, p - 1)));
-      frame.on('left-meeting', () => {
-        setVideoJoined(false);
-        setParticipantCount(0);
-        if (battleRef.current && profileRef.current && (
-          battleRef.current.player1_username === profileRef.current.username ||
-          battleRef.current.player2_username === profileRef.current.username
-        )) {
-          supabase.from('battles').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', id);
-        }
-        try { globalDailyFrame?.destroy(); } catch {}
-        globalDailyFrame = null;
-        callFrameRef.current = null;
-      });
-
-      await frame.join({ url: battleData.room_url });
-    } catch (err) {
-      console.error('Daily join error:', err);
+    const profileData = profileRef.current;
+    if (!battleData?.room_id || !profileData?.username) {
+      setVideoError('Room not ready. Please try again.');
+      return;
     }
+
+    setVideoError('');
+
+    try {
+      // Dynamically import 100ms SDK
+      const { HMSReactiveStore, selectIsConnectedToRoom, selectLocalPeer, selectPeers } = await import('@100mslive/hms-video-store');
+
+      const hms = new HMSReactiveStore();
+      const hmsStore = hms.getStore();
+      const hmsActions = hms.getActions();
+      hmsClientRef.current = hmsActions;
+
+      // Get auth token
+      const tokenRes = await fetch('/api/hms-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomId: battleData.room_id,
+          userId: profileData.username,
+          role: 'host',
+        }),
+      });
+      const { token, error: tokenError } = await tokenRes.json();
+      if (tokenError) throw new Error(tokenError);
+
+      // Subscribe to store updates
+      hmsStore.subscribe((isConnected) => {
+        if (isConnected) setVideoJoined(true);
+      }, selectIsConnectedToRoom);
+
+      hmsStore.subscribe((peers) => {
+        if (!peers) return;
+        const remote = peers.filter(p => !p.isLocal);
+        setRemotePeers(remote.map(p => ({
+          id: p.id,
+          name: p.name,
+          videoTrack: hmsStore.getState(state => state.tracks[p.videoTrack]),
+          audioTrack: hmsStore.getState(state => state.tracks[p.audioTrack]),
+        })));
+      }, selectPeers);
+
+      hmsStore.subscribe((localPeer) => {
+        if (!localPeer) return;
+        const videoTrack = hmsStore.getState(state => state.tracks[localPeer.videoTrack]);
+        if (videoTrack) setLocalVideoTrack(videoTrack);
+      }, selectLocalPeer);
+
+      await hmsActions.join({
+        userName: profileData.username,
+        authToken: token,
+        settings: { isAudioMuted: false, isVideoMuted: false },
+      });
+
+    } catch (err) {
+      console.error('100ms join error:', err);
+      setVideoError('Could not join video room: ' + err.message);
+    }
+  }
+
+  async function leaveVideo() {
+    if (hmsClientRef.current) {
+      try { await hmsClientRef.current.leave(); } catch {}
+      hmsClientRef.current = null;
+    }
+    setVideoJoined(false);
+    setLocalVideoTrack(null);
+    setRemotePeers([]);
+
+    if (battleRef.current && profileRef.current && (
+      battleRef.current.player1_username === profileRef.current.username ||
+      battleRef.current.player2_username === profileRef.current.username
+    )) {
+      supabase.from('battles').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', id);
+    }
+  }
+
+  async function toggleMic() {
+    if (!hmsClientRef.current) return;
+    await hmsClientRef.current.setLocalAudioEnabled(!isMicOn);
+    setIsMicOn(m => !m);
+  }
+
+  async function toggleCam() {
+    if (!hmsClientRef.current) return;
+    await hmsClientRef.current.setLocalVideoEnabled(!isCamOn);
+    setIsCamOn(c => !c);
   }
 
   function handleStartBattle() {
@@ -317,7 +389,7 @@ export default function BattleRoom({ params }) {
   const p2Pct = 100 - p1Pct;
   const isPlayer = user && (battle.player1_username === profile?.username || battle.player2_username === profile?.username);
   const isPlayer1 = profile?.username === battle.player1_username;
-  const bothInRoom = !!battle?.player2_username && participantCount >= 1;
+  const bothInRoom = !!battle?.player2_username && remotePeers.length >= 1;
   const shareLink = typeof window !== 'undefined' ? window.location.href : '';
   const roundConfig = currentRound > 0 ? ROUND_CONFIG[currentRound] : null;
   const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -375,43 +447,87 @@ export default function BattleRoom({ params }) {
             </div>
           )}
 
-          {/*
-            Video container — always in DOM with real dimensions via ref.
-            Wrapper uses display:none to hide but inner div is always mounted
-            so Daily can render into it via containerRef.
-          */}
-          <div style={{
-            width: '100%',
-            aspectRatio: '16/9',
-            borderRadius: '14px',
-            overflow: 'hidden',
-            background: '#000',
-            display: videoJoined ? 'block' : 'none',
-          }}>
-            <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
-          </div>
+          {/* Video — 100ms native video elements */}
+          {videoJoined ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {/* Remote video (opponent) */}
+              <div style={{
+                width: '100%', aspectRatio: '16/9', background: '#000',
+                borderRadius: '14px', overflow: 'hidden', position: 'relative',
+              }}>
+                {remotePeers.length > 0 ? (
+                  <video
+                    ref={el => { if (el) remoteVideoRefs.current[remotePeers[0].id] = el; }}
+                    autoPlay playsInline
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div style={{
+                    position: 'absolute', inset: 0, display: 'flex',
+                    flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    color: '#6B7A9E', fontSize: '14px', gap: '8px',
+                  }}>
+                    <div style={{ fontSize: '32px' }}>⏳</div>
+                    Waiting for opponent to join...
+                  </div>
+                )}
 
-          {/* Controls after joining */}
-          {videoJoined && (
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-              {isPlayer1 && bothInRoom && currentRound === 0 && !battleEnded && (
-                <button onClick={handleStartBattle} style={{
-                  background: '#10B981', border: 'none', borderRadius: '100px',
-                  padding: '10px 24px', color: 'white',
-                  fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
-                }}>▶ Start Battle</button>
-              )}
-              {!isPlayer1 && bothInRoom && currentRound === 0 && !battleEnded && (
+                {/* Local video PiP */}
+                <video
+                  ref={localVideoRef}
+                  autoPlay muted playsInline
+                  style={{
+                    position: 'absolute', bottom: '70px', right: '12px',
+                    width: '28%', maxWidth: '180px', aspectRatio: '16/9',
+                    objectFit: 'cover', borderRadius: '10px',
+                    border: '2px solid rgba(255,255,255,0.15)',
+                    transform: 'scaleX(-1)',
+                  }}
+                />
+
+                {/* Controls */}
                 <div style={{
-                  background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)',
-                  borderRadius: '100px', padding: '10px 20px', fontSize: '13px', color: '#60A5FA', fontWeight: 600,
-                }}>⏳ Waiting for Player 1 to start...</div>
-              )}
-            </div>
-          )}
+                  position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
+                  display: 'flex', gap: '10px', alignItems: 'center',
+                  background: 'rgba(0,0,0,0.7)', borderRadius: '100px',
+                  padding: '8px 16px', backdropFilter: 'blur(10px)',
+                }}>
+                  <button onClick={toggleMic} style={{
+                    width: '40px', height: '40px', borderRadius: '50%', border: 'none',
+                    background: isMicOn ? 'rgba(255,255,255,0.15)' : 'rgba(239,68,68,0.5)',
+                    fontSize: '18px', cursor: 'pointer',
+                  }}>{isMicOn ? '🎤' : '🔇'}</button>
+                  <button onClick={toggleCam} style={{
+                    width: '40px', height: '40px', borderRadius: '50%', border: 'none',
+                    background: isCamOn ? 'rgba(255,255,255,0.15)' : 'rgba(239,68,68,0.5)',
+                    fontSize: '18px', cursor: 'pointer',
+                  }}>{isCamOn ? '📹' : '🚫'}</button>
+                  <button onClick={leaveVideo} style={{
+                    background: '#EF4444', border: 'none', borderRadius: '100px',
+                    padding: '8px 18px', color: 'white',
+                    fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
+                  }}>Leave</button>
+                </div>
+              </div>
 
-          {/* Join prompt */}
-          {!videoJoined && (
+              {/* Start Battle / waiting indicator */}
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                {isPlayer1 && bothInRoom && currentRound === 0 && !battleEnded && (
+                  <button onClick={handleStartBattle} style={{
+                    background: '#10B981', border: 'none', borderRadius: '100px',
+                    padding: '10px 24px', color: 'white',
+                    fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
+                  }}>▶ Start Battle</button>
+                )}
+                {!isPlayer1 && bothInRoom && currentRound === 0 && !battleEnded && (
+                  <div style={{
+                    background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)',
+                    borderRadius: '100px', padding: '10px 20px', fontSize: '13px', color: '#60A5FA', fontWeight: 600,
+                  }}>⏳ Waiting for Player 1 to start...</div>
+                )}
+              </div>
+            </div>
+          ) : (
             <div className={styles.joinVideoWrap}>
               <div className={styles.joinVideoIcon}>⚔️</div>
               <div className={styles.joinVideoTitle}>
@@ -422,7 +538,12 @@ export default function BattleRoom({ params }) {
                   ? 'Tap Join Room to go live and start the debate.'
                   : 'Share the link below while you wait.'}
               </p>
-              {battle.room_url && (
+              {videoError && (
+                <div style={{ fontSize: '13px', color: '#F87171', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', padding: '8px 14px' }}>
+                  {videoError}
+                </div>
+              )}
+              {battle.room_id && (
                 <button className={styles.joinVideoBtn} onClick={joinVideo}>🎥 Join Room</button>
               )}
             </div>
