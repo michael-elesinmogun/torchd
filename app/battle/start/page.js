@@ -49,38 +49,26 @@ export default function StartBattle() {
       if (!session?.user) { router.push('/login'); return; }
       setUser(session.user);
 
-      // Try fetching profile by user id
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('username, full_name')
         .eq('id', session.user.id)
         .maybeSingle();
 
-      console.log('Profile loaded:', profileData, 'Error:', profileError);
-
       if (profileData?.username) {
         setProfile(profileData);
       } else {
-        // Profile missing or no username — try to create one from auth metadata
         const fullName = session.user.user_metadata?.full_name || '';
         const email = session.user.email || '';
         const fallbackUsername = fullName
           ? fullName.toLowerCase().replace(/\s+/g, '')
           : email.split('@')[0];
 
-        console.log('No profile found, attempting to create with username:', fallbackUsername);
-
-        const { data: newProfile, error: insertError } = await supabase
+        const { data: newProfile } = await supabase
           .from('profiles')
-          .upsert({
-            id: session.user.id,
-            username: fallbackUsername,
-            full_name: fullName,
-          }, { onConflict: 'id' })
-          .select()
-          .maybeSingle();
+          .upsert({ id: session.user.id, username: fallbackUsername, full_name: fullName }, { onConflict: 'id' })
+          .select().maybeSingle();
 
-        console.log('Created profile:', newProfile, 'Insert error:', insertError);
         if (newProfile) setProfile(newProfile);
         else setError('Could not load your profile. Please go to Settings and set a username.');
       }
@@ -155,8 +143,6 @@ export default function StartBattle() {
 
   async function createBattle() {
     if (!topic.trim() || !stance) return;
-
-    // Guard — profile must be loaded with a username
     if (!profile?.username) {
       setError('Your profile is still loading or missing a username. Please refresh and try again.');
       return;
@@ -183,6 +169,7 @@ export default function StartBattle() {
 
       if (battleError) throw new Error(battleError.message);
 
+      // Create 100ms room — returns { roomId, roomName }
       const roomRes = await fetch('/api/create-room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -192,9 +179,10 @@ export default function StartBattle() {
       const roomData = await roomRes.json();
       if (roomData.error) throw new Error(roomData.error);
 
-      await supabase.from('battles').update({ room_url: roomData.url }).eq('id', battle.id);
+      // Save room_id (100ms) to battles table
+      await supabase.from('battles').update({ room_id: roomData.roomId }).eq('id', battle.id);
 
-      setCreatedBattle({ ...battle, room_url: roomData.url, expires_at: expiresAt });
+      setCreatedBattle({ ...battle, room_id: roomData.roomId, expires_at: expiresAt });
       setStep(3);
     } catch (err) {
       setError(err.message);
