@@ -24,6 +24,7 @@ export default function StartBattle() {
   const router = useRouter();
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(true);
   const [step, setStep] = useState(1);
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [customTopic, setCustomTopic] = useState('');
@@ -47,10 +48,44 @@ export default function StartBattle() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) { router.push('/login'); return; }
       setUser(session.user);
-      const { data: profileData } = await supabase
-        .from('profiles').select('username, full_name')
-        .eq('id', session.user.id).maybeSingle();
-      setProfile(profileData);
+
+      // Try fetching profile by user id
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('username, full_name')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      console.log('Profile loaded:', profileData, 'Error:', profileError);
+
+      if (profileData?.username) {
+        setProfile(profileData);
+      } else {
+        // Profile missing or no username — try to create one from auth metadata
+        const fullName = session.user.user_metadata?.full_name || '';
+        const email = session.user.email || '';
+        const fallbackUsername = fullName
+          ? fullName.toLowerCase().replace(/\s+/g, '')
+          : email.split('@')[0];
+
+        console.log('No profile found, attempting to create with username:', fallbackUsername);
+
+        const { data: newProfile, error: insertError } = await supabase
+          .from('profiles')
+          .upsert({
+            id: session.user.id,
+            username: fallbackUsername,
+            full_name: fullName,
+          }, { onConflict: 'id' })
+          .select()
+          .maybeSingle();
+
+        console.log('Created profile:', newProfile, 'Insert error:', insertError);
+        if (newProfile) setProfile(newProfile);
+        else setError('Could not load your profile. Please go to Settings and set a username.');
+      }
+
+      setProfileLoading(false);
     }
     init();
   }, []);
@@ -71,7 +106,6 @@ export default function StartBattle() {
       }
     }
 
-    // Recalculate when tab becomes visible again
     function handleVisibility() {
       if (document.visibilityState === 'visible') tick();
     }
@@ -80,7 +114,6 @@ export default function StartBattle() {
     seekTimerRef.current = setInterval(tick, 1000);
     document.addEventListener('visibilitychange', handleVisibility);
 
-    // Realtime watch
     const channel = supabase
       .channel(`seeking-watch-${createdBattle.id}`)
       .on('postgres_changes', {
@@ -97,7 +130,6 @@ export default function StartBattle() {
       })
       .subscribe();
 
-    // Poll every 5s as fallback for mobile Safari
     pollRef.current = setInterval(async () => {
       const { data } = await supabase
         .from('battles').select('status, player2_username')
@@ -123,6 +155,13 @@ export default function StartBattle() {
 
   async function createBattle() {
     if (!topic.trim() || !stance) return;
+
+    // Guard — profile must be loaded with a username
+    if (!profile?.username) {
+      setError('Your profile is still loading or missing a username. Please refresh and try again.');
+      return;
+    }
+
     setCreating(true);
     setError('');
 
@@ -233,10 +272,16 @@ export default function StartBattle() {
               </button>
             </div>
             {error && <div className={styles.errorMsg}>{error}</div>}
+            {!profile?.username && !profileLoading && (
+              <div className={styles.errorMsg}>
+                ⚠️ Profile not found. Please go to <Link href="/settings" style={{ color: '#60A5FA' }}>Settings</Link> and set a username first.
+              </div>
+            )}
             <div className={styles.stepActions}>
               <button className={styles.backStepBtn} onClick={() => setStep(1)}>← Back</button>
-              <button className={styles.nextBtn} onClick={createBattle} disabled={!stance || creating}>
-                {creating ? 'Creating your battle room...' : '⚔️ Post Challenge →'}
+              <button className={styles.nextBtn} onClick={createBattle}
+                disabled={!stance || creating || !profile?.username || profileLoading}>
+                {profileLoading ? 'Loading profile...' : creating ? 'Creating your battle room...' : '⚔️ Post Challenge →'}
               </button>
             </div>
           </div>
