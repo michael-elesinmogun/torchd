@@ -1,4 +1,39 @@
 import { NextResponse } from 'next/server';
+import crypto from 'crypto';
+
+function generateHmsToken(accessKey, secret, type = 'management') {
+  const header = { alg: 'HS256', typ: 'JWT' };
+  const now = Math.floor(Date.now() / 1000);
+  const payload = {
+    access_key: accessKey,
+    type,
+    version: 2,
+    iat: now,
+    nbf: now,
+    exp: now + 86400,
+  };
+
+  const encode = (obj) =>
+    Buffer.from(JSON.stringify(obj))
+      .toString('base64')
+      .replace(/=/g, '')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_');
+
+  const headerB64 = encode(header);
+  const payloadB64 = encode(payload);
+  const signingInput = `${headerB64}.${payloadB64}`;
+
+  const signature = crypto
+    .createHmac('sha256', secret)
+    .update(signingInput)
+    .digest('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_');
+
+  return `${signingInput}.${signature}`;
+}
 
 export async function POST(request) {
   try {
@@ -6,47 +41,19 @@ export async function POST(request) {
 
     const accessKey = process.env.HMS_ACCESS_KEY;
     const secret = process.env.HMS_SECRET;
+    const templateId = process.env.HMS_TEMPLATE_ID;
 
     if (!accessKey || !secret) {
       return NextResponse.json({ error: '100ms credentials not configured' }, { status: 500 });
     }
 
-    // Generate management token for 100ms API
-    const crypto = await import('crypto');
-
-    function base64url(obj) {
-      return Buffer.from(JSON.stringify(obj))
-        .toString('base64')
-        .replace(/=/g, '')
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_');
+    if (!templateId) {
+      return NextResponse.json({ error: 'HMS_TEMPLATE_ID not configured' }, { status: 500 });
     }
 
-    const now = Math.floor(Date.now() / 1000);
-    const header = { alg: 'HS256', typ: 'JWT' };
-    const payload = {
-      access_key: accessKey,
-      type: 'management',
-      version: 2,
-      iat: now,
-      nbf: now,
-      exp: now + 86400,
-    };
+    const mgmtToken = generateHmsToken(accessKey, secret, 'management');
 
-    const headerB64 = base64url(header);
-    const payloadB64 = base64url(payload);
-    const signingInput = `${headerB64}.${payloadB64}`;
-    const signature = crypto
-      .createHmac('sha256', secret)
-      .update(signingInput)
-      .digest('base64')
-      .replace(/=/g, '')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_');
-
-    const mgmtToken = `${signingInput}.${signature}`;
-
-    // Create a room via 100ms API
+    // Create room via 100ms API
     const roomRes = await fetch('https://api.100ms.live/v2/rooms', {
       method: 'POST',
       headers: {
@@ -56,7 +63,7 @@ export async function POST(request) {
       body: JSON.stringify({
         name: `torchd-battle-${battleId}`,
         description: topic || 'Torchd Battle',
-        template_id: process.env.HMS_TEMPLATE_ID || undefined,
+        template_id: templateId,
       }),
     });
 

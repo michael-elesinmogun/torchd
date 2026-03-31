@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import crypto from 'crypto';
 
 export async function POST(request) {
   try {
@@ -11,36 +12,31 @@ export async function POST(request) {
       return NextResponse.json({ error: '100ms credentials not configured' }, { status: 500 });
     }
 
-    // Generate JWT token for 100ms
+    const encode = (obj) =>
+      Buffer.from(JSON.stringify(obj))
+        .toString('base64')
+        .replace(/=/g, '')
+        .replace(/\+/g, '-')
+        .replace(/\//g, '_');
+
     const header = { alg: 'HS256', typ: 'JWT' };
     const now = Math.floor(Date.now() / 1000);
     const payload = {
       access_key: accessKey,
       room_id: roomId,
-      user_id: userId,
+      user_id: userId || 'user',
       role: role || 'host',
       type: 'app',
       version: 2,
       iat: now,
       nbf: now,
-      exp: now + 86400, // 24 hours
+      exp: now + 86400,
     };
 
-    // Base64url encode
-    function base64url(obj) {
-      return Buffer.from(JSON.stringify(obj))
-        .toString('base64')
-        .replace(/=/g, '')
-        .replace(/\+/g, '-')
-        .replace(/\//g, '_');
-    }
-
-    const headerB64 = base64url(header);
-    const payloadB64 = base64url(payload);
+    const headerB64 = encode(header);
+    const payloadB64 = encode(payload);
     const signingInput = `${headerB64}.${payloadB64}`;
 
-    // HMAC-SHA256 signature
-    const crypto = await import('crypto');
     const signature = crypto
       .createHmac('sha256', secret)
       .update(signingInput)
@@ -53,7 +49,7 @@ export async function POST(request) {
 
     return NextResponse.json({ token });
   } catch (err) {
-    console.error('100ms token error:', err);
+    console.error('HMS token error:', err);
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
 }
