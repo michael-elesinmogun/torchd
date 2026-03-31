@@ -217,39 +217,51 @@ export default function BattleRoom({ params }) {
     const profileData = profileRef.current;
     if (!battleData?.room_url) return;
 
-    // Extract room name from URL
     const roomName = battleData.room_url.replace('https://meet.jit.si/', '');
     const displayName = profileData?.username || 'Debater';
 
-    // Load Jitsi External API script
-    const script = document.createElement('script');
-    script.src = 'https://8x8.vc/vpaas-magic-cookie-free-trial/external_api.js';
-    script.async = true;
-    script.onload = () => {
-      const container = document.getElementById('jitsi-container');
-      if (!container || !window.JitsiMeetExternalAPI) return;
+    const jitsiConfig = {
+      roomName,
+      parentNode: document.getElementById('jitsi-container'),
+      width: '100%',
+      height: '100%',
+      userInfo: { displayName },
+      configOverwrite: {
+        startWithAudioMuted: false,
+        startWithVideoMuted: false,
+        prejoinPageEnabled: false,
+        disableDeepLinking: true,
+        requireDisplayName: false,
+        enableUserRolesBasedOnToken: false,
+        enableGuests: true,
+        disableInviteFunctions: true,
+        doNotStoreRoom: true,
+        hideConferenceSubject: true,
+        hideConferenceTimer: false,
+      },
+      interfaceConfigOverwrite: {
+        SHOW_JITSI_WATERMARK: false,
+        SHOW_WATERMARK_FOR_GUESTS: false,
+        SHOW_BRAND_WATERMARK: false,
+        TOOLBAR_BUTTONS: ['microphone', 'camera', 'hangup', 'fullscreen', 'tileview'],
+        MOBILE_APP_PROMO: false,
+        NATIVE_APP_NAME: 'Torchd',
+        PROVIDER_NAME: 'Torchd',
+      },
+    };
 
+    function initJitsi() {
+      if (!window.JitsiMeetExternalAPI) return;
       if (jitsiApiRef.current) {
         try { jitsiApiRef.current.dispose(); } catch {}
       }
 
+      const container = document.getElementById('jitsi-container');
+      if (!container) return;
+
       const api = new window.JitsiMeetExternalAPI('meet.jit.si', {
-        roomName,
+        ...jitsiConfig,
         parentNode: container,
-        width: '100%',
-        height: '100%',
-        userInfo: { displayName },
-        configOverwrite: {
-          startWithAudioMuted: false,
-          startWithVideoMuted: false,
-          prejoinPageEnabled: false,
-          disableDeepLinking: true,
-        },
-        interfaceConfigOverwrite: {
-          SHOW_JITSI_WATERMARK: false,
-          SHOW_WATERMARK_FOR_GUESTS: false,
-          TOOLBAR_BUTTONS: ['microphone', 'camera', 'hangup', 'fullscreen'],
-        },
       });
 
       jitsiApiRef.current = api;
@@ -264,59 +276,23 @@ export default function BattleRoom({ params }) {
           supabase.from('battles').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', id);
         }
       });
-    };
 
-    // Use public Jitsi instead if 8x8 fails
-    script.onerror = () => {
-      const fallbackScript = document.createElement('script');
-      fallbackScript.src = 'https://meet.jit.si/external_api.js';
-      fallbackScript.async = true;
-      fallbackScript.onload = () => initJitsi(roomName, displayName);
-      document.head.appendChild(fallbackScript);
-    };
-
-    document.head.appendChild(script);
-  }
-
-  function initJitsi(roomName, displayName) {
-    const container = document.getElementById('jitsi-container');
-    if (!container || !window.JitsiMeetExternalAPI) return;
-
-    if (jitsiApiRef.current) {
-      try { jitsiApiRef.current.dispose(); } catch {}
+      api.addEventListener('readyToClose', () => {
+        setVideoJoined(false);
+      });
     }
 
-    const api = new window.JitsiMeetExternalAPI('meet.jit.si', {
-      roomName,
-      parentNode: container,
-      width: '100%',
-      height: '100%',
-      userInfo: { displayName },
-      configOverwrite: {
-        startWithAudioMuted: false,
-        startWithVideoMuted: false,
-        prejoinPageEnabled: false,
-        disableDeepLinking: true,
-      },
-      interfaceConfigOverwrite: {
-        SHOW_JITSI_WATERMARK: false,
-        SHOW_WATERMARK_FOR_GUESTS: false,
-        TOOLBAR_BUTTONS: ['microphone', 'camera', 'hangup', 'fullscreen'],
-      },
-    });
-
-    jitsiApiRef.current = api;
-    setVideoJoined(true);
-
-    api.addEventListener('videoConferenceLeft', () => {
-      setVideoJoined(false);
-      if (battleRef.current && profileRef.current && (
-        battleRef.current.player1_username === profileRef.current.username ||
-        battleRef.current.player2_username === profileRef.current.username
-      )) {
-        supabase.from('battles').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', id);
-      }
-    });
+    // Load Jitsi script if not already loaded
+    if (window.JitsiMeetExternalAPI) {
+      initJitsi();
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://meet.jit.si/external_api.js';
+      script.async = true;
+      script.onload = initJitsi;
+      script.onerror = () => console.error('Failed to load Jitsi script');
+      document.head.appendChild(script);
+    }
   }
 
   function handleStartBattle() {
@@ -418,7 +394,7 @@ export default function BattleRoom({ params }) {
             </div>
           )}
 
-          {/* Jitsi container — always in DOM */}
+          {/* Jitsi container */}
           <div
             id="jitsi-container"
             style={{
