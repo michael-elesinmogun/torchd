@@ -35,7 +35,6 @@ export default function BattleRoom({ params }) {
   const [battleEnded, setBattleEnded] = useState(false);
   const [winner, setWinner] = useState(null);
 
-  const jitsiApiRef = useRef(null);
   const roundStartTimeRef = useRef(null);
   const roundTimerRef = useRef(null);
   const currentRoundRef = useRef(0);
@@ -149,10 +148,6 @@ export default function BattleRoom({ params }) {
     return () => {
       clearInterval(roundTimerRef.current);
       document.removeEventListener('visibilitychange', handleVisibility);
-      if (jitsiApiRef.current) {
-        try { jitsiApiRef.current.dispose(); } catch {}
-        jitsiApiRef.current = null;
-      }
     };
   }, [id]);
 
@@ -212,89 +207,6 @@ export default function BattleRoom({ params }) {
     }
   }
 
-  function joinVideo() {
-    const battleData = battleRef.current;
-    const profileData = profileRef.current;
-    if (!battleData?.room_url) return;
-
-    const roomName = battleData.room_url.replace('https://meet.jit.si/', '');
-    const displayName = profileData?.username || 'Debater';
-
-    const jitsiConfig = {
-      roomName,
-      parentNode: document.getElementById('jitsi-container'),
-      width: '100%',
-      height: '100%',
-      userInfo: { displayName },
-      configOverwrite: {
-        startWithAudioMuted: false,
-        startWithVideoMuted: false,
-        prejoinPageEnabled: false,
-        disableDeepLinking: true,
-        requireDisplayName: false,
-        enableUserRolesBasedOnToken: false,
-        enableGuests: true,
-        disableInviteFunctions: true,
-        doNotStoreRoom: true,
-        hideConferenceSubject: true,
-        hideConferenceTimer: false,
-      },
-      interfaceConfigOverwrite: {
-        SHOW_JITSI_WATERMARK: false,
-        SHOW_WATERMARK_FOR_GUESTS: false,
-        SHOW_BRAND_WATERMARK: false,
-        TOOLBAR_BUTTONS: ['microphone', 'camera', 'hangup', 'fullscreen', 'tileview'],
-        MOBILE_APP_PROMO: false,
-        NATIVE_APP_NAME: 'Torchd',
-        PROVIDER_NAME: 'Torchd',
-      },
-    };
-
-    function initJitsi() {
-      if (!window.JitsiMeetExternalAPI) return;
-      if (jitsiApiRef.current) {
-        try { jitsiApiRef.current.dispose(); } catch {}
-      }
-
-      const container = document.getElementById('jitsi-container');
-      if (!container) return;
-
-      const api = new window.JitsiMeetExternalAPI('jitsi.riot.im', {
-        ...jitsiConfig,
-        parentNode: container,
-      });
-
-      jitsiApiRef.current = api;
-      setVideoJoined(true);
-
-      api.addEventListener('videoConferenceLeft', () => {
-        setVideoJoined(false);
-        if (battleRef.current && profileRef.current && (
-          battleRef.current.player1_username === profileRef.current.username ||
-          battleRef.current.player2_username === profileRef.current.username
-        )) {
-          supabase.from('battles').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', id);
-        }
-      });
-
-      api.addEventListener('readyToClose', () => {
-        setVideoJoined(false);
-      });
-    }
-
-    // Load Jitsi script if not already loaded
-    if (window.JitsiMeetExternalAPI) {
-      initJitsi();
-    } else {
-      const script = document.createElement('script');
-      script.src = 'https://jitsi.riot.im/external_api.js';
-      script.async = true;
-      script.onload = initJitsi;
-      script.onerror = () => console.error('Failed to load Jitsi script');
-      document.head.appendChild(script);
-    }
-  }
-
   function handleStartBattle() {
     if (!battleRef.current?.player2_username) return;
     supabase.channel(`round-sync-${id}`).send({ type: 'broadcast', event: 'start-round', payload: { round: 1 } });
@@ -340,6 +252,11 @@ export default function BattleRoom({ params }) {
   const shareLink = typeof window !== 'undefined' ? window.location.href : '';
   const roundConfig = currentRound > 0 ? ROUND_CONFIG[currentRound] : null;
   const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
+  // Build Jitsi iframe URL with config params
+  const jitsiUrl = battle.room_url
+    ? `${battle.room_url}#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.disableDeepLinking=true&config.requireDisplayName=false&userInfo.displayName=${encodeURIComponent(profile?.username || 'Debater')}`
+    : null;
 
   return (
     <main className={styles.main}>
@@ -394,40 +311,49 @@ export default function BattleRoom({ params }) {
             </div>
           )}
 
-          {/* Jitsi container */}
-          <div
-            id="jitsi-container"
-            style={{
-              width: '100%',
-              aspectRatio: '16/9',
-              borderRadius: '14px',
-              overflow: 'hidden',
-              background: '#000',
-              display: videoJoined ? 'block' : 'none',
-            }}
-          />
-
-          {/* Controls after joining */}
-          {videoJoined && (
-            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-              {isPlayer1 && battle.player2_username && currentRound === 0 && !battleEnded && (
-                <button onClick={handleStartBattle} style={{
-                  background: '#10B981', border: 'none', borderRadius: '100px',
-                  padding: '10px 24px', color: 'white',
-                  fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
-                }}>▶ Start Battle</button>
-              )}
-              {!isPlayer1 && battle.player2_username && currentRound === 0 && !battleEnded && (
-                <div style={{
-                  background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)',
-                  borderRadius: '100px', padding: '10px 20px', fontSize: '13px', color: '#60A5FA', fontWeight: 600,
-                }}>⏳ Waiting for Player 1 to start...</div>
-              )}
+          {/* Video — plain iframe, no SDK */}
+          {videoJoined && jitsiUrl ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: '14px', overflow: 'hidden', background: '#000' }}>
+                <iframe
+                  src={jitsiUrl}
+                  allow="camera; microphone; fullscreen; display-capture; autoplay"
+                  style={{ width: '100%', height: '100%', border: 'none' }}
+                />
+              </div>
+              <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                {isPlayer1 && battle.player2_username && currentRound === 0 && !battleEnded && (
+                  <button onClick={handleStartBattle} style={{
+                    background: '#10B981', border: 'none', borderRadius: '100px',
+                    padding: '10px 24px', color: 'white',
+                    fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
+                  }}>▶ Start Battle</button>
+                )}
+                {!isPlayer1 && battle.player2_username && currentRound === 0 && !battleEnded && (
+                  <div style={{
+                    background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)',
+                    borderRadius: '100px', padding: '10px 20px', fontSize: '13px', color: '#60A5FA', fontWeight: 600,
+                  }}>⏳ Waiting for Player 1 to start...</div>
+                )}
+                <button
+                  onClick={() => {
+                    setVideoJoined(false);
+                    if (battleRef.current && profileRef.current && (
+                      battleRef.current.player1_username === profileRef.current.username ||
+                      battleRef.current.player2_username === profileRef.current.username
+                    )) {
+                      supabase.from('battles').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', id);
+                    }
+                  }}
+                  style={{
+                    background: '#EF4444', border: 'none', borderRadius: '100px',
+                    padding: '10px 24px', color: 'white',
+                    fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
+                  }}
+                >Leave</button>
+              </div>
             </div>
-          )}
-
-          {/* Join prompt */}
-          {!videoJoined && (
+          ) : (
             <div className={styles.joinVideoWrap}>
               <div className={styles.joinVideoIcon}>⚔️</div>
               <div className={styles.joinVideoTitle}>
@@ -439,7 +365,9 @@ export default function BattleRoom({ params }) {
                   : 'Share the link below while you wait.'}
               </p>
               {battle.room_url && (
-                <button className={styles.joinVideoBtn} onClick={joinVideo}>🎥 Join Room</button>
+                <button className={styles.joinVideoBtn} onClick={() => setVideoJoined(true)}>
+                  🎥 Join Room
+                </button>
               )}
             </div>
           )}
