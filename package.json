@@ -12,6 +12,7 @@
     "@100mslive/hms-video-store": "^0.13.2",
     "@daily-co/daily-js": "^0.89.1",
     "@supabase/supabase-js": "^2.100.1",
+    "jsonwebtoken": "^9.0.3",
     "next": "16.2.1",
     "react": "19.2.4",
     "react-dom": "19.2.4"

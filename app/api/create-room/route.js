@@ -1,29 +1,5 @@
 import { NextResponse } from 'next/server';
-import crypto from 'crypto';
-
-function makeJwt(accessKey, secret, extraPayload = {}) {
-  const now = Math.floor(Date.now() / 1000);
-
-  const header = btoa(JSON.stringify({ alg: 'HS256', typ: 'JWT' }))
-    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-
-  const payload = btoa(JSON.stringify({
-    access_key: accessKey,
-    version: 2,
-    iat: now,
-    nbf: now,
-    exp: now + 86400,
-    ...extraPayload,
-  })).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-
-  const sig = crypto
-    .createHmac('sha256', secret)
-    .update(`${header}.${payload}`)
-    .digest('base64')
-    .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-
-  return `${header}.${payload}.${sig}`;
-}
+import jwt from 'jsonwebtoken';
 
 export async function POST(request) {
   try {
@@ -38,13 +14,28 @@ export async function POST(request) {
     }
 
     if (!templateId) {
-      return NextResponse.json({ error: 'HMS_TEMPLATE_ID not set in env vars' }, { status: 500 });
+      return NextResponse.json({ error: 'HMS_TEMPLATE_ID not set' }, { status: 500 });
     }
 
-    const mgmtToken = makeJwt(accessKey, secret, { type: 'management' });
+    const now = Math.floor(Date.now() / 1000);
 
-    console.log('Creating 100ms room for battle:', battleId);
-    console.log('Template ID:', templateId);
+    const mgmtToken = jwt.sign(
+      {
+        access_key: accessKey,
+        type: 'management',
+        version: 2,
+        iat: now,
+        nbf: now,
+      },
+      secret,
+      {
+        algorithm: 'HS256',
+        expiresIn: '24h',
+        jwtid: crypto.randomUUID(),
+      }
+    );
+
+    console.log('Creating 100ms room, templateId:', templateId);
 
     const roomRes = await fetch('https://api.100ms.live/v2/rooms', {
       method: 'POST',
@@ -60,12 +51,11 @@ export async function POST(request) {
     });
 
     const roomData = await roomRes.json();
-    console.log('100ms room response:', JSON.stringify(roomData));
+    console.log('100ms response:', JSON.stringify(roomData));
 
     if (!roomRes.ok) {
       return NextResponse.json({
-        error: roomData.message || roomData.error || 'Failed to create room',
-        details: roomData,
+        error: roomData.message || 'Failed to create room',
       }, { status: 500 });
     }
 
