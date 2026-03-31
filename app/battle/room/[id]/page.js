@@ -15,7 +15,6 @@ const ROUND_CONFIG = {
   3: { label: 'Round 3', desc: 'Open mic — both players speak freely', speaker: 'both' },
 };
 
-// Module-level frame tracker — persists across React re-renders
 let globalDailyFrame = null;
 
 export default function BattleRoom({ params }) {
@@ -230,23 +229,18 @@ export default function BattleRoom({ params }) {
     const battleData = battleRef.current;
     if (!battleData?.room_url) return;
 
-    // Destroy any existing frame
-    if (globalDailyFrame) {
-      try { globalDailyFrame.destroy(); } catch {}
-      globalDailyFrame = null;
-    }
-    if (callFrameRef.current) {
-      try { callFrameRef.current.destroy(); } catch {}
-      callFrameRef.current = null;
-    }
+    // Use Daily's own API to find and destroy any existing instance
+    try {
+      const existing = DailyIframe.getCallInstance();
+      if (existing) await existing.destroy();
+    } catch {}
+
+    globalDailyFrame = null;
+    callFrameRef.current = null;
 
     try {
-      // Use the ref directly — guaranteed to exist
       const container = containerRef.current;
-      if (!container) {
-        console.error('Daily container ref not found');
-        return;
-      }
+      if (!container) return;
 
       const frame = DailyIframe.createFrame(container, {
         iframeStyle: { width: '100%', height: '100%', border: 'none', borderRadius: '14px' },
@@ -382,9 +376,9 @@ export default function BattleRoom({ params }) {
           )}
 
           {/*
-            Video container — always rendered with a ref.
-            Uses a wrapper to control visibility so the inner div
-            always has real dimensions for Daily to render into.
+            Video container — always in DOM with real dimensions via ref.
+            Wrapper uses display:none to hide but inner div is always mounted
+            so Daily can render into it via containerRef.
           */}
           <div style={{
             width: '100%',
@@ -394,10 +388,7 @@ export default function BattleRoom({ params }) {
             background: '#000',
             display: videoJoined ? 'block' : 'none',
           }}>
-            <div
-              ref={containerRef}
-              style={{ width: '100%', height: '100%' }}
-            />
+            <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
           </div>
 
           {/* Controls after joining */}
