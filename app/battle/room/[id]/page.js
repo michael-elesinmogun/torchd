@@ -39,6 +39,7 @@ export default function BattleRoom({ params }) {
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCamOn, setIsCamOn] = useState(true);
   const [remoteTracks, setRemoteTracks] = useState([]);
+  const [localTrack, setLocalTrack] = useState(null);
 
   const roomRef = useRef(null);
   const localVideoRef = useRef(null);
@@ -49,6 +50,14 @@ export default function BattleRoom({ params }) {
   const profileRef = useRef(null);
   const battleRef = useRef(null);
   const votesRef = useRef({ player1: 0, player2: 0 });
+
+  // Attach local video track when both track and ref are ready
+  useEffect(() => {
+    if (localTrack && localVideoRef.current) {
+      localTrack.attach(localVideoRef.current);
+      return () => { try { localTrack.detach(localVideoRef.current); } catch {} };
+    }
+  }, [localTrack]);
 
   useEffect(() => {
     async function init() {
@@ -206,24 +215,18 @@ export default function BattleRoom({ params }) {
     await supabase.from('battles').update({ status: 'ended', winner: winnerUsername, ended_at: new Date().toISOString() }).eq('id', id);
     setBattleEnded(true);
     setWinner(winnerUsername);
+    clearInterval(roundTimerRef.current);
   }
 
-  // The person who LEAVES loses — winner is the OTHER player
   async function declareWinnerByForfeit(leavingUsername) {
     const b = battleRef.current;
     if (!b || b.status === 'ended') return;
-
-    // Winner is whoever is NOT the person leaving
-    const winnerUsername = b.player1_username === leavingUsername
-      ? b.player2_username
-      : b.player1_username;
-
+    const winnerUsername = b.player1_username === leavingUsername ? b.player2_username : b.player1_username;
     await supabase.from('battles').update({
       status: 'ended',
       winner: winnerUsername,
       ended_at: new Date().toISOString(),
     }).eq('id', id);
-
     setBattleEnded(true);
     setWinner(winnerUsername);
     clearInterval(roundTimerRef.current);
@@ -256,6 +259,10 @@ export default function BattleRoom({ params }) {
     const profileData = profileRef.current;
     if (!battleData?.room_name) {
       setVideoError('Room not ready. Please try again.');
+      return;
+    }
+    if (battleData.status === 'ended') {
+      setVideoError('This battle has ended.');
       return;
     }
 
@@ -297,24 +304,24 @@ export default function BattleRoom({ params }) {
       room.on(RoomEvent.Disconnected, () => {
         setVideoJoined(false);
         setRemoteTracks([]);
+        setLocalTrack(null);
         clearInterval(roundTimerRef.current);
       });
 
-      // Attach local video as soon as camera track is published
+      // Store local track in state so the useEffect can attach it once ref is ready
       room.on(RoomEvent.LocalTrackPublished, (publication) => {
-        if (publication.source === Track.Source.Camera && localVideoRef.current) {
-          publication.track?.attach(localVideoRef.current);
+        if (publication.source === Track.Source.Camera && publication.track) {
+          setLocalTrack(publication.track);
         }
       });
 
-      // If a debater disconnects mid-battle, they forfeit
       room.on(RoomEvent.ParticipantDisconnected, (participant) => {
         const b = battleRef.current;
         if (!b || b.status === 'ended') return;
-        const isDebaterDisconnecting =
+        const isDebaterLeaving =
           participant.identity === b.player1_username ||
           participant.identity === b.player2_username;
-        if (isDebaterDisconnecting && currentRoundRef.current > 0) {
+        if (isDebaterLeaving && currentRoundRef.current > 0) {
           declareWinnerByForfeit(participant.identity);
         }
       });
@@ -337,7 +344,6 @@ export default function BattleRoom({ params }) {
     const profileData = profileRef.current;
     const battleData = battleRef.current;
 
-    // If a debater leaves mid-battle, they forfeit — the OTHER player wins
     if (
       profileData &&
       battleData &&
@@ -360,6 +366,10 @@ export default function BattleRoom({ params }) {
     }
     setVideoJoined(false);
     setRemoteTracks([]);
+    setLocalTrack(null);
+
+    // Redirect to battle list after leaving
+    router.push('/battle');
   }
 
   async function toggleMic() {
@@ -470,14 +480,22 @@ export default function BattleRoom({ params }) {
               <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: '20px', color: '#EEF2FF', marginBottom: '4px' }}>
                 {winner === 'tie' ? "It's a tie!" : `@${winner} wins!`}
               </div>
-              <div style={{ fontSize: '13px', color: '#6B7A9E' }}>
+              <div style={{ fontSize: '13px', color: '#6B7A9E', marginBottom: '1rem' }}>
                 Final vote: {battle.player1_username} {votes.player1} — {votes.player2} {battle.player2_username}
               </div>
+              <button
+                onClick={() => router.push('/battle')}
+                style={{
+                  background: '#3B82F6', border: 'none', borderRadius: '100px',
+                  padding: '10px 24px', color: 'white',
+                  fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
+                }}
+              >← Back to Battles</button>
             </div>
           )}
 
           {/* Video */}
-          {videoJoined ? (
+          {!battleEnded && videoJoined ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <div style={{
                 width: '100%', aspectRatio: '16/9', background: '#000',
@@ -507,7 +525,6 @@ export default function BattleRoom({ params }) {
                   </div>
                 )}
 
-                {/* Local video PiP — only for debaters */}
                 {isPlayer && (
                   <video
                     ref={localVideoRef}
@@ -521,6 +538,7 @@ export default function BattleRoom({ params }) {
                       border: '2px solid rgba(59,130,246,0.4)',
                       transform: 'scaleX(-1)',
                       background: '#111',
+                      display: localTrack ? 'block' : 'none',
                     }}
                   />
                 )}
@@ -576,7 +594,7 @@ export default function BattleRoom({ params }) {
                 )}
               </div>
             </div>
-          ) : (
+          ) : !battleEnded ? (
             <div className={styles.joinVideoWrap}>
               <div className={styles.joinVideoIcon}>⚔️</div>
               <div className={styles.joinVideoTitle}>
@@ -594,14 +612,14 @@ export default function BattleRoom({ params }) {
                   {videoError}
                 </div>
               )}
-              {/* Show join button for both debaters AND viewers once battle is live */}
+              {/* Only show join when battle is not ended and room exists */}
               {battle.room_name && (battle.player2_username || isPlayer) && (
                 <button className={styles.joinVideoBtn} onClick={joinVideo}>
                   {isPlayer ? '🎥 Join as Debater' : '👁 Watch Live'}
                 </button>
               )}
             </div>
-          )}
+          ) : null}
 
           {/* Vote area */}
           <div className={styles.voteSection}>
@@ -675,19 +693,14 @@ export default function BattleRoom({ params }) {
 
 function RemoteVideoTrack({ track }) {
   const videoRef = useRef(null);
-
   useEffect(() => {
     if (track && videoRef.current) {
       track.attach(videoRef.current);
       return () => { try { track.detach(videoRef.current); } catch {} };
     }
   }, [track]);
-
   return (
-    <video
-      ref={videoRef}
-      autoPlay playsInline
-      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-    />
+    <video ref={videoRef} autoPlay playsInline
+      style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
   );
 }
