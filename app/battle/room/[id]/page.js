@@ -51,12 +51,21 @@ export default function BattleRoom({ params }) {
   const battleRef = useRef(null);
   const votesRef = useRef({ player1: 0, player2: 0 });
 
-  // Attach local video track when both track and ref are ready
+  // Use raw mediaStreamTrack to attach local video — avoids .attach() issues
   useEffect(() => {
     if (localTrack && localVideoRef.current) {
-      localTrack.attach(localVideoRef.current);
-      return () => { try { localTrack.detach(localVideoRef.current); } catch {} };
+      try {
+        const mediaStream = new MediaStream([localTrack.mediaStreamTrack]);
+        localVideoRef.current.srcObject = mediaStream;
+      } catch (e) {
+        console.error('Local video attach error:', e);
+      }
     }
+    return () => {
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = null;
+      }
+    };
   }, [localTrack]);
 
   useEffect(() => {
@@ -254,6 +263,13 @@ export default function BattleRoom({ params }) {
     }
   }
 
+  function grabLocalTrack(room, Track) {
+    const camPub = room.localParticipant.getTrackPublication(Track.Source.Camera);
+    if (camPub?.track?.mediaStreamTrack) {
+      setLocalTrack(camPub.track);
+    }
+  }
+
   async function joinVideo() {
     const battleData = battleRef.current;
     const profileData = profileRef.current;
@@ -308,9 +324,8 @@ export default function BattleRoom({ params }) {
         clearInterval(roundTimerRef.current);
       });
 
-      // Set local track via event
       room.on(RoomEvent.LocalTrackPublished, (publication) => {
-        if (publication.source === Track.Source.Camera && publication.track) {
+        if (publication.source === Track.Source.Camera && publication.track?.mediaStreamTrack) {
           setLocalTrack(publication.track);
         }
       });
@@ -332,16 +347,11 @@ export default function BattleRoom({ params }) {
         await room.localParticipant.setCameraEnabled(true);
         await room.localParticipant.setMicrophoneEnabled(true);
 
-        // Poll for track in case event fired before state was ready
-        setTimeout(() => {
-          const camPub = room.localParticipant.getTrackPublication(Track.Source.Camera);
-          if (camPub?.track) setLocalTrack(camPub.track);
-        }, 500);
-
-        setTimeout(() => {
-          const camPub = room.localParticipant.getTrackPublication(Track.Source.Camera);
-          if (camPub?.track) setLocalTrack(camPub.track);
-        }, 1500);
+        // Try grabbing track immediately and at intervals in case event missed
+        grabLocalTrack(room, Track);
+        setTimeout(() => grabLocalTrack(room, Track), 500);
+        setTimeout(() => grabLocalTrack(room, Track), 1500);
+        setTimeout(() => grabLocalTrack(room, Track), 3000);
       }
 
       setVideoJoined(true);
@@ -530,7 +540,6 @@ export default function BattleRoom({ params }) {
                   </div>
                 )}
 
-                {/* Local video PiP */}
                 {isPlayer && (
                   <video
                     ref={localVideoRef}
@@ -699,9 +708,16 @@ function RemoteVideoTrack({ track }) {
   const videoRef = useRef(null);
   useEffect(() => {
     if (track && videoRef.current) {
-      track.attach(videoRef.current);
-      return () => { try { track.detach(videoRef.current); } catch {} };
+      try {
+        const mediaStream = new MediaStream([track.mediaStreamTrack]);
+        videoRef.current.srcObject = mediaStream;
+      } catch {
+        track.attach?.(videoRef.current);
+      }
     }
+    return () => {
+      if (videoRef.current) videoRef.current.srcObject = null;
+    };
   }, [track]);
   return (
     <video ref={videoRef} autoPlay playsInline
