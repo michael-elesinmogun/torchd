@@ -282,7 +282,7 @@ export default function BattleRoom({ params }) {
         setRemoteTracks([]);
       });
 
-      const livekitUrl = 'wss://torchd-p_2a1n1ynv3ei.livekit.cloud';
+      const livekitUrl = 'wss://torchd-kub6j4c8.livekit.cloud';
       await room.connect(livekitUrl, token);
 
       // Debaters enable camera + mic, viewers just watch
