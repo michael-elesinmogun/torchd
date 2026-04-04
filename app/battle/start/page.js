@@ -172,9 +172,9 @@ export default function StartBattle() {
       if (roomData.error) throw new Error(roomData.error);
 
       // Save room_url
-      await supabase.from('battles').update({ room_url: roomData.roomUrl }).eq('id', battle.id);
+      await supabase.from('battles').update({ room_name: roomData.roomName }).eq('id', battle.id);
 
-      setCreatedBattle({ ...battle, room_url: roomData.roomUrl, expires_at: expiresAt });
+      setCreatedBattle({ ...battle, room_name: roomData.roomName, expires_at: expiresAt });
       setStep(3);
     } catch (err) {
       setError(err.message);

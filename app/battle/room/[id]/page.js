@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '../../../supabase';
 import styles from './room.module.css';
+import '@livekit/components-styles';
 
 const ROUND_DURATION = 120;
 const TOTAL_ROUNDS = 3;
@@ -30,11 +31,17 @@ export default function BattleRoom({ params }) {
   const [messages, setMessages] = useState([]);
   const [copied, setCopied] = useState(false);
   const [videoJoined, setVideoJoined] = useState(false);
+  const [videoError, setVideoError] = useState('');
   const [currentRound, setCurrentRound] = useState(0);
   const [roundTimeLeft, setRoundTimeLeft] = useState(ROUND_DURATION);
   const [battleEnded, setBattleEnded] = useState(false);
   const [winner, setWinner] = useState(null);
+  const [isMicOn, setIsMicOn] = useState(true);
+  const [isCamOn, setIsCamOn] = useState(true);
+  const [remoteTracks, setRemoteTracks] = useState([]);
 
+  const roomRef = useRef(null);
+  const localVideoRef = useRef(null);
   const roundStartTimeRef = useRef(null);
   const roundTimerRef = useRef(null);
   const currentRoundRef = useRef(0);
@@ -148,6 +155,7 @@ export default function BattleRoom({ params }) {
     return () => {
       clearInterval(roundTimerRef.current);
       document.removeEventListener('visibilitychange', handleVisibility);
+      leaveVideo();
     };
   }, [id]);
 
@@ -161,6 +169,7 @@ export default function BattleRoom({ params }) {
     roundStartTimeRef.current = Date.now();
     setCurrentRound(round);
     setRoundTimeLeft(ROUND_DURATION);
+    enforceMicForRound(round);
 
     roundTimerRef.current = setInterval(() => {
       const elapsed = Math.floor((Date.now() - roundStartTimeRef.current) / 1000);
@@ -173,6 +182,17 @@ export default function BattleRoom({ params }) {
         else startRound(next);
       }
     }, 1000);
+  }
+
+  async function enforceMicForRound(round) {
+    if (!roomRef.current) return;
+    const isP1 = battleRef.current?.player1_username === profileRef.current?.username;
+    const { speaker } = ROUND_CONFIG[round];
+    const shouldHaveMic = speaker === 'both' || (speaker === 'player1' && isP1) || (speaker === 'player2' && !isP1);
+    try {
+      await roomRef.current.localParticipant.setMicrophoneEnabled(shouldHaveMic);
+      setIsMicOn(shouldHaveMic);
+    } catch {}
   }
 
   async function declareWinner() {
@@ -205,6 +225,112 @@ export default function BattleRoom({ params }) {
       setVotes(v => ({ ...v, [side]: v[side] - 1 }));
       votesRef.current = { ...votesRef.current, [side]: votesRef.current[side] - 1 };
     }
+  }
+
+  async function joinVideo() {
+    const battleData = battleRef.current;
+    const profileData = profileRef.current;
+    if (!battleData?.room_name) {
+      setVideoError('Room not ready. Please try again.');
+      return;
+    }
+
+    setVideoError('');
+
+    try {
+      const { Room, RoomEvent, Track } = await import('livekit-client');
+
+      // Determine if this user is a debater or viewer
+      const isDebater = profileData && (
+        battleData.player1_username === profileData.username ||
+        battleData.player2_username === profileData.username
+      );
+
+      // Get token
+      const tokenRes = await fetch('/api/livekit-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          roomName: battleData.room_name,
+          participantName: profileData?.username || `viewer-${Date.now()}`,
+          canPublish: isDebater,
+        }),
+      });
+      const { token, error: tokenError } = await tokenRes.json();
+      if (tokenError) throw new Error(tokenError);
+
+      // Create and connect room
+      const room = new Room({
+        adaptiveStream: true,
+        dynacast: true,
+      });
+      roomRef.current = room;
+
+      // Handle remote tracks (for viewers watching debaters)
+      room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+        if (track.kind === Track.Kind.Video) {
+          setRemoteTracks(prev => [...prev, { track, participant }]);
+        }
+      });
+
+      room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+        setRemoteTracks(prev => prev.filter(t => t.track !== track));
+      });
+
+      room.on(RoomEvent.Disconnected, () => {
+        setVideoJoined(false);
+        setRemoteTracks([]);
+      });
+
+      await room.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL || '', token);
+
+      // Debaters enable camera + mic, viewers just watch
+      if (isDebater) {
+        await room.localParticipant.setCameraEnabled(true);
+        await room.localParticipant.setMicrophoneEnabled(true);
+
+        // Attach local video
+        const localVideoPublication = room.localParticipant.getTrackPublication(Track.Source.Camera);
+        if (localVideoPublication?.track && localVideoRef.current) {
+          localVideoPublication.track.attach(localVideoRef.current);
+        }
+      }
+
+      setVideoJoined(true);
+    } catch (err) {
+      console.error('LiveKit join error:', err);
+      setVideoError('Could not join: ' + err.message);
+    }
+  }
+
+  async function leaveVideo() {
+    if (roomRef.current) {
+      try { await roomRef.current.disconnect(); } catch {}
+      roomRef.current = null;
+    }
+    setVideoJoined(false);
+    setRemoteTracks([]);
+
+    if (battleRef.current && profileRef.current && (
+      battleRef.current.player1_username === profileRef.current.username ||
+      battleRef.current.player2_username === profileRef.current.username
+    )) {
+      supabase.from('battles').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', id);
+    }
+  }
+
+  async function toggleMic() {
+    if (!roomRef.current) return;
+    const enabled = !isMicOn;
+    await roomRef.current.localParticipant.setMicrophoneEnabled(enabled);
+    setIsMicOn(enabled);
+  }
+
+  async function toggleCam() {
+    if (!roomRef.current) return;
+    const enabled = !isCamOn;
+    await roomRef.current.localParticipant.setCameraEnabled(enabled);
+    setIsCamOn(enabled);
   }
 
   function handleStartBattle() {
@@ -249,14 +375,10 @@ export default function BattleRoom({ params }) {
   const p2Pct = 100 - p1Pct;
   const isPlayer = user && (battle.player1_username === profile?.username || battle.player2_username === profile?.username);
   const isPlayer1 = profile?.username === battle.player1_username;
+  const bothInRoom = !!battle?.player2_username && remoteTracks.length >= 1;
   const shareLink = typeof window !== 'undefined' ? window.location.href : '';
   const roundConfig = currentRound > 0 ? ROUND_CONFIG[currentRound] : null;
   const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-
-  // Build Jitsi iframe URL with config params
-  const jitsiUrl = battle.room_url
-    ? `${battle.room_url}#config.prejoinPageEnabled=false&config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.disableDeepLinking=true&config.requireDisplayName=false&userInfo.displayName=${encodeURIComponent(profile?.username || 'Debater')}`
-    : null;
 
   return (
     <main className={styles.main}>
@@ -311,62 +433,131 @@ export default function BattleRoom({ params }) {
             </div>
           )}
 
-          {/* Video — plain iframe, no SDK */}
-          {videoJoined && jitsiUrl ? (
+          {/* Video */}
+          {videoJoined ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{ width: '100%', aspectRatio: '16/9', borderRadius: '14px', overflow: 'hidden', background: '#000' }}>
-                <iframe
-                  src={jitsiUrl}
-                  allow="camera; microphone; fullscreen; display-capture; autoplay"
-                  style={{ width: '100%', height: '100%', border: 'none' }}
-                />
+              <div style={{
+                width: '100%', aspectRatio: '16/9', background: '#000',
+                borderRadius: '14px', overflow: 'hidden', position: 'relative',
+              }}>
+                {/* Remote videos — debaters seen by everyone */}
+                {remoteTracks.length > 0 ? (
+                  <RemoteVideoTrack track={remoteTracks[0].track} />
+                ) : (
+                  <div style={{
+                    position: 'absolute', inset: 0, display: 'flex',
+                    flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    color: '#6B7A9E', fontSize: '14px', gap: '8px',
+                  }}>
+                    <div style={{ fontSize: '32px' }}>⏳</div>
+                    {isPlayer ? 'Waiting for opponent...' : 'Waiting for debaters to join...'}
+                  </div>
+                )}
+
+                {/* Second remote video if 2 debaters */}
+                {remoteTracks.length > 1 && (
+                  <div style={{
+                    position: 'absolute', bottom: '70px', right: '12px',
+                    width: '28%', maxWidth: '180px', aspectRatio: '16/9',
+                    borderRadius: '10px', overflow: 'hidden',
+                    border: '2px solid rgba(255,255,255,0.15)',
+                  }}>
+                    <RemoteVideoTrack track={remoteTracks[1].track} />
+                  </div>
+                )}
+
+                {/* Local video PiP for debaters */}
+                {isPlayer && (
+                  <video
+                    ref={localVideoRef}
+                    autoPlay muted playsInline
+                    style={{
+                      position: 'absolute',
+                      bottom: remoteTracks.length > 1 ? '140px' : '70px',
+                      right: '12px',
+                      width: '28%', maxWidth: '180px', aspectRatio: '16/9',
+                      objectFit: 'cover', borderRadius: '10px',
+                      border: '2px solid rgba(59,130,246,0.4)',
+                      transform: 'scaleX(-1)',
+                    }}
+                  />
+                )}
+
+                {/* Controls for debaters */}
+                {isPlayer && (
+                  <div style={{
+                    position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
+                    display: 'flex', gap: '10px', alignItems: 'center',
+                    background: 'rgba(0,0,0,0.7)', borderRadius: '100px',
+                    padding: '8px 16px', backdropFilter: 'blur(10px)',
+                  }}>
+                    <button onClick={toggleMic} style={{
+                      width: '40px', height: '40px', borderRadius: '50%', border: 'none',
+                      background: isMicOn ? 'rgba(255,255,255,0.15)' : 'rgba(239,68,68,0.5)',
+                      fontSize: '18px', cursor: 'pointer',
+                    }}>{isMicOn ? '🎤' : '🔇'}</button>
+                    <button onClick={toggleCam} style={{
+                      width: '40px', height: '40px', borderRadius: '50%', border: 'none',
+                      background: isCamOn ? 'rgba(255,255,255,0.15)' : 'rgba(239,68,68,0.5)',
+                      fontSize: '18px', cursor: 'pointer',
+                    }}>{isCamOn ? '📹' : '🚫'}</button>
+                    <button onClick={leaveVideo} style={{
+                      background: '#EF4444', border: 'none', borderRadius: '100px',
+                      padding: '8px 18px', color: 'white',
+                      fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
+                    }}>Leave</button>
+                  </div>
+                )}
+
+                {/* Leave for viewers */}
+                {!isPlayer && (
+                  <button onClick={leaveVideo} style={{
+                    position: 'absolute', bottom: '16px', right: '16px',
+                    background: 'rgba(239,68,68,0.8)', border: 'none', borderRadius: '100px',
+                    padding: '8px 16px', color: 'white',
+                    fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
+                  }}>Leave</button>
+                )}
               </div>
+
+              {/* Start / waiting */}
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                {isPlayer1 && battle.player2_username && currentRound === 0 && !battleEnded && (
+                {isPlayer1 && bothInRoom && currentRound === 0 && !battleEnded && (
                   <button onClick={handleStartBattle} style={{
                     background: '#10B981', border: 'none', borderRadius: '100px',
                     padding: '10px 24px', color: 'white',
                     fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
                   }}>▶ Start Battle</button>
                 )}
-                {!isPlayer1 && battle.player2_username && currentRound === 0 && !battleEnded && (
+                {!isPlayer1 && isPlayer && bothInRoom && currentRound === 0 && !battleEnded && (
                   <div style={{
                     background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)',
                     borderRadius: '100px', padding: '10px 20px', fontSize: '13px', color: '#60A5FA', fontWeight: 600,
                   }}>⏳ Waiting for Player 1 to start...</div>
                 )}
-                <button
-                  onClick={() => {
-                    setVideoJoined(false);
-                    if (battleRef.current && profileRef.current && (
-                      battleRef.current.player1_username === profileRef.current.username ||
-                      battleRef.current.player2_username === profileRef.current.username
-                    )) {
-                      supabase.from('battles').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', id);
-                    }
-                  }}
-                  style={{
-                    background: '#EF4444', border: 'none', borderRadius: '100px',
-                    padding: '10px 24px', color: 'white',
-                    fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
-                  }}
-                >Leave</button>
               </div>
             </div>
           ) : (
             <div className={styles.joinVideoWrap}>
               <div className={styles.joinVideoIcon}>⚔️</div>
               <div className={styles.joinVideoTitle}>
-                {battle.player2_username ? 'Your opponent is ready' : 'Waiting for opponent'}
+                {battle.player2_username ? 'Battle is live' : 'Waiting for opponent'}
               </div>
               <p className={styles.joinVideoSub}>
-                {battle.player2_username
-                  ? 'Tap Join Room to go live and start the debate.'
-                  : 'Share the link below while you wait.'}
+                {isPlayer
+                  ? 'Join the room to go live on camera.'
+                  : battle.player2_username
+                    ? 'Watch the debate live and cast your vote.'
+                    : 'Share the link below while you wait.'}
               </p>
-              {battle.room_url && (
-                <button className={styles.joinVideoBtn} onClick={() => setVideoJoined(true)}>
-                  🎥 Join Room
+              {videoError && (
+                <div style={{ fontSize: '13px', color: '#F87171', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', padding: '8px 14px' }}>
+                  {videoError}
+                </div>
+              )}
+              {battle.room_name && (
+                <button className={styles.joinVideoBtn} onClick={joinVideo}>
+                  {isPlayer ? '🎥 Join as Debater' : '👁 Watch Live'}
                 </button>
               )}
             </div>
@@ -439,5 +630,25 @@ export default function BattleRoom({ params }) {
 
       </div>
     </main>
+  );
+}
+
+// Helper component to attach a LiveKit track to a video element
+function RemoteVideoTrack({ track }) {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    if (track && videoRef.current) {
+      track.attach(videoRef.current);
+      return () => { try { track.detach(videoRef.current); } catch {} };
+    }
+  }, [track]);
+
+  return (
+    <video
+      ref={videoRef}
+      autoPlay playsInline
+      style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+    />
   );
 }
