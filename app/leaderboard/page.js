@@ -30,10 +30,10 @@ export default function Leaderboard() {
 
       const { data } = await supabase
         .from('profiles')
-        .select('username, full_name, sport, avatar_url')
+        .select('username, full_name, sport, avatar_url, wins, losses, battles_count')
         .eq('show_on_leaderboard', true)
         .eq('is_public', true)
-        .order('username', { ascending: true })
+        .order('wins', { ascending: false })
         .limit(100);
 
       setUsers(data || []);
@@ -49,12 +49,21 @@ export default function Leaderboard() {
   const podium = filtered.slice(0, 3);
   const rest = filtered.slice(3);
 
-  const sportLabel = { nba: 'NBA', nfl: 'NFL', soccer: 'Soccer', mlb: 'MLB', nhl: 'NHL', all: 'All Sports' };
+  const sportLabel = { nba: 'NBA', nfl: 'NFL', soccer: 'Soccer', mlb: 'MLB', nhl: 'NHL' };
 
   function getInitials(u) {
     return u.full_name
       ? u.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
       : u.username.slice(0, 2).toUpperCase();
+  }
+
+  function getWinRate(u) {
+    if (!u.battles_count || u.battles_count === 0) return '—';
+    return `${Math.round((u.wins / u.battles_count) * 100)}%`;
+  }
+
+  function getPoints(u) {
+    return ((u.wins || 0) * 100) + ((u.battles_count || 0) * 10);
   }
 
   const podiumMedals = ['🏆 Champion', '🥈 2nd Place', '🥉 3rd Place'];
@@ -120,8 +129,12 @@ export default function Leaderboard() {
                           {isMe && <span className={styles.youBadge}>YOU</span>}
                         </div>
                         <div className={styles.podiumHandle}>@{user.username}</div>
-                        <div className={`${styles.podiumPts} ${isFirst ? styles.podiumPtsGold : ''}`}>— pts</div>
-                        <div className={styles.podiumWins}>— wins · — win rate</div>
+                        <div className={`${styles.podiumPts} ${isFirst ? styles.podiumPtsGold : ''}`}>
+                          {getPoints(user)} pts
+                        </div>
+                        <div className={styles.podiumWins}>
+                          {user.wins || 0} wins · {getWinRate(user)} win rate
+                        </div>
                       </Link>
                     );
                   })}
@@ -164,9 +177,11 @@ export default function Leaderboard() {
                           <div className={styles.userSport}>@{user.username} · {sport}</div>
                         </div>
                       </div>
-                      <div className={styles.battlesVal}>—</div>
-                      <div className={styles.winRateVal} style={{ color: '#6B7A9E' }}>—</div>
-                      <div className={styles.ptsVal}>—</div>
+                      <div className={styles.battlesVal}>{user.battles_count || 0}</div>
+                      <div className={styles.winRateVal} style={{ color: (user.wins || 0) > 0 ? '#10B981' : '#6B7A9E' }}>
+                        {getWinRate(user)}
+                      </div>
+                      <div className={styles.ptsVal}>{getPoints(user)}</div>
                     </Link>
                   );
                 })}
@@ -189,7 +204,7 @@ export default function Leaderboard() {
                       <div className={styles.miniRow} style={{ marginTop: '0.5rem' }}>
                         <div className={styles.miniAv} style={{ background: AVATAR_COLORS[0] }}>{getInitials(podium[0])}</div>
                         <div className={styles.miniName}>{podium[0].full_name || podium[0].username}</div>
-                        <div className={styles.miniVal}>👑</div>
+                        <div className={styles.miniVal}>👑 {podium[0].wins || 0}W</div>
                       </div>
                     </Link>
                   ) : (
