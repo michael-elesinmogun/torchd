@@ -10,21 +10,30 @@ export async function POST(request) {
     const livekitUrl = process.env.LIVEKIT_URL;
 
     if (!apiKey || !apiSecret || !livekitUrl) {
-      return NextResponse.json({ error: 'LiveKit credentials not configured' }, { status: 500 });
+      return NextResponse.json({
+        error: `LiveKit credentials not configured. Key: ${!!apiKey}, Secret: ${!!apiSecret}, URL: ${!!livekitUrl}`
+      }, { status: 500 });
     }
 
-    // Convert wss:// to https:// for the REST API
-    const httpUrl = livekitUrl.replace('wss://', 'https://').replace('ws://', 'http://');
-
-    const roomService = new RoomServiceClient(httpUrl, apiKey, apiSecret);
+    // LiveKit SDK needs https:// not wss://
+    const httpUrl = livekitUrl
+      .replace('wss://', 'https://')
+      .replace('ws://', 'http://');
 
     const roomName = `torchd-battle-${battleId}`;
 
-    await roomService.createRoom({
-      name: roomName,
-      emptyTimeout: 600,      // delete after 10 min empty
-      maxParticipants: 50,    // viewers + debaters
-    });
+    const svc = new RoomServiceClient(httpUrl, apiKey, apiSecret);
+
+    try {
+      await svc.createRoom({
+        name: roomName,
+        emptyTimeout: 600,
+        maxParticipants: 50,
+      });
+    } catch (roomErr) {
+      // Room may already exist — that's fine
+      console.log('Room creation note:', roomErr.message);
+    }
 
     return NextResponse.json({ roomName });
   } catch (err) {
