@@ -201,23 +201,29 @@ export default function BattleRoom({ params }) {
   async function declareWinner() {
     const v = votesRef.current;
     const b = battleRef.current;
-    if (!b) return;
+    if (!b || b.status === 'ended') return;
     const winnerUsername = v.player1 > v.player2 ? b.player1_username : v.player2 > v.player1 ? b.player2_username : 'tie';
     await supabase.from('battles').update({ status: 'ended', winner: winnerUsername, ended_at: new Date().toISOString() }).eq('id', id);
     setBattleEnded(true);
     setWinner(winnerUsername);
   }
 
-  // Called when a debater leaves mid-battle — they get the loss
+  // The person who LEAVES loses — winner is the OTHER player
   async function declareWinnerByForfeit(leavingUsername) {
     const b = battleRef.current;
     if (!b || b.status === 'ended') return;
-    const winnerUsername = b.player1_username === leavingUsername ? b.player2_username : b.player1_username;
+
+    // Winner is whoever is NOT the person leaving
+    const winnerUsername = b.player1_username === leavingUsername
+      ? b.player2_username
+      : b.player1_username;
+
     await supabase.from('battles').update({
       status: 'ended',
       winner: winnerUsername,
       ended_at: new Date().toISOString(),
     }).eq('id', id);
+
     setBattleEnded(true);
     setWinner(winnerUsername);
     clearInterval(roundTimerRef.current);
@@ -294,7 +300,7 @@ export default function BattleRoom({ params }) {
         clearInterval(roundTimerRef.current);
       });
 
-      // Attach local video as soon as it's published
+      // Attach local video as soon as camera track is published
       room.on(RoomEvent.LocalTrackPublished, (publication) => {
         if (publication.source === Track.Source.Camera && localVideoRef.current) {
           publication.track?.attach(localVideoRef.current);
@@ -305,8 +311,10 @@ export default function BattleRoom({ params }) {
       room.on(RoomEvent.ParticipantDisconnected, (participant) => {
         const b = battleRef.current;
         if (!b || b.status === 'ended') return;
-        const isPlayer = participant.identity === b.player1_username || participant.identity === b.player2_username;
-        if (isPlayer && currentRoundRef.current > 0) {
+        const isDebaterDisconnecting =
+          participant.identity === b.player1_username ||
+          participant.identity === b.player2_username;
+        if (isDebaterDisconnecting && currentRoundRef.current > 0) {
           declareWinnerByForfeit(participant.identity);
         }
       });
@@ -329,9 +337,16 @@ export default function BattleRoom({ params }) {
     const profileData = profileRef.current;
     const battleData = battleRef.current;
 
-    // If a debater leaves mid-battle, they forfeit
-    if (profileData && battleData && battleData.status !== 'ended' && currentRoundRef.current > 0) {
-      const isDebater = battleData.player1_username === profileData.username || battleData.player2_username === profileData.username;
+    // If a debater leaves mid-battle, they forfeit — the OTHER player wins
+    if (
+      profileData &&
+      battleData &&
+      battleData.status !== 'ended' &&
+      currentRoundRef.current > 0
+    ) {
+      const isDebater =
+        battleData.player1_username === profileData.username ||
+        battleData.player2_username === profileData.username;
       if (isDebater) {
         await declareWinnerByForfeit(profileData.username);
       }
@@ -492,6 +507,7 @@ export default function BattleRoom({ params }) {
                   </div>
                 )}
 
+                {/* Local video PiP — only for debaters */}
                 {isPlayer && (
                   <video
                     ref={localVideoRef}
@@ -504,6 +520,7 @@ export default function BattleRoom({ params }) {
                       objectFit: 'cover', borderRadius: '10px',
                       border: '2px solid rgba(59,130,246,0.4)',
                       transform: 'scaleX(-1)',
+                      background: '#111',
                     }}
                   />
                 )}
@@ -577,7 +594,8 @@ export default function BattleRoom({ params }) {
                   {videoError}
                 </div>
               )}
-              {battle.room_name && (
+              {/* Show join button for both debaters AND viewers once battle is live */}
+              {battle.room_name && (battle.player2_username || isPlayer) && (
                 <button className={styles.joinVideoBtn} onClick={joinVideo}>
                   {isPlayer ? '🎥 Join as Debater' : '👁 Watch Live'}
                 </button>
