@@ -308,7 +308,7 @@ export default function BattleRoom({ params }) {
         clearInterval(roundTimerRef.current);
       });
 
-      // Store local track in state so the useEffect can attach it once ref is ready
+      // Set local track via event
       room.on(RoomEvent.LocalTrackPublished, (publication) => {
         if (publication.source === Track.Source.Camera && publication.track) {
           setLocalTrack(publication.track);
@@ -331,6 +331,17 @@ export default function BattleRoom({ params }) {
       if (isDebater) {
         await room.localParticipant.setCameraEnabled(true);
         await room.localParticipant.setMicrophoneEnabled(true);
+
+        // Poll for track in case event fired before state was ready
+        setTimeout(() => {
+          const camPub = room.localParticipant.getTrackPublication(Track.Source.Camera);
+          if (camPub?.track) setLocalTrack(camPub.track);
+        }, 500);
+
+        setTimeout(() => {
+          const camPub = room.localParticipant.getTrackPublication(Track.Source.Camera);
+          if (camPub?.track) setLocalTrack(camPub.track);
+        }, 1500);
       }
 
       setVideoJoined(true);
@@ -344,12 +355,7 @@ export default function BattleRoom({ params }) {
     const profileData = profileRef.current;
     const battleData = battleRef.current;
 
-    if (
-      profileData &&
-      battleData &&
-      battleData.status !== 'ended' &&
-      currentRoundRef.current > 0
-    ) {
+    if (profileData && battleData && battleData.status !== 'ended' && currentRoundRef.current > 0) {
       const isDebater =
         battleData.player1_username === profileData.username ||
         battleData.player2_username === profileData.username;
@@ -368,7 +374,6 @@ export default function BattleRoom({ params }) {
     setRemoteTracks([]);
     setLocalTrack(null);
 
-    // Redirect to battle list after leaving
     router.push('/battle');
   }
 
@@ -525,6 +530,7 @@ export default function BattleRoom({ params }) {
                   </div>
                 )}
 
+                {/* Local video PiP */}
                 {isPlayer && (
                   <video
                     ref={localVideoRef}
@@ -537,7 +543,6 @@ export default function BattleRoom({ params }) {
                       objectFit: 'cover', borderRadius: '10px',
                       border: '2px solid rgba(59,130,246,0.4)',
                       transform: 'scaleX(-1)',
-                      background: '#111',
                       display: localTrack ? 'block' : 'none',
                     }}
                   />
@@ -612,7 +617,6 @@ export default function BattleRoom({ params }) {
                   {videoError}
                 </div>
               )}
-              {/* Only show join when battle is not ended and room exists */}
               {battle.room_name && (battle.player2_username || isPlayer) && (
                 <button className={styles.joinVideoBtn} onClick={joinVideo}>
                   {isPlayer ? '🎥 Join as Debater' : '👁 Watch Live'}
