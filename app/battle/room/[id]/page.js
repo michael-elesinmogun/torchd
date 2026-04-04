@@ -155,7 +155,10 @@ export default function BattleRoom({ params }) {
     return () => {
       clearInterval(roundTimerRef.current);
       document.removeEventListener('visibilitychange', handleVisibility);
-      leaveVideo();
+      if (roomRef.current) {
+        try { roomRef.current.disconnect(); } catch {}
+        roomRef.current = null;
+      }
     };
   }, [id]);
 
@@ -205,6 +208,21 @@ export default function BattleRoom({ params }) {
     setWinner(winnerUsername);
   }
 
+  // Called when a debater leaves mid-battle — they get the loss
+  async function declareWinnerByForfeit(leavingUsername) {
+    const b = battleRef.current;
+    if (!b || b.status === 'ended') return;
+    const winnerUsername = b.player1_username === leavingUsername ? b.player2_username : b.player1_username;
+    await supabase.from('battles').update({
+      status: 'ended',
+      winner: winnerUsername,
+      ended_at: new Date().toISOString(),
+    }).eq('id', id);
+    setBattleEnded(true);
+    setWinner(winnerUsername);
+    clearInterval(roundTimerRef.current);
+  }
+
   async function loadVotes() {
     const { data } = await supabase.from('votes').select('side').eq('battle_id', id);
     if (data) {
@@ -240,13 +258,11 @@ export default function BattleRoom({ params }) {
     try {
       const { Room, RoomEvent, Track } = await import('livekit-client');
 
-      // Determine if this user is a debater or viewer
       const isDebater = profileData && (
         battleData.player1_username === profileData.username ||
         battleData.player2_username === profileData.username
       );
 
-      // Get token
       const tokenRes = await fetch('/api/livekit-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -259,42 +275,47 @@ export default function BattleRoom({ params }) {
       const { token, error: tokenError } = await tokenRes.json();
       if (tokenError) throw new Error(tokenError);
 
-      // Create and connect room
-      const room = new Room({
-        adaptiveStream: true,
-        dynacast: true,
-      });
+      const room = new Room({ adaptiveStream: true, dynacast: true });
       roomRef.current = room;
 
-      // Handle remote tracks (for viewers watching debaters)
       room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
         if (track.kind === Track.Kind.Video) {
           setRemoteTracks(prev => [...prev, { track, participant }]);
         }
       });
 
-      room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+      room.on(RoomEvent.TrackUnsubscribed, (track) => {
         setRemoteTracks(prev => prev.filter(t => t.track !== track));
       });
 
       room.on(RoomEvent.Disconnected, () => {
         setVideoJoined(false);
         setRemoteTracks([]);
+        clearInterval(roundTimerRef.current);
       });
 
-      const livekitUrl = 'wss://torchd-kub6j4c8.livekit.cloud';
-      await room.connect(livekitUrl, token);
+      // Attach local video as soon as it's published
+      room.on(RoomEvent.LocalTrackPublished, (publication) => {
+        if (publication.source === Track.Source.Camera && localVideoRef.current) {
+          publication.track?.attach(localVideoRef.current);
+        }
+      });
 
-      // Debaters enable camera + mic, viewers just watch
+      // If a debater disconnects mid-battle, they forfeit
+      room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+        const b = battleRef.current;
+        if (!b || b.status === 'ended') return;
+        const isPlayer = participant.identity === b.player1_username || participant.identity === b.player2_username;
+        if (isPlayer && currentRoundRef.current > 0) {
+          declareWinnerByForfeit(participant.identity);
+        }
+      });
+
+      await room.connect('wss://torchd-kub6j4c8.livekit.cloud', token);
+
       if (isDebater) {
         await room.localParticipant.setCameraEnabled(true);
         await room.localParticipant.setMicrophoneEnabled(true);
-
-        // Attach local video
-        const localVideoPublication = room.localParticipant.getTrackPublication(Track.Source.Camera);
-        if (localVideoPublication?.track && localVideoRef.current) {
-          localVideoPublication.track.attach(localVideoRef.current);
-        }
       }
 
       setVideoJoined(true);
@@ -305,19 +326,25 @@ export default function BattleRoom({ params }) {
   }
 
   async function leaveVideo() {
+    const profileData = profileRef.current;
+    const battleData = battleRef.current;
+
+    // If a debater leaves mid-battle, they forfeit
+    if (profileData && battleData && battleData.status !== 'ended' && currentRoundRef.current > 0) {
+      const isDebater = battleData.player1_username === profileData.username || battleData.player2_username === profileData.username;
+      if (isDebater) {
+        await declareWinnerByForfeit(profileData.username);
+      }
+    }
+
+    clearInterval(roundTimerRef.current);
+
     if (roomRef.current) {
       try { await roomRef.current.disconnect(); } catch {}
       roomRef.current = null;
     }
     setVideoJoined(false);
     setRemoteTracks([]);
-
-    if (battleRef.current && profileRef.current && (
-      battleRef.current.player1_username === profileRef.current.username ||
-      battleRef.current.player2_username === profileRef.current.username
-    )) {
-      supabase.from('battles').update({ status: 'ended', ended_at: new Date().toISOString() }).eq('id', id);
-    }
   }
 
   async function toggleMic() {
@@ -441,7 +468,6 @@ export default function BattleRoom({ params }) {
                 width: '100%', aspectRatio: '16/9', background: '#000',
                 borderRadius: '14px', overflow: 'hidden', position: 'relative',
               }}>
-                {/* Remote videos — debaters seen by everyone */}
                 {remoteTracks.length > 0 ? (
                   <RemoteVideoTrack track={remoteTracks[0].track} />
                 ) : (
@@ -455,7 +481,6 @@ export default function BattleRoom({ params }) {
                   </div>
                 )}
 
-                {/* Second remote video if 2 debaters */}
                 {remoteTracks.length > 1 && (
                   <div style={{
                     position: 'absolute', bottom: '70px', right: '12px',
@@ -467,7 +492,6 @@ export default function BattleRoom({ params }) {
                   </div>
                 )}
 
-                {/* Local video PiP for debaters */}
                 {isPlayer && (
                   <video
                     ref={localVideoRef}
@@ -484,7 +508,6 @@ export default function BattleRoom({ params }) {
                   />
                 )}
 
-                {/* Controls for debaters */}
                 {isPlayer && (
                   <div style={{
                     position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
@@ -510,7 +533,6 @@ export default function BattleRoom({ params }) {
                   </div>
                 )}
 
-                {/* Leave for viewers */}
                 {!isPlayer && (
                   <button onClick={leaveVideo} style={{
                     position: 'absolute', bottom: '16px', right: '16px',
@@ -521,7 +543,6 @@ export default function BattleRoom({ params }) {
                 )}
               </div>
 
-              {/* Start / waiting */}
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
                 {isPlayer1 && bothInRoom && currentRound === 0 && !battleEnded && (
                   <button onClick={handleStartBattle} style={{
@@ -634,7 +655,6 @@ export default function BattleRoom({ params }) {
   );
 }
 
-// Helper component to attach a LiveKit track to a video element
 function RemoteVideoTrack({ track }) {
   const videoRef = useRef(null);
 

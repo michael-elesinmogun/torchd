@@ -46,7 +46,6 @@ export default function Battle() {
     }
     init();
 
-    // Also listen for auth state changes (handles mobile session restore)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
@@ -68,10 +67,23 @@ export default function Battle() {
 
   async function loadBattles() {
     const nowIso = new Date().toISOString();
+
     const [{ data: challenges }, { data: live }, { data: ended }] = await Promise.all([
-      supabase.from('battles').select('*').eq('status', 'seeking').gt('expires_at', nowIso).order('created_at', { ascending: false }).limit(20),
-      supabase.from('battles').select('*').eq('status', 'live').order('created_at', { ascending: false }).limit(10),
-      supabase.from('battles').select('*').eq('status', 'ended').not('winner', 'is', null).order('ended_at', { ascending: false }).limit(5),
+      supabase.from('battles').select('*')
+        .eq('status', 'seeking')
+        .gt('expires_at', nowIso)
+        .order('created_at', { ascending: false })
+        .limit(20),
+      supabase.from('battles').select('*')
+        .eq('status', 'live')
+        .gt('expires_at', nowIso)
+        .order('created_at', { ascending: false })
+        .limit(10),
+      supabase.from('battles').select('*')
+        .eq('status', 'ended')
+        .not('winner', 'is', null)
+        .order('ended_at', { ascending: false })
+        .limit(5),
     ]);
     setOpenChallenges(challenges || []);
     setLiveBattles(live || []);
@@ -79,26 +91,19 @@ export default function Battle() {
   }
 
   async function acceptChallenge(battle) {
-    // Not ready yet
     if (!authReady) {
       setAcceptError('Still loading, please try again in a second.');
       return;
     }
-
-    // Not logged in
     if (!user) {
       router.push('/login?redirect=/battle');
       return;
     }
-
-    // Logged in but profile not loaded yet
     if (!profile) {
       setAcceptError('Profile not loaded yet, please wait a moment and try again.');
       setAccepting(null);
       return;
     }
-
-    // Can't accept your own challenge
     if (profile.username === battle.player1_username) return;
 
     setAcceptError('');
@@ -110,9 +115,17 @@ export default function Battle() {
         ? `AGAINST — ${battle.topic.slice(0, 40)}`
         : `FOR — ${battle.topic.slice(0, 40)}`;
 
+      // Give live battles 40 minutes max before auto-expiring from the list
+      const liveExpiresAt = new Date(Date.now() + 40 * 60 * 1000).toISOString();
+
       const { data, error } = await supabase
         .from('battles')
-        .update({ player2_username: profile.username, player2_stance: p2Stance, status: 'live' })
+        .update({
+          player2_username: profile.username,
+          player2_stance: p2Stance,
+          status: 'live',
+          expires_at: liveExpiresAt,
+        })
         .eq('id', battle.id)
         .eq('status', 'seeking')
         .select()
@@ -127,7 +140,6 @@ export default function Battle() {
         return;
       }
 
-      // Notify player1
       const { data: p1Profile } = await supabase
         .from('profiles').select('id').eq('username', battle.player1_username).maybeSingle();
 
@@ -335,7 +347,7 @@ export default function Battle() {
           </div>
           <div className={styles.howGrid}>
             {[
-              { num: '1', title: 'Post a challenge', body: 'Pick a topic, choose your stance. Your challenge goes live for 10 minutes.' },
+              { num: '1', title: 'Post a challenge', body: 'Pick a topic, choose your stance. Your challenge stays live for 10 minutes.' },
               { num: '2', title: 'Someone accepts', body: 'Another user takes the opposing side. You both get matched instantly.' },
               { num: '3', title: '3 rounds, 2 minutes each', body: 'Round 1 you speak, Round 2 they speak, Round 3 open mic.' },
               { num: '4', title: 'Let the crowd vote', body: 'Live viewers vote on who makes the better argument. Most votes wins.' },
