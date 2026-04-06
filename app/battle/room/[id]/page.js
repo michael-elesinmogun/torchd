@@ -39,10 +39,10 @@ export default function BattleRoom({ params }) {
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCamOn, setIsCamOn] = useState(true);
   const [remoteTracks, setRemoteTracks] = useState([]);
-  const [localTrack, setLocalTrack] = useState(null);
 
   const roomRef = useRef(null);
   const localVideoRef = useRef(null);
+  const localTrackRef = useRef(null);
   const roundStartTimeRef = useRef(null);
   const roundTimerRef = useRef(null);
   const currentRoundRef = useRef(0);
@@ -50,23 +50,6 @@ export default function BattleRoom({ params }) {
   const profileRef = useRef(null);
   const battleRef = useRef(null);
   const votesRef = useRef({ player1: 0, player2: 0 });
-
-  // Use raw mediaStreamTrack to attach local video — avoids .attach() issues
-  useEffect(() => {
-    if (localTrack && localVideoRef.current) {
-      try {
-        const mediaStream = new MediaStream([localTrack.mediaStreamTrack]);
-        localVideoRef.current.srcObject = mediaStream;
-      } catch (e) {
-        console.error('Local video attach error:', e);
-      }
-    }
-    return () => {
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = null;
-      }
-    };
-  }, [localTrack]);
 
   useEffect(() => {
     async function init() {
@@ -184,6 +167,17 @@ export default function BattleRoom({ params }) {
     chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  function attachLocalVideo(track) {
+    if (!track?.mediaStreamTrack || !localVideoRef.current) return;
+    try {
+      localTrackRef.current = track;
+      localVideoRef.current.srcObject = new MediaStream([track.mediaStreamTrack]);
+      localVideoRef.current.style.display = 'block';
+    } catch (e) {
+      console.error('Local video attach error:', e);
+    }
+  }
+
   function startRound(round) {
     clearInterval(roundTimerRef.current);
     currentRoundRef.current = round;
@@ -263,13 +257,6 @@ export default function BattleRoom({ params }) {
     }
   }
 
-  function grabLocalTrack(room, Track) {
-    const camPub = room.localParticipant.getTrackPublication(Track.Source.Camera);
-    if (camPub?.track?.mediaStreamTrack) {
-      setLocalTrack(camPub.track);
-    }
-  }
-
   async function joinVideo() {
     const battleData = battleRef.current;
     const profileData = profileRef.current;
@@ -320,13 +307,15 @@ export default function BattleRoom({ params }) {
       room.on(RoomEvent.Disconnected, () => {
         setVideoJoined(false);
         setRemoteTracks([]);
-        setLocalTrack(null);
+        localTrackRef.current = null;
+        if (localVideoRef.current) localVideoRef.current.srcObject = null;
         clearInterval(roundTimerRef.current);
       });
 
+      // Attach local video directly to DOM via ref — bypasses React state timing issues
       room.on(RoomEvent.LocalTrackPublished, (publication) => {
-        if (publication.source === Track.Source.Camera && publication.track?.mediaStreamTrack) {
-          setLocalTrack(publication.track);
+        if (publication.source === Track.Source.Camera) {
+          attachLocalVideo(publication.track);
         }
       });
 
@@ -347,11 +336,15 @@ export default function BattleRoom({ params }) {
         await room.localParticipant.setCameraEnabled(true);
         await room.localParticipant.setMicrophoneEnabled(true);
 
-        // Try grabbing track immediately and at intervals in case event missed
-        grabLocalTrack(room, Track);
-        setTimeout(() => grabLocalTrack(room, Track), 500);
-        setTimeout(() => grabLocalTrack(room, Track), 1500);
-        setTimeout(() => grabLocalTrack(room, Track), 3000);
+        // Poll for track in case event already fired before we subscribed
+        const tryAttach = () => {
+          const camPub = room.localParticipant.getTrackPublication(Track.Source.Camera);
+          if (camPub?.track) attachLocalVideo(camPub.track);
+        };
+        tryAttach();
+        setTimeout(tryAttach, 500);
+        setTimeout(tryAttach, 1500);
+        setTimeout(tryAttach, 3000);
       }
 
       setVideoJoined(true);
@@ -382,7 +375,8 @@ export default function BattleRoom({ params }) {
     }
     setVideoJoined(false);
     setRemoteTracks([]);
-    setLocalTrack(null);
+    localTrackRef.current = null;
+    if (localVideoRef.current) localVideoRef.current.srcObject = null;
 
     router.push('/battle');
   }
@@ -540,6 +534,7 @@ export default function BattleRoom({ params }) {
                   </div>
                 )}
 
+                {/* Local video PiP — hidden by default, shown when track attaches */}
                 {isPlayer && (
                   <video
                     ref={localVideoRef}
@@ -552,7 +547,7 @@ export default function BattleRoom({ params }) {
                       objectFit: 'cover', borderRadius: '10px',
                       border: '2px solid rgba(59,130,246,0.4)',
                       transform: 'scaleX(-1)',
-                      display: localTrack ? 'block' : 'none',
+                      display: 'none',
                     }}
                   />
                 )}
@@ -707,13 +702,8 @@ export default function BattleRoom({ params }) {
 function RemoteVideoTrack({ track }) {
   const videoRef = useRef(null);
   useEffect(() => {
-    if (track && videoRef.current) {
-      try {
-        const mediaStream = new MediaStream([track.mediaStreamTrack]);
-        videoRef.current.srcObject = mediaStream;
-      } catch {
-        track.attach?.(videoRef.current);
-      }
+    if (track?.mediaStreamTrack && videoRef.current) {
+      videoRef.current.srcObject = new MediaStream([track.mediaStreamTrack]);
     }
     return () => {
       if (videoRef.current) videoRef.current.srcObject = null;
