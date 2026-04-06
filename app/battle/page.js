@@ -1,372 +1,342 @@
 'use client';
-import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { supabase } from '../supabase';
-import styles from './battle.module.css';
+import Link from 'next/link';
+import { supabase } from '../../supabase';
+import styles from './start.module.css';
 
-export default function Battle() {
+const TOPICS = [
+  { tag: 'NBA', text: 'LeBron James is the greatest basketball player of all time' },
+  { tag: 'NFL', text: 'Patrick Mahomes has already surpassed Tom Brady as the GOAT QB' },
+  { tag: 'NBA', text: 'The Boston Celtics are building a legitimate dynasty' },
+  { tag: 'NBA', text: 'Steph Curry changed basketball more than any player in 30 years' },
+  { tag: 'NFL', text: 'Lamar Jackson is the best QB in football right now' },
+  { tag: 'NBA', text: 'Wembanyama will be better than LeBron by age 25' },
+  { tag: 'NFL', text: 'The NFL needs an 18-game season' },
+  { tag: 'Soccer', text: 'Messi is the greatest footballer of all time' },
+  { tag: 'NBA', text: 'The Warriors dynasty is officially over' },
+  { tag: 'NFL', text: 'Defensive players should be eligible for MVP' },
+];
+
+const SEEK_DURATION = 10 * 60;
+
+export default function StartBattle() {
   const router = useRouter();
-  const [openChallenges, setOpenChallenges] = useState([]);
-  const [liveBattles, setLiveBattles] = useState([]);
-  const [recentBattles, setRecentBattles] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
-  const [authReady, setAuthReady] = useState(false);
-  const [accepting, setAccepting] = useState(null);
-  const [acceptError, setAcceptError] = useState('');
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [step, setStep] = useState(1);
+  const [selectedTopic, setSelectedTopic] = useState(null);
+  const [customTopic, setCustomTopic] = useState('');
+  const [stance, setStance] = useState(null);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState('');
+  const [createdBattle, setCreatedBattle] = useState(null);
 
-  const [now, setNow] = useState(Date.now());
-  const tickRef = useRef(null);
+  const [seekTimeLeft, setSeekTimeLeft] = useState(SEEK_DURATION);
+  const [battleAccepted, setBattleAccepted] = useState(false);
+  const [acceptedBy, setAcceptedBy] = useState('');
+  const [seekExpired, setSeekExpired] = useState(false);
 
-  useEffect(() => {
-    tickRef.current = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(tickRef.current);
-  }, []);
+  const seekTimerRef = useRef(null);
+  const pollRef = useRef(null);
+  const expiresAtRef = useRef(null);
+  const createdBattleRef = useRef(null);
+  const profileLoadedRef = useRef(false);
 
-  useEffect(() => {
-    async function init() {
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
+  async function loadProfile(currentUser) {
+    if (profileLoadedRef.current) return;
+    profileLoadedRef.current = true;
+    setProfileLoading(true);
 
-      if (currentUser) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('id', currentUser.id)
-          .maybeSingle();
-        setProfile(profileData);
-      }
+    const { data: profileData } = await supabase
+      .from('profiles').select('username, full_name').eq('id', currentUser.id).maybeSingle();
 
-      setAuthReady(true);
-      await loadBattles();
-      setLoading(false);
+    if (profileData?.username) {
+      setProfile(profileData);
+    } else {
+      const fullName = currentUser.user_metadata?.full_name || '';
+      const email = currentUser.email || '';
+      const fallbackUsername = fullName ? fullName.toLowerCase().replace(/\s+/g, '') : email.split('@')[0];
+      const { data: newProfile } = await supabase
+        .from('profiles')
+        .upsert({ id: currentUser.id, username: fallbackUsername, full_name: fullName }, { onConflict: 'id' })
+        .select().maybeSingle();
+      if (newProfile) setProfile(newProfile);
+      else setError('Could not load your profile. Please go to Settings and set a username.');
     }
-    init();
+    setProfileLoading(false);
+  }
 
+  useEffect(() => {
+    // onAuthStateChange fires faster than getSession on refresh
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('username')
-          .eq('id', currentUser.id)
-          .maybeSingle();
-        setProfile(profileData);
-      } else {
-        setProfile(null);
+      if (!session?.user) return; // Don't redirect immediately — let getSession handle it
+      setUser(session.user);
+      loadProfile(session.user);
+    });
+
+    // getSession as the authoritative check — redirects if truly not logged in
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.user) {
+        router.push('/login');
+        return;
       }
-      setAuthReady(true);
+      setUser(session.user);
+      loadProfile(session.user);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  async function loadBattles() {
-    const nowIso = new Date().toISOString();
+  useEffect(() => {
+    if (step !== 3 || !createdBattle) return;
 
-    const [{ data: challenges }, { data: live }, { data: ended }] = await Promise.all([
-      supabase.from('battles').select('*')
-        .eq('status', 'seeking')
-        .gt('expires_at', nowIso)
-        .order('created_at', { ascending: false })
-        .limit(20),
-      supabase.from('battles').select('*')
-        .eq('status', 'live')
-        .gt('expires_at', nowIso)
-        .order('created_at', { ascending: false })
-        .limit(10),
-      supabase.from('battles').select('*')
-        .eq('status', 'ended')
-        .not('winner', 'is', null)
-        .order('ended_at', { ascending: false })
-        .limit(5),
-    ]);
-    setOpenChallenges(challenges || []);
-    setLiveBattles(live || []);
-    setRecentBattles(ended || []);
-  }
+    createdBattleRef.current = createdBattle;
+    expiresAtRef.current = new Date(createdBattle.expires_at).getTime();
 
-  async function acceptChallenge(battle) {
-    if (!authReady) {
-      setAcceptError('Still loading, please try again in a second.');
+    function tick() {
+      const left = Math.max(0, Math.floor((expiresAtRef.current - Date.now()) / 1000));
+      setSeekTimeLeft(left);
+      if (left <= 0) {
+        clearInterval(seekTimerRef.current);
+        supabase.from('battles').update({ status: 'expired' }).eq('id', createdBattleRef.current.id);
+        setSeekExpired(true);
+      }
+    }
+
+    function handleVisibility() {
+      if (document.visibilityState === 'visible') tick();
+    }
+
+    tick();
+    seekTimerRef.current = setInterval(tick, 1000);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    const channel = supabase
+      .channel(`seeking-watch-${createdBattle.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'battles',
+        filter: `id=eq.${createdBattle.id}`,
+      }, (payload) => {
+        if (payload.new.status === 'live') {
+          clearInterval(seekTimerRef.current);
+          clearInterval(pollRef.current);
+          setBattleAccepted(true);
+          setAcceptedBy(payload.new.player2_username || '');
+          setTimeout(() => router.push(`/battle/room/${createdBattle.id}`), 2500);
+        }
+      })
+      .subscribe();
+
+    pollRef.current = setInterval(async () => {
+      const { data } = await supabase
+        .from('battles').select('status, player2_username')
+        .eq('id', createdBattleRef.current.id).maybeSingle();
+      if (data?.status === 'live') {
+        clearInterval(seekTimerRef.current);
+        clearInterval(pollRef.current);
+        setBattleAccepted(true);
+        setAcceptedBy(data.player2_username || '');
+        setTimeout(() => router.push(`/battle/room/${createdBattle.id}`), 2500);
+      }
+    }, 5000);
+
+    return () => {
+      clearInterval(seekTimerRef.current);
+      clearInterval(pollRef.current);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      supabase.removeChannel(channel);
+    };
+  }, [step, createdBattle]);
+
+  const topic = selectedTopic === 'custom' ? customTopic : selectedTopic?.text || '';
+
+  async function createBattle() {
+    if (!topic.trim() || !stance) return;
+
+    // If profile still loading, wait a moment and try again
+    if (profileLoading) {
+      setError('Profile still loading, please wait a second and try again.');
       return;
     }
-    if (!user) {
-      router.push('/login?redirect=/battle');
-      return;
-    }
-    if (!profile) {
-      setAcceptError('Profile not loaded yet, please wait a moment and try again.');
-      setAccepting(null);
-      return;
-    }
-    if (profile.username === battle.player1_username) return;
 
-    setAcceptError('');
-    setAccepting(battle.id);
+    if (!profile?.username) {
+      setError('Profile not found. Please go to Settings and set a username.');
+      return;
+    }
+
+    setCreating(true);
+    setError('');
 
     try {
-      const p1IsFor = battle.player1_stance?.startsWith('FOR');
-      const p2Stance = p1IsFor
-        ? `AGAINST — ${battle.topic.slice(0, 40)}`
-        : `FOR — ${battle.topic.slice(0, 40)}`;
+      const expiresAt = new Date(Date.now() + SEEK_DURATION * 1000).toISOString();
 
-      // Give live battles 40 minutes max before auto-expiring from the list
-      const liveExpiresAt = new Date(Date.now() + 40 * 60 * 1000).toISOString();
-
-      const { data, error } = await supabase
+      const { data: battle, error: battleError } = await supabase
         .from('battles')
-        .update({
-          player2_username: profile.username,
-          player2_stance: p2Stance,
-          status: 'live',
-          expires_at: liveExpiresAt,
+        .insert({
+          topic: topic.trim(),
+          player1_username: profile.username,
+          player1_stance: stance === 'for'
+            ? `FOR — ${topic.trim().slice(0, 40)}`
+            : `AGAINST — ${topic.trim().slice(0, 40)}`,
+          status: 'seeking',
+          expires_at: expiresAt,
         })
-        .eq('id', battle.id)
-        .eq('status', 'seeking')
-        .select()
-        .maybeSingle();
+        .select().single();
 
-      if (error) throw new Error(error.message);
+      if (battleError) throw new Error(battleError.message);
 
-      if (!data) {
-        setAcceptError('This challenge was just taken. Browse for another one.');
-        setAccepting(null);
-        await loadBattles();
-        return;
-      }
+      const roomRes = await fetch('/api/create-room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ battleId: battle.id, topic: topic.trim() }),
+      });
 
-      const { data: p1Profile } = await supabase
-        .from('profiles').select('id').eq('username', battle.player1_username).maybeSingle();
+      const roomData = await roomRes.json();
+      if (roomData.error) throw new Error(roomData.error);
 
-      if (p1Profile) {
-        await supabase.from('notifications').insert({
-          user_id: p1Profile.id,
-          type: 'battle_accepted',
-          message: `@${profile.username} accepted your battle challenge`,
-          from_username: profile.username,
-        });
-      }
+      await supabase.from('battles').update({ room_name: roomData.roomName }).eq('id', battle.id);
 
-      router.push(`/battle/room/${battle.id}`);
+      setCreatedBattle({ ...battle, room_name: roomData.roomName, expires_at: expiresAt });
+      setStep(3);
     } catch (err) {
-      setAcceptError(err.message);
-      setAccepting(null);
+      setError(err.message);
+    } finally {
+      setCreating(false);
     }
   }
 
-  function formatTimeLeft(expiresAt) {
-    const left = Math.max(0, Math.floor((new Date(expiresAt).getTime() - now) / 1000));
-    return `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
+  async function cancelChallenge() {
+    if (!createdBattle) return;
+    await supabase.from('battles').update({ status: 'expired' }).eq('id', createdBattle.id);
+    router.push('/battle');
   }
 
-  function getTimerColor(expiresAt) {
-    const left = Math.max(0, Math.floor((new Date(expiresAt).getTime() - now) / 1000));
-    if (left <= 60) return '#EF4444';
-    if (left <= 180) return '#F59E0B';
-    return '#6B7A9E';
-  }
+  const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  const timerPct = (seekTimeLeft / SEEK_DURATION) * 100;
+  const timerColor = seekTimeLeft <= 60 ? '#EF4444' : seekTimeLeft <= 180 ? '#F59E0B' : '#3B82F6';
 
   return (
     <main className={styles.main}>
       <div className={styles.page}>
-
-        {/* Hero */}
-        <div className={styles.hero}>
-          <div className={styles.heroBg}></div>
-          <div className={styles.heroInner}>
-            <div className={styles.eyebrow}>
-              <span className={styles.liveDot}></span> Battle Mode
-            </div>
-            <h1 className={styles.heroTitle}>Debate live.<br />Let the crowd decide.</h1>
-            <p className={styles.heroSub}>Pick a topic, choose your stance, and go head-to-head on camera with someone who disagrees. Real people. Real takes. Live votes.</p>
-            <div className={styles.heroActions}>
-              <Link href="/battle/start" className={styles.startBtn}>⚔️ Post a Challenge</Link>
-              {authReady && !user && <Link href="/signup" className={styles.signupBtn}>Create free account →</Link>}
-            </div>
-          </div>
+        <div className={styles.header}>
+          <Link href="/battle" className={styles.backBtn}>← Back</Link>
+          <h1 className={styles.title}>Start a Battle</h1>
+          <p className={styles.sub}>Pick a topic, choose your stance, and challenge someone to debate you live.</p>
         </div>
 
-        {acceptError && (
-          <div style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '10px', padding: '12px 16px', fontSize: '13px', color: '#F87171', margin: '0 1.5rem' }}>
-            {acceptError}
+        {step === 1 && (
+          <div className={styles.stepWrap}>
+            <div className={styles.stepLabel}>Step 1 of 2 — Pick your topic</div>
+            <div className={styles.topicGrid}>
+              {TOPICS.map((t, i) => (
+                <button key={i}
+                  className={`${styles.topicBtn} ${selectedTopic === t ? styles.topicSelected : ''}`}
+                  onClick={() => { setSelectedTopic(t); setCustomTopic(''); }}
+                >
+                  <span className={styles.topicTag}>{t.tag}</span>
+                  <span className={styles.topicText}>"{t.text}"</span>
+                </button>
+              ))}
+              <button
+                className={`${styles.topicBtn} ${selectedTopic === 'custom' ? styles.topicSelected : ''}`}
+                onClick={() => setSelectedTopic('custom')}
+              >
+                <span className={styles.topicTag}>✏️ Custom</span>
+                <span className={styles.topicText}>Write your own topic</span>
+              </button>
+            </div>
+            {selectedTopic === 'custom' && (
+              <textarea className={styles.customInput} placeholder="Write your debate topic here..."
+                value={customTopic} onChange={e => setCustomTopic(e.target.value)} maxLength={200} rows={3} autoFocus />
+            )}
+            <button className={styles.nextBtn} onClick={() => setStep(2)}
+              disabled={!selectedTopic || (selectedTopic === 'custom' && !customTopic.trim())}>
+              Next: Choose your stance →
+            </button>
           </div>
         )}
 
-        {/* Open Challenges */}
-        <div className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <div className={styles.sectionTitle}>
-              <span className={styles.liveDot} style={{ background: '#F59E0B' }}></span> Open Challenges
+        {step === 2 && (
+          <div className={styles.stepWrap}>
+            <div className={styles.stepLabel}>Step 2 of 2 — Choose your stance</div>
+            <div className={styles.topicDisplay}>"{topic}"</div>
+            <div className={styles.stanceGrid}>
+              <button className={`${styles.stanceBtn} ${styles.stanceBtnFor} ${stance === 'for' ? styles.stanceSelected : ''}`} onClick={() => setStance('for')}>
+                <span className={styles.stanceIcon}>✊</span>
+                <span className={styles.stanceLabel}>I'm FOR this</span>
+                <span className={styles.stanceSub}>I'll argue in favor of this statement</span>
+              </button>
+              <button className={`${styles.stanceBtn} ${styles.stanceBtnAgainst} ${stance === 'against' ? styles.stanceSelected : ''}`} onClick={() => setStance('against')}>
+                <span className={styles.stanceIcon}>🚫</span>
+                <span className={styles.stanceLabel}>I'm AGAINST this</span>
+                <span className={styles.stanceSub}>I'll argue against this statement</span>
+              </button>
             </div>
-            <Link href="/battle/start" className={styles.sectionLink}>Post your own →</Link>
-          </div>
-
-          {loading ? (
-            <div className={styles.loadingState}>Loading challenges...</div>
-          ) : openChallenges.length === 0 ? (
-            <div className={styles.emptyState}>
-              <div className={styles.emptyIcon}>🎯</div>
-              <div className={styles.emptyTitle}>No open challenges right now</div>
-              <p className={styles.emptyBody}>Be the first to post one. Your challenge stays live for 10 minutes.</p>
-              <Link href="/battle/start" className={styles.emptyBtn}>Post the first challenge →</Link>
-            </div>
-          ) : (
-            <div className={styles.battlesList}>
-              {openChallenges.map(battle => {
-                const isOwn = profile?.username === battle.player1_username;
-                const timeLeft = formatTimeLeft(battle.expires_at);
-                const timerColor = getTimerColor(battle.expires_at);
-
-                return (
-                  <div key={battle.id} className={styles.challengeCard}>
-                    <div className={styles.challengeCardLeft}>
-                      <div className={styles.challengeTopRow}>
-                        <div className={styles.challengeBadge}>
-                          <span style={{ color: '#F59E0B' }}>◎</span> Open Challenge
-                        </div>
-                        <div className={styles.challengeTimer} style={{ color: timerColor }}>
-                          ⏱ {timeLeft}
-                        </div>
-                      </div>
-                      <div className={styles.battleTopic}>"{battle.topic}"</div>
-                      <div className={styles.challengeStance}>
-                        <span className={styles.battlePlayer}>@{battle.player1_username}</span>
-                        <span style={{
-                          fontSize: '11px', fontWeight: 700,
-                          color: battle.player1_stance?.startsWith('FOR') ? '#60A5FA' : '#F87171',
-                          background: battle.player1_stance?.startsWith('FOR') ? 'rgba(59,130,246,0.1)' : 'rgba(239,68,68,0.1)',
-                          border: `1px solid ${battle.player1_stance?.startsWith('FOR') ? 'rgba(59,130,246,0.22)' : 'rgba(239,68,68,0.22)'}`,
-                          borderRadius: '100px', padding: '2px 9px',
-                        }}>
-                          {battle.player1_stance?.startsWith('FOR') ? 'FOR ✊' : 'AGAINST 🚫'}
-                        </span>
-                        <span style={{ fontSize: '12px', color: '#3D4A66' }}>
-                          · needs someone {battle.player1_stance?.startsWith('FOR') ? 'AGAINST' : 'FOR'}
-                        </span>
-                      </div>
-                    </div>
-                    <div>
-                      {isOwn ? (
-                        <div className={styles.ownChallengeBadge}>Your challenge</div>
-                      ) : authReady && !user ? (
-                        <Link
-                          href="/login?redirect=/battle"
-                          className={styles.acceptBtn}
-                          style={{ textDecoration: 'none', display: 'inline-block' }}
-                        >
-                          Sign in to accept →
-                        </Link>
-                      ) : (
-                        <button
-                          className={styles.acceptBtn}
-                          onClick={() => acceptChallenge(battle)}
-                          disabled={accepting === battle.id}
-                        >
-                          {accepting === battle.id ? 'Accepting...' : 'Accept →'}
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Live Now */}
-        <div className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <div className={styles.sectionTitle}>
-              <span className={styles.liveDot}></span> Live Now
-            </div>
-          </div>
-          {loading ? (
-            <div className={styles.loadingState}>Loading live battles...</div>
-          ) : liveBattles.length === 0 ? (
-            <div className={styles.emptyState}>
-              <div className={styles.emptyIcon}>⚔️</div>
-              <div className={styles.emptyTitle}>No live battles right now</div>
-              <p className={styles.emptyBody}>Accept an open challenge to start one.</p>
-            </div>
-          ) : (
-            <div className={styles.battlesList}>
-              {liveBattles.map(battle => (
-                <Link href={`/battle/room/${battle.id}`} key={battle.id} className={styles.battleCard}>
-                  <div className={styles.battleCardLeft}>
-                    <div className={styles.battleLiveBadge}><span className={styles.liveDotSmall}></span> LIVE</div>
-                    <div className={styles.battleTopic}>"{battle.topic}"</div>
-                    <div className={styles.battlePlayers}>
-                      <span className={styles.battlePlayer}>@{battle.player1_username}</span>
-                      <span className={styles.battleVs}>vs</span>
-                      <span className={styles.battlePlayer}>@{battle.player2_username}</span>
-                    </div>
-                  </div>
-                  <div className={styles.watchBtn}>Watch →</div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Recent results */}
-        {recentBattles.length > 0 && (
-          <div className={styles.section}>
-            <div className={styles.sectionHeader}>
-              <div className={styles.sectionTitle}>🏆 Recent results</div>
-            </div>
-            <div className={styles.battlesList}>
-              {recentBattles.map(battle => (
-                <Link href={`/battle/room/${battle.id}`} key={battle.id} className={styles.battleCard}>
-                  <div className={styles.battleCardLeft}>
-                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '11px', fontWeight: 700, color: '#10B981', background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.22)', borderRadius: '100px', padding: '3px 10px', marginBottom: '6px' }}>
-                      🏆 {battle.winner === 'tie' ? 'TIE' : `@${battle.winner} won`}
-                    </div>
-                    <div className={styles.battleTopic}>"{battle.topic}"</div>
-                    <div className={styles.battlePlayers}>
-                      <span className={styles.battlePlayer}>@{battle.player1_username}</span>
-                      <span className={styles.battleVs}>vs</span>
-                      <span className={styles.battlePlayer}>@{battle.player2_username}</span>
-                    </div>
-                  </div>
-                  <div className={styles.watchBtn}>Replay →</div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* How it works */}
-        <div className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <div className={styles.sectionTitle}>How it works</div>
-          </div>
-          <div className={styles.howGrid}>
-            {[
-              { num: '1', title: 'Post a challenge', body: 'Pick a topic, choose your stance. Your challenge stays live for 10 minutes.' },
-              { num: '2', title: 'Someone accepts', body: 'Another user takes the opposing side. You both get matched instantly.' },
-              { num: '3', title: '3 rounds, 2 minutes each', body: 'Round 1 you speak, Round 2 they speak, Round 3 open mic.' },
-              { num: '4', title: 'Let the crowd vote', body: 'Live viewers vote on who makes the better argument. Most votes wins.' },
-            ].map((step, i) => (
-              <div key={i} className={styles.howCard}>
-                <div className={styles.howNum}>{step.num}</div>
-                <div className={styles.howTitle}>{step.title}</div>
-                <p className={styles.howBody}>{step.body}</p>
+            {error && <div className={styles.errorMsg}>{error}</div>}
+            {!profile?.username && !profileLoading && user && (
+              <div className={styles.errorMsg}>
+                ⚠️ Profile not found. Please go to <Link href="/settings" style={{ color: '#60A5FA' }}>Settings</Link> and set a username first.
               </div>
-            ))}
+            )}
+            <div className={styles.stepActions}>
+              <button className={styles.backStepBtn} onClick={() => setStep(1)}>← Back</button>
+              <button className={styles.nextBtn} onClick={createBattle}
+                disabled={!stance || creating}>
+                {creating ? 'Creating room...' : profileLoading ? 'Almost ready...' : '⚔️ Post Challenge →'}
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className={styles.cta}>
-          <h2 className={styles.ctaTitle}>Ready to prove your take?</h2>
-          <p className={styles.ctaSub}>Post a challenge in under 60 seconds.</p>
-          <Link href="/battle/start" className={styles.startBtn}>⚔️ Post a Challenge</Link>
-        </div>
-
+        {step === 3 && createdBattle && (
+          <div className={styles.stepWrap}>
+            {battleAccepted ? (
+              <div className={styles.acceptedWrap}>
+                <div className={styles.acceptedIcon}>🔥</div>
+                <h2 className={styles.acceptedTitle}>Challenge accepted!</h2>
+                <p className={styles.acceptedSub}>
+                  {acceptedBy ? `@${acceptedBy}` : 'Your opponent'} is ready to battle. Taking you to the room now...
+                </p>
+                <div className={styles.acceptedSpinner}></div>
+              </div>
+            ) : seekExpired ? (
+              <div className={styles.expiredWrap}>
+                <div className={styles.expiredIcon}>⏰</div>
+                <h2 className={styles.expiredTitle}>Challenge expired</h2>
+                <p className={styles.expiredSub}>Nobody accepted in 10 minutes. Try posting again.</p>
+                <Link href="/battle/start" className={styles.nextBtn} style={{ textDecoration: 'none', textAlign: 'center' }}>
+                  Post a new challenge →
+                </Link>
+                <Link href="/battle" className={styles.laterBtn}>Browse open challenges</Link>
+              </div>
+            ) : (
+              <>
+                <div className={styles.seekingHeader}>
+                  <div className={styles.seekingPulse}></div>
+                  <span className={styles.seekingLabel}>Looking for an opponent...</span>
+                </div>
+                <div className={styles.topicDisplay}>"{topic}"</div>
+                <div className={styles.stanceDisplay}>
+                  Your stance: <strong>{stance === 'for' ? 'FOR ✊' : 'AGAINST 🚫'}</strong>
+                </div>
+                <div className={styles.countdownWrap}>
+                  <div className={styles.countdownTime} style={{ color: timerColor }}>{formatTime(seekTimeLeft)}</div>
+                  <div className={styles.countdownLabel}>until challenge expires</div>
+                  <div className={styles.countdownTrack}>
+                    <div className={styles.countdownFill} style={{ width: `${timerPct}%`, background: timerColor }} />
+                  </div>
+                </div>
+                <div className={styles.seekingInfo}>
+                  Your challenge is live on the <Link href="/battle" className={styles.seekingLink}>battles page</Link>.
+                  Anyone can accept it while this timer runs.
+                </div>
+                <button className={styles.cancelBtn} onClick={cancelChallenge}>Cancel challenge</button>
+              </>
+            )}
+          </div>
+        )}
       </div>
     </main>
   );
