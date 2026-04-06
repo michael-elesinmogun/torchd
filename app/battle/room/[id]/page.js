@@ -23,6 +23,7 @@ export default function BattleRoom({ params }) {
 
   const [battle, setBattle] = useState(null);
   const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [votes, setVotes] = useState({ player1: 0, player2: 0 });
@@ -56,6 +57,7 @@ export default function BattleRoom({ params }) {
       const { data: { session } } = await supabase.auth.getSession();
       const currentUser = session?.user ?? null;
       setUser(currentUser);
+      setAuthReady(true);
 
       if (currentUser) {
         const { data: profileData } = await supabase
@@ -138,6 +140,19 @@ export default function BattleRoom({ params }) {
 
     init();
 
+    // Also listen for auth state changes to handle mobile session restore
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      const currentUser = session?.user ?? null;
+      setUser(currentUser);
+      setAuthReady(true);
+      if (currentUser) {
+        const { data: profileData } = await supabase
+          .from('profiles').select('username, full_name').eq('id', currentUser.id).maybeSingle();
+        setProfile(profileData);
+        profileRef.current = profileData;
+      }
+    });
+
     function handleVisibility() {
       if (document.visibilityState === 'visible' && roundStartTimeRef.current && currentRoundRef.current > 0) {
         const elapsed = Math.floor((Date.now() - roundStartTimeRef.current) / 1000);
@@ -156,6 +171,7 @@ export default function BattleRoom({ params }) {
     return () => {
       clearInterval(roundTimerRef.current);
       document.removeEventListener('visibilitychange', handleVisibility);
+      subscription.unsubscribe();
       if (roomRef.current) {
         try { roomRef.current.disconnect(); } catch {}
         roomRef.current = null;
@@ -312,7 +328,6 @@ export default function BattleRoom({ params }) {
         clearInterval(roundTimerRef.current);
       });
 
-      // Attach local video directly to DOM via ref — bypasses React state timing issues
       room.on(RoomEvent.LocalTrackPublished, (publication) => {
         if (publication.source === Track.Source.Camera) {
           attachLocalVideo(publication.track);
@@ -336,7 +351,6 @@ export default function BattleRoom({ params }) {
         await room.localParticipant.setCameraEnabled(true);
         await room.localParticipant.setMicrophoneEnabled(true);
 
-        // Poll for track in case event already fired before we subscribed
         const tryAttach = () => {
           const camPub = room.localParticipant.getTrackPublication(Track.Source.Camera);
           if (camPub?.track) attachLocalVideo(camPub.track);
@@ -435,7 +449,7 @@ export default function BattleRoom({ params }) {
   const total = votes.player1 + votes.player2;
   const p1Pct = total === 0 ? 50 : Math.round((votes.player1 / total) * 100);
   const p2Pct = 100 - p1Pct;
-  const isPlayer = user && (battle.player1_username === profile?.username || battle.player2_username === profile?.username);
+  const isPlayer = authReady && user && (battle.player1_username === profile?.username || battle.player2_username === profile?.username);
   const isPlayer1 = profile?.username === battle.player1_username;
   const bothInRoom = !!battle?.player2_username && remoteTracks.length >= 1;
   const shareLink = typeof window !== 'undefined' ? window.location.href : '';
@@ -534,7 +548,6 @@ export default function BattleRoom({ params }) {
                   </div>
                 )}
 
-                {/* Local video PiP — hidden by default, shown when track attaches */}
                 {isPlayer && (
                   <video
                     ref={localVideoRef}
@@ -639,7 +652,7 @@ export default function BattleRoom({ params }) {
               <span style={{ color: '#6B7A9E', fontSize: '12px' }}>{total} votes</span>
               <span style={{ color: '#F87171' }}>{p2Pct}% — {battle.player2_username || 'Player 2'}</span>
             </div>
-            {!voted && user && !isPlayer && !battleEnded && (
+            {authReady && !voted && user && !isPlayer && !battleEnded && (
               <div className={styles.voteButtons}>
                 <button className={`${styles.voteBtn} ${styles.voteBtnBlue}`} onClick={() => castVote('player1')}>
                   Vote for {battle.player1_username || 'Player 1'}
@@ -651,7 +664,11 @@ export default function BattleRoom({ params }) {
             )}
             {voted && <div className={styles.voteCast}>✓ Vote cast — {voted === 'player1' ? battle.player1_username : battle.player2_username}</div>}
             {isPlayer && !battleEnded && <div className={styles.playerNotice}>You're in this battle — you can't vote on your own debate</div>}
-            {!user && <div className={styles.loginPrompt}><Link href="/login" className={styles.loginLink}>Sign in</Link> to vote</div>}
+            {authReady && !user && (
+              <div className={styles.loginPrompt}>
+                <Link href="/login" className={styles.loginLink}>Sign in</Link> to vote
+              </div>
+            )}
           </div>
 
           {/* Waiting card */}
