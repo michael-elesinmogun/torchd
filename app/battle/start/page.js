@@ -42,32 +42,53 @@ export default function StartBattle() {
   const pollRef = useRef(null);
   const expiresAtRef = useRef(null);
   const createdBattleRef = useRef(null);
+  const profileLoadedRef = useRef(false);
+
+  async function loadProfile(currentUser) {
+    if (profileLoadedRef.current) return;
+    profileLoadedRef.current = true;
+
+    const { data: profileData } = await supabase
+      .from('profiles').select('username, full_name').eq('id', currentUser.id).maybeSingle();
+
+    if (profileData?.username) {
+      setProfile(profileData);
+    } else {
+      const fullName = currentUser.user_metadata?.full_name || '';
+      const email = currentUser.email || '';
+      const fallbackUsername = fullName ? fullName.toLowerCase().replace(/\s+/g, '') : email.split('@')[0];
+      const { data: newProfile } = await supabase
+        .from('profiles')
+        .upsert({ id: currentUser.id, username: fallbackUsername, full_name: fullName }, { onConflict: 'id' })
+        .select().maybeSingle();
+      if (newProfile) setProfile(newProfile);
+      else setError('Could not load your profile. Please go to Settings and set a username.');
+    }
+    setProfileLoading(false);
+  }
 
   useEffect(() => {
-    async function init() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) { router.push('/login'); return; }
-      setUser(session.user);
-
-      const { data: profileData } = await supabase
-        .from('profiles').select('username, full_name').eq('id', session.user.id).maybeSingle();
-
-      if (profileData?.username) {
-        setProfile(profileData);
-      } else {
-        const fullName = session.user.user_metadata?.full_name || '';
-        const email = session.user.email || '';
-        const fallbackUsername = fullName ? fullName.toLowerCase().replace(/\s+/g, '') : email.split('@')[0];
-        const { data: newProfile } = await supabase
-          .from('profiles')
-          .upsert({ id: session.user.id, username: fallbackUsername, full_name: fullName }, { onConflict: 'id' })
-          .select().maybeSingle();
-        if (newProfile) setProfile(newProfile);
-        else setError('Could not load your profile. Please go to Settings and set a username.');
+    // Listen for auth state — fires faster than getSession on refresh
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!session?.user) {
+        router.push('/login');
+        return;
       }
-      setProfileLoading(false);
-    }
-    init();
+      setUser(session.user);
+      await loadProfile(session.user);
+    });
+
+    // Also call getSession as fallback
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.user) {
+        router.push('/login');
+        return;
+      }
+      setUser(session.user);
+      loadProfile(session.user);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -161,7 +182,6 @@ export default function StartBattle() {
 
       if (battleError) throw new Error(battleError.message);
 
-      // Generate Jitsi room URL — no API needed
       const roomRes = await fetch('/api/create-room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -171,7 +191,6 @@ export default function StartBattle() {
       const roomData = await roomRes.json();
       if (roomData.error) throw new Error(roomData.error);
 
-      // Save room_url
       await supabase.from('battles').update({ room_name: roomData.roomName }).eq('id', battle.id);
 
       setCreatedBattle({ ...battle, room_name: roomData.roomName, expires_at: expiresAt });
