@@ -1,4 +1,4 @@
-// TORCHD_PROFILE_V5
+// TORCHD_PROFILE_V6
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
@@ -90,6 +90,9 @@ export default function Profile({ params }) {
   const [copied, setCopied] = useState(false);
   const [checklist, setChecklist] = useState({ addBio: false, pickTeams: false, firstBattle: false });
 
+  // Real stats
+  const [stats, setStats] = useState({ wins: 0, losses: 0, battles_count: 0, rank: null });
+
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
@@ -124,7 +127,27 @@ export default function Profile({ params }) {
         const sportMap = { nba: 'NBA', nfl: 'NFL', soccer: 'Soccer', mlb: 'MLB', nhl: 'NHL', all: 'NBA' };
         const mappedSport = sportMap[profileData.sport?.toLowerCase()];
         if (mappedSport) setFavSports([mappedSport]);
-        setChecklist({ addBio: !!profileData.bio, pickTeams: !!profileData.sport, firstBattle: false });
+        setChecklist({
+          addBio: !!profileData.bio,
+          pickTeams: !!profileData.sport,
+          firstBattle: (profileData.battles_count || 0) > 0,
+        });
+
+        // Set stats from profile
+        const wins = profileData.wins || 0;
+        const losses = profileData.losses || 0;
+        const battles = profileData.battles_count || 0;
+
+        // Fetch rank — count profiles with more wins
+        const { count } = await supabase
+          .from('profiles')
+          .select('id', { count: 'exact', head: true })
+          .eq('show_on_leaderboard', true)
+          .eq('is_public', true)
+          .gt('wins', wins);
+
+        const rank = (count ?? 0) + 1;
+        setStats({ wins, losses, battles_count: battles, rank });
       } else {
         setDisplayName(username.split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
         setInitials(username.slice(0, 2).toUpperCase());
@@ -257,6 +280,7 @@ export default function Profile({ params }) {
   function toggleTeam(team) { setFavTeams(prev => prev.includes(team) ? prev.filter(t => t !== team) : [...prev, team]); }
   function shareProfile() { navigator.clipboard.writeText(window.location.href).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); }); }
 
+  const winRate = stats.battles_count > 0 ? `${Math.round((stats.wins / stats.battles_count) * 100)}%` : '—';
   const completedCount = Object.values(checklist).filter(Boolean).length;
   const totalCount = Object.keys(checklist).length;
   const progressPct = Math.round((completedCount / totalCount) * 100);
@@ -398,20 +422,51 @@ export default function Profile({ params }) {
               )}
             </div>
 
+            {/* Stats card with real data */}
             <div className={styles.sideCard}>
               <div className={styles.sideCardTitle}>Stats</div>
               <div className={styles.statsGrid}>
-                <div className={styles.statItem}><div className={styles.statNum} style={{ color: '#3D4A66' }}>0</div><div className={styles.statLabel}>Battles</div></div>
-                <div className={styles.statItem}><div className={styles.statNum} style={{ color: '#3D4A66' }}>—</div><div className={styles.statLabel}>Win Rate</div></div>
-                <div className={styles.statItem}><div className={styles.statNum} style={{ color: '#3D4A66' }}>—</div><div className={styles.statLabel}>Rank</div></div>
-                <div className={styles.statItem}><div className={styles.statNum} style={{ color: '#3D4A66' }}>—</div><div className={styles.statLabel}>Streak</div></div>
+                <div className={styles.statItem}>
+                  <div className={styles.statNum} style={{ color: stats.battles_count > 0 ? '#EEF2FF' : '#3D4A66' }}>
+                    {stats.battles_count}
+                  </div>
+                  <div className={styles.statLabel}>Battles</div>
+                </div>
+                <div className={styles.statItem}>
+                  <div className={styles.statNum} style={{ color: stats.wins > 0 ? '#10B981' : '#3D4A66' }}>
+                    {stats.wins > 0 ? `${stats.wins}W` : '—'}
+                  </div>
+                  <div className={styles.statLabel}>Wins</div>
+                </div>
+                <div className={styles.statItem}>
+                  <div className={styles.statNum} style={{ color: stats.battles_count > 0 ? '#EEF2FF' : '#3D4A66' }}>
+                    {winRate}
+                  </div>
+                  <div className={styles.statLabel}>Win Rate</div>
+                </div>
+                <div className={styles.statItem}>
+                  <div className={styles.statNum} style={{ color: stats.rank ? '#F59E0B' : '#3D4A66' }}>
+                    {stats.rank && stats.battles_count > 0 ? `#${stats.rank}` : '—'}
+                  </div>
+                  <div className={styles.statLabel}>Rank</div>
+                </div>
               </div>
+              {stats.battles_count > 0 && (
+                <div style={{
+                  marginTop: '0.75rem', paddingTop: '0.75rem',
+                  borderTop: '1px solid rgba(255,255,255,0.06)',
+                  display: 'flex', justifyContent: 'space-between',
+                  fontSize: '12px', color: '#6B7A9E',
+                }}>
+                  <span>{stats.wins}W — {stats.losses}L</span>
+                  <Link href="/leaderboard" style={{ color: '#3B82F6', textDecoration: 'none' }}>View leaderboard →</Link>
+                </div>
+              )}
             </div>
           </div>
 
           <div className={styles.mainContent}>
 
-            {/* Followers / Following tabs only */}
             <div className={styles.tabs}>
               <button className={`${styles.tab} ${activeTab === 'followers' ? styles.tabActive : ''}`} onClick={() => setActiveTab('followers')}>
                 Followers ({followerCount})
@@ -459,7 +514,6 @@ export default function Profile({ params }) {
               )
             )}
 
-            {/* Onboarding — shown below the lists for owners */}
             {isOwner && (
               <div className={styles.onboardingSection} style={{ marginTop: '1.5rem' }}>
                 <div className={styles.checklistCard}>
@@ -487,9 +541,17 @@ export default function Profile({ params }) {
 
                 <div className={styles.firstBattleCard}>
                   <div className={styles.firstBattleIcon}>⚔️</div>
-                  <div className={styles.firstBattleTitle}>Start your first battle</div>
-                  <p className={styles.firstBattleBody}>You haven't debated yet. Pick a topic, get matched with someone who disagrees, and let the crowd decide who wins.</p>
-                  <Link href="/battle" className={styles.firstBattleBtn}>Find me an opponent →</Link>
+                  <div className={styles.firstBattleTitle}>
+                    {stats.battles_count > 0 ? 'Keep battling!' : 'Start your first battle'}
+                  </div>
+                  <p className={styles.firstBattleBody}>
+                    {stats.battles_count > 0
+                      ? `You've fought ${stats.battles_count} battle${stats.battles_count > 1 ? 's' : ''} with a ${winRate} win rate. Keep going to climb the ranks.`
+                      : "You haven't debated yet. Pick a topic, get matched with someone who disagrees, and let the crowd decide who wins."}
+                  </p>
+                  <Link href="/battle" className={styles.firstBattleBtn}>
+                    {stats.battles_count > 0 ? 'Battle again →' : 'Find me an opponent →'}
+                  </Link>
                 </div>
 
                 <div className={styles.suggestedCard}>
