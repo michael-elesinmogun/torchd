@@ -18,10 +18,7 @@ export async function GET(request) {
   const url = `https://site.api.espn.com/apis/site/v2/sports/${sportPath}/summary?event=${gameId}`;
 
   try {
-    const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mozilla/5.0' },
-      next: { revalidate: 15 },
-    });
+    const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
 
     if (!res.ok) {
       return Response.json({ error: 'Failed to fetch gamecast' }, { status: 500 });
@@ -29,43 +26,29 @@ export async function GET(request) {
 
     const data = await res.json();
 
-    // Build an atBat → inning map from MLB scoring plays / at-bats if available
-    // ESPN sometimes buries the inning in at-bat data rather than play.period
-    const atBatInningMap = {};
-    if (sport === 'mlb' && data.atBats) {
-      for (const ab of data.atBats) {
-        if (ab.id && ab.period?.number > 0) {
-          atBatInningMap[String(ab.id)] = ab.period.number;
-        }
-      }
-    }
-
     const headerPeriod = data.header?.competitions?.[0]?.status?.period || null;
 
     const plays = (data.plays || []).slice(-200).reverse().map(play => {
-      // 1. Trust period.number if it's a positive integer
-      let periodNumber = (play.period?.number && play.period.number > 0)
-        ? play.period.number
-        : null;
+      let periodNumber = null;
 
-      // 2. Parse any digit from period.displayValue e.g. "1st Inning", "Top 3rd"
+      // 1. period.number if positive
+      if (play.period?.number && play.period.number > 0) {
+        periodNumber = play.period.number;
+      }
+
+      // 2. Parse digit from period.displayValue: "1st Inning", "Top 3rd Inning", etc.
       if (!periodNumber && play.period?.displayValue) {
         const m = play.period.displayValue.match(/(\d+)/);
         if (m) periodNumber = parseInt(m[1], 10);
       }
 
-      // 3. Try atBat map (MLB only)
-      if (!periodNumber && play.atBatId) {
-        periodNumber = atBatInningMap[String(play.atBatId)] || null;
-      }
-
-      // 4. Parse from play type text e.g. "End of 2nd"
-      if (!periodNumber && play.type?.text) {
-        const m = play.type.text.match(/(\d+)/);
+      // 3. Parse digit from play.text for baseball e.g. "End of 2nd inning"
+      if (!periodNumber && play.text) {
+        const m = play.text.match(/(\d+)(?:st|nd|rd|th)\s+inning/i);
         if (m) periodNumber = parseInt(m[1], 10);
       }
 
-      // 5. Last resort — use the current game period from the header
+      // 4. Fall back to current game period from header
       if (!periodNumber && headerPeriod) {
         periodNumber = headerPeriod;
       }
