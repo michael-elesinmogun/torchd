@@ -14,6 +14,7 @@ export default function NavBar() {
   const [unreadCount, setUnreadCount] = useState(0);
   const notifRef = useRef(null);
   const pathname = usePathname();
+  const profileLoadedRef = useRef(false);
 
   useEffect(() => { setMenuOpen(false); setNotifOpen(false); }, [pathname]);
 
@@ -30,24 +31,32 @@ export default function NavBar() {
   useEffect(() => {
     let notifChannel = null;
 
-    async function fetchUserAndProfile() {
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentUser = session?.user;
+    async function setupUser(currentUser) {
+      if (!currentUser) {
+        setUser(null);
+        setProfileSlug(null);
+        setNotifications([]);
+        setUnreadCount(0);
+        setLoading(false);
+        return;
+      }
+
       setUser(currentUser);
 
-      if (currentUser) {
-        const { data: profile } = await supabase
-          .from('profiles').select('username').eq('id', currentUser.id).single();
+      // Load profile
+      const { data: profile } = await supabase
+        .from('profiles').select('username').eq('id', currentUser.id).single();
 
-        if (profile?.username) {
-          setProfileSlug(profile.username);
-        } else {
-          const fullName = currentUser.user_metadata?.full_name || '';
-          setProfileSlug(fullName ? fullName.toLowerCase().replace(/\s+/g, '') : currentUser.email?.split('@')[0] || 'profile');
-        }
+      if (profile?.username) {
+        setProfileSlug(profile.username);
+      } else {
+        const fullName = currentUser.user_metadata?.full_name || '';
+        setProfileSlug(fullName ? fullName.toLowerCase().replace(/\s+/g, '') : currentUser.email?.split('@')[0] || 'profile');
+      }
 
-        await loadNotifications(currentUser.id);
+      await loadNotifications(currentUser.id);
 
+      if (!notifChannel) {
         notifChannel = supabase
           .channel(`notifications-${currentUser.id}`)
           .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${currentUser.id}` }, (payload) => {
@@ -60,20 +69,36 @@ export default function NavBar() {
       setLoading(false);
     }
 
-    fetchUserAndProfile();
-
+    // onAuthStateChange fires faster than getSession on page load
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        supabase.from('profiles').select('username').eq('id', session.user.id).single()
-          .then(({ data: profile }) => { if (profile?.username) setProfileSlug(profile.username); });
-        loadNotifications(session.user.id);
+      if (!profileLoadedRef.current) {
+        profileLoadedRef.current = true;
+        setupUser(session?.user ?? null);
       } else {
-        setProfileSlug(null);
-        setNotifications([]);
-        setUnreadCount(0);
+        // Handle sign out / sign in after initial load
+        if (!session?.user) {
+          setUser(null);
+          setProfileSlug(null);
+          setNotifications([]);
+          setUnreadCount(0);
+        } else {
+          setUser(session.user);
+          supabase.from('profiles').select('username').eq('id', session.user.id).single()
+            .then(({ data: profile }) => { if (profile?.username) setProfileSlug(profile.username); });
+          loadNotifications(session.user.id);
+        }
       }
     });
+
+    // Fallback — getSession in case onAuthStateChange doesn't fire
+    setTimeout(() => {
+      if (!profileLoadedRef.current) {
+        profileLoadedRef.current = true;
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          setupUser(session?.user ?? null);
+        });
+      }
+    }, 1000);
 
     return () => {
       subscription.unsubscribe();
@@ -227,7 +252,6 @@ export default function NavBar() {
                     border: '1px solid rgba(255,255,255,0.065)', borderRadius: '14px',
                     boxShadow: '0 20px 60px rgba(0,0,0,0.5)', zIndex: 300, overflow: 'hidden',
                   }}>
-                    {/* Header */}
                     <div style={{
                       padding: '12px 16px', borderBottom: '1px solid rgba(255,255,255,0.065)',
                       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -241,23 +265,18 @@ export default function NavBar() {
                             fontSize: '11px', color: '#60A5FA', background: 'none',
                             border: 'none', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
                             padding: '2px 6px', borderRadius: '4px',
-                          }}>
-                            Mark all read
-                          </button>
+                          }}>Mark all read</button>
                         )}
                         {notifications.length > 0 && (
                           <button onClick={clearAllNotifications} style={{
                             fontSize: '11px', color: '#6B7A9E', background: 'none',
                             border: 'none', cursor: 'pointer', fontFamily: 'DM Sans, sans-serif',
                             padding: '2px 6px', borderRadius: '4px',
-                          }}>
-                            Clear all
-                          </button>
+                          }}>Clear all</button>
                         )}
                       </div>
                     </div>
 
-                    {/* List */}
                     <div style={{ maxHeight: '360px', overflowY: 'auto', scrollbarWidth: 'thin' }}>
                       {notifications.length === 0 ? (
                         <div style={{ padding: '2.5rem 1rem', textAlign: 'center', color: '#6B7A9E', fontSize: '13px' }}>
