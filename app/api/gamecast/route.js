@@ -29,21 +29,31 @@ export async function GET(request) {
 
     const data = await res.json();
 
-    const plays = (data.plays || []).slice(-200).reverse().map(play => ({
-      id: play.id,
-      text: play.text,
-      clock: play.clock?.displayValue,
-      period: play.period?.number,
-      periodText: play.period?.displayValue,
-      team: play.team?.abbreviation,
-      teamLogo: play.team?.logo || null,
-      teamColor: play.team?.color || null,
-      scoreValue: play.scoreValue,
-      scoringPlay: play.scoringPlay,
-      awayScore: play.awayScore,
-      homeScore: play.homeScore,
-      type: play.type?.text,
-    }));
+    const plays = (data.plays || []).slice(-200).reverse().map(play => {
+      // ESPN MLB sometimes sends period.number as 0 or null.
+      // Fall back to parsing the displayValue e.g. "1st Inning" → 1
+      let periodNumber = play.period?.number || null;
+      if (!periodNumber && play.period?.displayValue) {
+        const match = play.period.displayValue.match(/(\d+)/);
+        if (match) periodNumber = parseInt(match[1], 10);
+      }
+
+      return {
+        id: play.id,
+        text: play.text,
+        clock: play.clock?.displayValue,
+        period: periodNumber,
+        periodText: play.period?.displayValue,
+        team: play.team?.abbreviation,
+        teamLogo: play.team?.logo || null,
+        teamColor: play.team?.color || null,
+        scoreValue: play.scoreValue,
+        scoringPlay: play.scoringPlay,
+        awayScore: play.awayScore,
+        homeScore: play.homeScore,
+        type: play.type?.text,
+      };
+    });
 
     const boxscore = data.boxscore || {};
     const teams = boxscore.teams || [];
@@ -95,6 +105,7 @@ export async function GET(request) {
       plays,
       teamStats,
       players,
+      sport,
       status: {
         type: status.type?.name,
         detail: status.type?.detail,

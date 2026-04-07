@@ -567,7 +567,13 @@ export default function GameRoom() {
                 const statGroup = teamPlayers.statistics?.[0];
                 if (!statGroup) return null;
                 const labels = statGroup.labels || [];
-                const keyStats = ['MIN','PTS','REB','AST','STL','BLK','FG','3PT','TO'];
+                const keyStats = sport === 'mlb'
+  ? ['AB','R','H','RBI','BB','SO','AVG']
+  : sport === 'nhl'
+  ? ['G','A','PTS','+/-','PIM','SOG']
+  : sport === 'nfl' || sport === 'ncaafb'
+  ? ['C/ATT','YDS','TD','INT','SACKS']
+  : ['MIN','PTS','REB','AST','STL','BLK','FG','3PT','TO'];
                 const keyIndices = keyStats.map(k => labels.indexOf(k)).filter(i => i >= 0);
                 const displayLabels = keyIndices.map(i => labels[i]);
                 return (
