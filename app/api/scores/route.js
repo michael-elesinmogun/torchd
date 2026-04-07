@@ -16,10 +16,10 @@ export async function GET(request) {
 
   // Force today's date for MLB (and all sports) so ESPN doesn't return
   // a different week's games. Format: YYYYMMDD
-  const today = new Date();
-  const dateStr = today.getFullYear().toString() +
-    String(today.getMonth() + 1).padStart(2, '0') +
-    String(today.getDate()).padStart(2, '0');
+  const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+const dateStr = today.getFullYear().toString() +
+  String(today.getMonth() + 1).padStart(2, '0') +
+  String(today.getDate()).padStart(2, '0');
 
   const url = `${base}?dates=${dateStr}`;
 
