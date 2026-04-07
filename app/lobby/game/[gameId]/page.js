@@ -61,7 +61,7 @@ export default function GameRoom() {
   const [plays, setPlays] = useState([]);
   const [gamcastLoading, setGamecastLoading] = useState(false);
   const [activePeriod, setActivePeriod] = useState('all');
-  const [activeStatsTab, setActiveStatsTab] = useState('plays');
+  const [activeStatsTab, setActiveStatsTab] = useState('chat');
   const [teamStats, setTeamStats] = useState([]);
   const [players, setPlayers] = useState([]);
   const [splitPct, setSplitPct] = useState(50);
@@ -547,10 +547,10 @@ export default function GameRoom() {
       {/* MOBILE: single column with chat as a tab */}
       <div className={styles.mobileLayout}>
         <div className={styles.mainStatsTabs}>
+          <button className={`${styles.mainStatsTab} ${activeStatsTab === 'chat' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('chat')}>💬 Chat</button>
           <button className={`${styles.mainStatsTab} ${activeStatsTab === 'plays' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('plays')}>▶ Plays</button>
           <button className={`${styles.mainStatsTab} ${activeStatsTab === 'team' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('team')}>📊 Team</button>
           <button className={`${styles.mainStatsTab} ${activeStatsTab === 'box' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('box')}>{getSportEmoji(sport)} Box</button>
-          <button className={`${styles.mainStatsTab} ${activeStatsTab === 'chat' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('chat')}>💬 Chat</button>
         </div>
 
         {activeStatsTab === 'plays' && <>
