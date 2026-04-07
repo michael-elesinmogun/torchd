@@ -1,3 +1,10 @@
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const gameId = searchParams.get('gameId');
@@ -28,47 +35,73 @@ export async function GET(request) {
 
     const headerPeriod = data.header?.competitions?.[0]?.status?.period || null;
 
-    const plays = (data.plays || []).slice(-200).reverse().map(play => {
+    const espnPlays = (data.plays || []).map(play => {
       let periodNumber = null;
 
-      // 1. period.number if positive
       if (play.period?.number && play.period.number > 0) {
         periodNumber = play.period.number;
       }
-
-      // 2. Parse digit from period.displayValue: "1st Inning", "Top 3rd Inning", etc.
       if (!periodNumber && play.period?.displayValue) {
         const m = play.period.displayValue.match(/(\d+)/);
         if (m) periodNumber = parseInt(m[1], 10);
       }
-
-      // 3. Parse digit from play.text for baseball e.g. "End of 2nd inning"
       if (!periodNumber && play.text) {
         const m = play.text.match(/(\d+)(?:st|nd|rd|th)\s+inning/i);
         if (m) periodNumber = parseInt(m[1], 10);
       }
-
-      // 4. Fall back to current game period from header
       if (!periodNumber && headerPeriod) {
         periodNumber = headerPeriod;
       }
 
       return {
-        id: play.id,
-        text: play.text,
-        clock: play.clock?.displayValue,
+        id: String(play.id),
+        game_id: gameId,
+        sport,
+        text: play.text || null,
+        clock: play.clock?.displayValue || null,
         period: periodNumber,
-        periodText: play.period?.displayValue,
-        team: play.team?.abbreviation,
-        teamLogo: play.team?.logo || null,
-        teamColor: play.team?.color || null,
-        scoreValue: play.scoreValue,
-        scoringPlay: play.scoringPlay,
-        awayScore: play.awayScore,
-        homeScore: play.homeScore,
-        type: play.type?.text,
+        period_text: play.period?.displayValue || null,
+        team: play.team?.abbreviation || null,
+        team_logo: play.team?.logo || null,
+        team_color: play.team?.color || null,
+        score_value: play.scoreValue || 0,
+        scoring_play: play.scoringPlay || false,
+        away_score: play.awayScore || 0,
+        home_score: play.homeScore || 0,
+        type: play.type?.text || null,
       };
     });
+
+    // Upsert all ESPN plays into Supabase (insert new, update existing)
+    if (espnPlays.length > 0) {
+      await supabaseAdmin
+        .from('game_plays')
+        .upsert(espnPlays, { onConflict: 'id,game_id', ignoreDuplicates: false });
+    }
+
+    // Fetch the full play history from Supabase (all innings)
+    const { data: allPlays } = await supabaseAdmin
+      .from('game_plays')
+      .select('*')
+      .eq('game_id', gameId)
+      .order('id', { ascending: false })
+      .limit(500);
+
+    const plays = (allPlays || []).map(p => ({
+      id: p.id,
+      text: p.text,
+      clock: p.clock,
+      period: p.period,
+      periodText: p.period_text,
+      team: p.team,
+      teamLogo: p.team_logo,
+      teamColor: p.team_color,
+      scoreValue: p.score_value,
+      scoringPlay: p.scoring_play,
+      awayScore: p.away_score,
+      homeScore: p.home_score,
+      type: p.type,
+    }));
 
     const boxscore = data.boxscore || {};
     const teams = boxscore.teams || [];

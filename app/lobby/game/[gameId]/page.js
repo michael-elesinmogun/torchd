@@ -250,18 +250,8 @@ export default function GameRoom() {
     try {
       const res = await fetch(`/api/gamecast?gameId=${espnId}&sport=${sport}`);
       const data = await res.json();
-      if (data.plays) {
-        if (!isRefresh) {
-          setPlays(data.plays);
-        } else {
-          setPlays(prev => {
-            const existingIds = new Set(prev.map(p => String(p.id)));
-            const newPlays = data.plays.filter(p => !existingIds.has(String(p.id)));
-            if (newPlays.length === 0) return prev;
-            return [...newPlays, ...prev];
-          });
-        }
-      }
+      // Route now returns full history from Supabase — always replace
+      if (data.plays) setPlays(data.plays);
       if (data.teamStats) setTeamStats(data.teamStats);
       if (data.players) setPlayers(data.players);
     } catch (e) {}
@@ -582,7 +572,6 @@ export default function GameRoom() {
                   ? ['C/ATT','YDS','TD','INT','SACKS']
                   : ['MIN','PTS','REB','AST','STL','BLK','FG','3PT','TO'];
                 const keyIndices = keyStats.map(k => labels.indexOf(k)).filter(i => i >= 0);
-                // If no key stats matched, show all labels
                 const finalIndices = keyIndices.length > 0 ? keyIndices : labels.map((_, i) => i).slice(0, 8);
                 const displayLabels = finalIndices.map(i => labels[i]);
                 return (
