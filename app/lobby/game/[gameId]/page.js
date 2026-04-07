@@ -250,7 +250,6 @@ export default function GameRoom() {
     try {
       const res = await fetch(`/api/gamecast?gameId=${espnId}&sport=${sport}`);
       const data = await res.json();
-      // Route now returns full history from Supabase — always replace
       if (data.plays) setPlays(data.plays);
       if (data.teamStats) setTeamStats(data.teamStats);
       if (data.players) setPlayers(data.players);
@@ -374,6 +373,88 @@ export default function GameRoom() {
 
   const live = game && isLive(game.status);
 
+  // The chat panel — shared between desktop sidebar and mobile tab
+  const chatPanel = (
+    <div className={styles.chatWrap} style={{width: `${100 - splitPct}%`}}>
+      <div className={styles.chatHeader}>
+        <div className={styles.colHeader}>
+          {game ? (
+            <span style={{display:'flex',alignItems:'center',gap:'6px'}}>
+              {game.away.logo && <img src={game.away.logo} style={{width:'18px',height:'18px',objectFit:'contain'}} alt={game.away.abbr} />}
+              <span>{game.away.abbr}</span>
+              <span style={{color:'#3D4A66',fontSize:'11px'}}>vs</span>
+              <span>{game.home.abbr}</span>
+              {game.home.logo && <img src={game.home.logo} style={{width:'18px',height:'18px',objectFit:'contain'}} alt={game.home.abbr} />}
+              <span style={{color:'#6B7A9E',fontFamily:'DM Sans',fontSize:'12px',fontWeight:400,marginLeft:'4px'}}>Live Chat</span>
+            </span>
+          ) : '💬 Live Chat'}
+        </div>
+        <div className={styles.chatOnline}>
+          <span className={styles.onlineDot}></span>
+          {onlineCount} watching
+        </div>
+      </div>
+
+      <div className={styles.messages}>
+        {loading ? (
+          <div className={styles.chatLoading}>Loading chat...</div>
+        ) : messages.length === 0 ? (
+          <div className={styles.chatEmpty}>
+            {game ? (
+              <div className={styles.chatEmptyLogos}>
+                {game.away.logo && <img src={game.away.logo} alt={game.away.abbr} className={styles.chatEmptyLogo} />}
+                <span className={styles.chatEmptyVs}>VS</span>
+                {game.home.logo && <img src={game.home.logo} alt={game.home.abbr} className={styles.chatEmptyLogo} />}
+              </div>
+            ) : <div className={styles.chatEmptyIcon}>💬</div>}
+            <div className={styles.chatEmptyTitle}>Be the first to react!</div>
+            <p className={styles.chatEmptySub}>{game ? `Chat with other ${game.away.abbr} and ${game.home.abbr} fans watching live.` : 'Chat with other fans.'}</p>
+          </div>
+        ) : messages.map((msg) => {
+          const isMe = user && msg.user_id === user.id;
+          const avatarColor = `hsl(${(msg.username?.charCodeAt(0) || 0) * 10 % 360}, 60%, 45%)`;
+          const msgReactions = reactions[msg.id] || {};
+          return (
+            <ChatMessage key={msg.id} msg={msg} isMe={isMe} avatarColor={avatarColor}
+              msgReactions={msgReactions} toggleReaction={toggleReaction}
+              user={user} REACTION_EMOJIS={REACTION_EMOJIS} styles={styles} formatTime={formatTime} />
+          );
+        })}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {user && (
+        <div className={styles.reactionsBar}>
+          {['🔥','😤','💀','🐐','😱','👑','🏀','💯'].map(emoji => (
+            <button key={emoji} className={styles.reactionBtn} onClick={() => {
+              setChatInput(prev => prev + emoji);
+              inputRef.current?.focus();
+            }}>{emoji}</button>
+          ))}
+        </div>
+      )}
+
+      <div className={styles.inputRow}>
+        {!authReady ? null : user ? (
+          <>
+            <input ref={inputRef} className={styles.input}
+              placeholder="Say something about the game..."
+              value={chatInput} onChange={e => setChatInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+              maxLength={300} />
+            <button className={styles.sendBtn} onClick={sendMessage} disabled={!chatInput.trim() || sending}>
+              {sending ? '...' : '↑'}
+            </button>
+          </>
+        ) : (
+          <div className={styles.loginPrompt}>
+            <Link href="/login" className={styles.loginLink}>Sign in</Link> to join the conversation
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <main className={styles.main}>
 
@@ -463,9 +544,156 @@ export default function GameRoom() {
         </div>
       )}
 
-      {/* Main layout */}
-      <div className={styles.mainContent} ref={containerRef}>
+      {/* MOBILE: single column with chat as a tab */}
+      <div className={styles.mobileLayout}>
+        <div className={styles.mainStatsTabs}>
+          <button className={`${styles.mainStatsTab} ${activeStatsTab === 'plays' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('plays')}>▶ Plays</button>
+          <button className={`${styles.mainStatsTab} ${activeStatsTab === 'team' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('team')}>📊 Team</button>
+          <button className={`${styles.mainStatsTab} ${activeStatsTab === 'box' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('box')}>{getSportEmoji(sport)} Box</button>
+          <button className={`${styles.mainStatsTab} ${activeStatsTab === 'chat' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('chat')}>💬 Chat</button>
+        </div>
 
+        {activeStatsTab === 'plays' && <>
+          {plays.length > 0 && (() => {
+            const periods = ['all', ...new Set(plays.map(p => p.period).filter(Boolean).sort((a,b) => a-b))];
+            return (
+              <div className={styles.periodTabs}>
+                {periods.map(p => (
+                  <button key={p} className={`${styles.periodTab} ${activePeriod === 'all' ? p === 'all' : Number(activePeriod) === Number(p) ? styles.periodTabActive : ''}`} onClick={() => setActivePeriod(p)}>
+                    {getPeriodLabel(sport, p)}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
+          <div className={styles.mobileScrollPane}>
+            {gamcastLoading ? (
+              <div className={styles.chatLoading}>Loading...</div>
+            ) : plays.length === 0 ? (
+              <div className={styles.chatEmpty}>
+                <div className={styles.chatEmptyIcon}>📊</div>
+                <div className={styles.chatEmptyTitle}>No plays yet</div>
+                <p className={styles.chatEmptySub}>Play-by-play appears here during the game.</p>
+              </div>
+            ) : plays.filter(p => activePeriod === 'all' || Number(p.period) === Number(activePeriod)).map((play, i) => {
+              let scoringClass = '';
+              if (play.scoringPlay) {
+                const prevPlayCheck = plays[i + 1];
+                const awayDiff = prevPlayCheck ? (play.awayScore - prevPlayCheck.awayScore) : 0;
+                const homeDiff = prevPlayCheck ? (play.homeScore - prevPlayCheck.homeScore) : 0;
+                if (awayDiff > 0) scoringClass = styles.playScoringAway;
+                else if (homeDiff > 0) scoringClass = styles.playScoringHome;
+                else scoringClass = styles.playScoring;
+              }
+              const awayColor = game?.away?.color ? `#${game.away.color}` : '#3B82F6';
+              const homeColor = game?.home?.color ? `#${game.home.color}` : '#10B981';
+              const prevPlay = plays[i + 1];
+              let scoringLogo = null;
+              if (play.scoringPlay && prevPlay) {
+                if (play.awayScore > prevPlay.awayScore) scoringLogo = game?.away?.logo;
+                else if (play.homeScore > prevPlay.homeScore) scoringLogo = game?.home?.logo;
+              }
+              return (
+                <div key={play.id || i} className={`${styles.play} ${scoringClass}`}
+                  style={{ animationDelay: `${Math.min(i, 10) * 80}ms`, '--away-color': awayColor, '--home-color': homeColor }}>
+                  <div className={styles.playHeader}>
+                    {scoringLogo && <img src={scoringLogo} alt="" className={styles.playTeamLogo} />}
+                    <div className={styles.playClock}>{play.clock} {play.periodText}</div>
+                  </div>
+                  <div className={styles.playText}>{play.text}</div>
+                  {play.scoringPlay && game && (
+                    <div className={styles.playScore}>
+                      <span className={styles.scoreTeamPill} style={{ background: `${awayColor}22`, border: `1px solid ${awayColor}55`, color: '#EEF2FF' }}>{game.away?.abbr} {play.awayScore}</span>
+                      <span style={{color:'#3D4A66',margin:'0 4px'}}>–</span>
+                      <span className={styles.scoreTeamPill} style={{ background: `${homeColor}22`, border: `1px solid ${homeColor}55`, color: '#EEF2FF' }}>{game.home?.abbr} {play.homeScore}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </>}
+
+        {activeStatsTab === 'team' && (
+          <div className={styles.mobileScrollPane}>
+            {teamStats.length === 0 ? <div className={styles.chatLoading}>Loading team stats...</div>
+            : teamStats.map(team => (
+              <div key={team.team} className={styles.teamStatsBlock}>
+                <div className={styles.teamStatsHeader}>
+                  {team.logo && <img src={team.logo} alt={team.team} className={styles.teamStatsLogo} />}
+                  <span className={styles.teamStatsName}>{team.name}</span>
+                </div>
+                <div className={styles.teamStatsGrid}>
+                  {team.statistics?.filter(s => ['FG','3PT','FT','REB','AST','TO','STL','BLK','PTS','R','H','E','LOB','HR','BB','SO'].includes(s.abbreviation)).map(stat => (
+                    <div key={stat.name} className={styles.teamStatItem}>
+                      <div className={styles.teamStatValue}>{stat.displayValue}</div>
+                      <div className={styles.teamStatLabel}>{stat.abbreviation || stat.label}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {activeStatsTab === 'box' && (
+          <div className={styles.mobileScrollPane}>
+            {players.length === 0 ? <div className={styles.chatLoading}>Loading box score...</div>
+            : players.map(teamPlayers => {
+              const statGroup = teamPlayers.statistics?.[0];
+              if (!statGroup) return null;
+              const labels = statGroup.labels || [];
+              const keyStats = sport === 'mlb'
+                ? ['AB','R','H','RBI','BB','SO','AVG']
+                : sport === 'nhl'
+                ? ['G','A','PTS','+/-','PIM','SOG']
+                : sport === 'nfl' || sport === 'ncaafb'
+                ? ['C/ATT','YDS','TD','INT','SACKS']
+                : ['MIN','PTS','REB','AST','STL','BLK','FG','3PT','TO'];
+              const keyIndices = keyStats.map(k => labels.indexOf(k)).filter(i => i >= 0);
+              const finalIndices = keyIndices.length > 0 ? keyIndices : labels.map((_, i) => i).slice(0, 8);
+              const displayLabels = finalIndices.map(i => labels[i]);
+              return (
+                <div key={teamPlayers.team} className={styles.boxScoreBlock}>
+                  <div className={styles.teamStatsHeader}>
+                    {teamPlayers.teamLogo && <img src={teamPlayers.teamLogo} alt={teamPlayers.team} className={styles.teamStatsLogo} />}
+                    <span className={styles.teamStatsName}>{teamPlayers.teamName}</span>
+                  </div>
+                  <div className={styles.boxScoreTable}>
+                    <div className={styles.boxScoreRow + ' ' + styles.boxScoreHeader}>
+                      <div className={styles.boxScorePlayer}>PLAYER</div>
+                      {displayLabels.map(l => <div key={l} className={styles.boxScoreStat}>{l}</div>)}
+                    </div>
+                    {statGroup.athletes?.map(athlete => (
+                      <div key={athlete.id} className={`${styles.boxScoreRow} ${athlete.starter ? styles.boxScoreStarter : ''} ${athlete.didNotPlay ? styles.boxScoreDNP : ''}`}>
+                        <div className={styles.boxScorePlayer}>
+                          <span className={styles.boxScoreJersey}>{athlete.jersey}</span>
+                          <span className={styles.boxScoreName}>{athlete.shortName}</span>
+                          <span className={styles.boxScorePos}>{athlete.position}</span>
+                        </div>
+                        {athlete.didNotPlay ? (
+                          <div className={styles.boxScoreDNPLabel} style={{flex:4,textAlign:'left',paddingLeft:'4px'}}>{athlete.reason || 'DNP'}</div>
+                        ) : finalIndices.map((ki, idx) => (
+                          <div key={idx} className={styles.boxScoreStat}>{athlete.stats?.[ki] || '—'}</div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {activeStatsTab === 'chat' && (
+          <div className={styles.mobileChatPane}>
+            {chatPanel}
+          </div>
+        )}
+      </div>
+
+      {/* DESKTOP: side-by-side split layout */}
+      <div className={styles.mainContent} ref={containerRef}>
         <div className={styles.gamecastCol} style={{width: `${splitPct}%`}}>
           <div className={styles.mainStatsTabs}>
             <button className={`${styles.mainStatsTab} ${activeStatsTab === 'plays' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('plays')}>▶ Plays</button>
@@ -611,85 +839,7 @@ export default function GameRoom() {
           <div className={styles.dividerHandle}></div>
         </div>
 
-        {/* Chat */}
-        <div className={styles.chatWrap} style={{width: `${100 - splitPct}%`}}>
-          <div className={styles.chatHeader}>
-            <div className={styles.colHeader}>
-              {game ? (
-                <span style={{display:'flex',alignItems:'center',gap:'6px'}}>
-                  {game.away.logo && <img src={game.away.logo} style={{width:'18px',height:'18px',objectFit:'contain'}} alt={game.away.abbr} />}
-                  <span>{game.away.abbr}</span>
-                  <span style={{color:'#3D4A66',fontSize:'11px'}}>vs</span>
-                  <span>{game.home.abbr}</span>
-                  {game.home.logo && <img src={game.home.logo} style={{width:'18px',height:'18px',objectFit:'contain'}} alt={game.home.abbr} />}
-                  <span style={{color:'#6B7A9E',fontFamily:'DM Sans',fontSize:'12px',fontWeight:400,marginLeft:'4px'}}>Live Chat</span>
-                </span>
-              ) : '💬 Live Chat'}
-            </div>
-            <div className={styles.chatOnline}>
-              <span className={styles.onlineDot}></span>
-              {onlineCount} watching
-            </div>
-          </div>
-
-          <div className={styles.messages}>
-            {loading ? (
-              <div className={styles.chatLoading}>Loading chat...</div>
-            ) : messages.length === 0 ? (
-              <div className={styles.chatEmpty}>
-                {game ? (
-                  <div className={styles.chatEmptyLogos}>
-                    {game.away.logo && <img src={game.away.logo} alt={game.away.abbr} className={styles.chatEmptyLogo} />}
-                    <span className={styles.chatEmptyVs}>VS</span>
-                    {game.home.logo && <img src={game.home.logo} alt={game.home.abbr} className={styles.chatEmptyLogo} />}
-                  </div>
-                ) : <div className={styles.chatEmptyIcon}>💬</div>}
-                <div className={styles.chatEmptyTitle}>Be the first to react!</div>
-                <p className={styles.chatEmptySub}>{game ? `Chat with other ${game.away.abbr} and ${game.home.abbr} fans watching live.` : 'Chat with other fans.'}</p>
-              </div>
-            ) : messages.map((msg) => {
-              const isMe = user && msg.user_id === user.id;
-              const avatarColor = `hsl(${(msg.username?.charCodeAt(0) || 0) * 10 % 360}, 60%, 45%)`;
-              const msgReactions = reactions[msg.id] || {};
-              return (
-                <ChatMessage key={msg.id} msg={msg} isMe={isMe} avatarColor={avatarColor}
-                  msgReactions={msgReactions} toggleReaction={toggleReaction}
-                  user={user} REACTION_EMOJIS={REACTION_EMOJIS} styles={styles} formatTime={formatTime} />
-              );
-            })}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {user && (
-            <div className={styles.reactionsBar}>
-              {['🔥','😤','💀','🐐','😱','👑','🏀','💯'].map(emoji => (
-                <button key={emoji} className={styles.reactionBtn} onClick={() => {
-                  setChatInput(prev => prev + emoji);
-                  inputRef.current?.focus();
-                }}>{emoji}</button>
-              ))}
-            </div>
-          )}
-
-          <div className={styles.inputRow}>
-            {!authReady ? null : user ? (
-              <>
-                <input ref={inputRef} className={styles.input}
-                  placeholder="Say something about the game..."
-                  value={chatInput} onChange={e => setChatInput(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                  maxLength={300} />
-                <button className={styles.sendBtn} onClick={sendMessage} disabled={!chatInput.trim() || sending}>
-                  {sending ? '...' : '↑'}
-                </button>
-              </>
-            ) : (
-              <div className={styles.loginPrompt}>
-                <Link href="/login" className={styles.loginLink}>Sign in</Link> to join the conversation
-              </div>
-            )}
-          </div>
-        </div>
+        {chatPanel}
       </div>
     </main>
   );

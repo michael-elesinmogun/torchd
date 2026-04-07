@@ -84,11 +84,15 @@
 }
 .debateBtn:hover { background: #60A5FA; }
 
-/* Show/hide debate button text on mobile */
 .debateBtnFull { display: inline; }
 .debateBtnShort { display: none; }
 
-/* TWO COLUMN LAYOUT */
+/* MOBILE layout — shown only on small screens */
+.mobileLayout {
+  display: none;
+}
+
+/* DESKTOP layout — shown only on large screens */
 .mainContent {
   flex: 1; display: flex;
   min-height: 0;
@@ -122,10 +126,6 @@
   flex-shrink: 0;
 }
 
-.chatTitle {
-  font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 800; color: #EEF2FF;
-}
-
 .chatOnline {
   display: flex; align-items: center; gap: 6px;
   font-size: 12px; color: #6B7A9E;
@@ -150,12 +150,6 @@
 .chatEmptyTitle { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 800; color: #EEF2FF; margin-bottom: 0.5rem; }
 .chatEmptySub { font-size: 13px; color: #6B7A9E; }
 
-.message {
-  display: flex; gap: 8px; align-items: flex-start;
-  padding: 0.25rem 0;
-  animation: msgIn 0.25s ease both;
-}
-
 .chatRow {
   display: flex; gap: 10px; align-items: flex-start;
   padding: 0.5rem 1rem;
@@ -170,8 +164,6 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-.messageMe { flex-direction: row-reverse; }
-
 .messageAvatar {
   width: 28px; height: 28px; border-radius: 50%;
   background: #3B82F6; display: flex; align-items: center; justify-content: center;
@@ -181,9 +173,7 @@
 
 .messageBody { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
 
-.messageUsername {
-  font-size: 11px; color: #6B7A9E; padding: 0 4px;
-}
+.messageUsername { font-size: 11px; color: #6B7A9E; padding: 0 4px; }
 
 .messageBubble {
   display: inline-block;
@@ -192,11 +182,8 @@
   line-height: 1.5; word-break: break-word; max-width: 100%;
 }
 
-.messageTime {
-  font-size: 10px; color: #3D4A66; padding: 0 4px;
-}
+.messageTime { font-size: 10px; color: #3D4A66; padding: 0 4px; }
 
-/* Input */
 .inputRow {
   display: flex; gap: 8px; padding: 1rem 0;
   border-top: 1px solid rgba(255,255,255,0.065);
@@ -221,8 +208,7 @@
 .sendBtn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .loginPrompt {
-  flex: 1; text-align: center; font-size: 14px; color: #6B7A9E;
-  padding: 10px;
+  flex: 1; text-align: center; font-size: 14px; color: #6B7A9E; padding: 10px;
 }
 .loginLink { color: #60A5FA; text-decoration: none; font-weight: 600; }
 .loginLink:hover { text-decoration: underline; }
@@ -247,45 +233,6 @@
 .joinCameraBtn:hover { background: #60A5FA; }
 .joinCameraBtn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-.cameraWrap {
-  border-bottom: 1px solid rgba(255,255,255,0.065);
-  position: relative; flex-shrink: 0; overflow: hidden;
-  display: flex; flex-direction: column;
-  will-change: height;
-}
-
-.cameraHeader {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0.75rem clamp(1rem, 4vw, 2rem);
-  font-size: 13px; font-weight: 600; color: #EEF2FF;
-  background: #0f1623;
-}
-
-.leaveCameraBtn {
-  font-size: 12px; color: #6B7A9E; background: none;
-  border: 1px solid rgba(255,255,255,0.065); border-radius: 6px;
-  padding: 5px 12px; cursor: pointer; font-family: 'DM Sans', sans-serif;
-  transition: all 0.2s;
-}
-.leaveCameraBtn:hover { color: #F87171; border-color: rgba(239,68,68,0.3); }
-
-.cameraFrame {
-  width: 100%; flex: 1; border: none; display: block;
-  background: #060912; min-height: 0;
-}
-
-/* TABS */
-.tabs { display: flex; gap: 4px; }
-
-.tab {
-  font-size: 13px; font-weight: 600; color: #6B7A9E;
-  background: none; border: none; border-bottom: 2px solid transparent;
-  padding: 8px 12px; cursor: pointer; transition: all 0.2s;
-  font-family: 'DM Sans', sans-serif;
-}
-.tab:hover { color: #EEF2FF; }
-.tabActive { color: #EEF2FF; border-bottom-color: #3B82F6; }
-
 /* GAMECAST */
 .gamecastWrap {
   flex: 1; overflow-y: auto; padding: 0;
@@ -300,7 +247,6 @@
   display: flex; flex-direction: column; gap: 4px;
   transition: background 0.15s;
   animation: playSlideIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-fill-mode: both;
 }
 
 @keyframes playSlideIn {
@@ -314,24 +260,18 @@
   border-left: 3px solid #3B82F6;
   padding-left: calc(1.25rem - 3px);
 }
-
 .playScoringAway {
   background: color-mix(in srgb, var(--away-color, #3B82F6) 8%, transparent) !important;
   border-left: 3px solid color-mix(in srgb, var(--away-color, #3B82F6) 70%, white);
   padding-left: calc(1.25rem - 3px);
 }
-
 .playScoringHome {
   background: color-mix(in srgb, var(--home-color, #10B981) 8%, transparent) !important;
   border-left: 3px solid color-mix(in srgb, var(--home-color, #10B981) 70%, white);
   padding-left: calc(1.25rem - 3px);
 }
 
-.playClock {
-  font-size: 10px; font-weight: 700; color: #3D4A66;
-  text-transform: uppercase; letter-spacing: 0.06em;
-}
-
+.playClock { font-size: 10px; font-weight: 700; color: #3D4A66; text-transform: uppercase; letter-spacing: 0.06em; }
 .playText { font-size: 13px; color: #C4CCDF; line-height: 1.55; }
 .playScoring .playText { color: #EEF2FF; font-weight: 500; }
 
@@ -356,15 +296,10 @@
   border-right: 1px solid rgba(255,255,255,0.065);
   cursor: col-resize;
   display: flex; align-items: center; justify-content: center;
-  transition: background 0.2s;
-  z-index: 10;
+  transition: background 0.2s; z-index: 10;
 }
 .divider:hover { background: rgba(59,130,246,0.15); }
-
-.dividerHandle {
-  width: 2px; height: 40px; border-radius: 2px;
-  background: rgba(255,255,255,0.15);
-}
+.dividerHandle { width: 2px; height: 40px; border-radius: 2px; background: rgba(255,255,255,0.15); }
 .divider:hover .dividerHandle { background: #3B82F6; }
 
 /* REACTIONS */
@@ -381,24 +316,6 @@
 }
 .reactionBtn:hover { background: #1c2840; border-color: rgba(59,130,246,0.22); transform: scale(1.15); }
 
-/* VERTICAL DRAG DIVIDER */
-.verticalDivider {
-  height: 8px; width: 100%; flex-shrink: 0;
-  background: rgba(255,255,255,0.04);
-  border-top: 1px solid rgba(255,255,255,0.065);
-  cursor: row-resize;
-  display: flex; align-items: center; justify-content: center;
-  transition: background 0.2s;
-  position: absolute; bottom: 0; left: 0; right: 0;
-}
-.verticalDivider:hover { background: rgba(59,130,246,0.15); }
-
-.verticalDividerHandle {
-  width: 40px; height: 2px; border-radius: 2px;
-  background: rgba(255,255,255,0.15);
-}
-.verticalDivider:hover .verticalDividerHandle { background: #3B82F6; }
-
 /* MESSAGE REACTIONS */
 .msgReactBtn {
   opacity: 0; position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%);
@@ -408,53 +325,40 @@
 }
 .msgReactBtn:hover { background: #253452; color: #EEF2FF; }
 
-.msgReactions {
-  display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px;
-}
+.msgReactions { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
 
 .msgReaction {
   display: inline-flex; align-items: center; gap: 3px;
   background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2);
   border-radius: 100px; padding: 2px 8px;
-  font-size: 12px; cursor: pointer; transition: all 0.15s;
-  color: #EEF2FF;
+  font-size: 12px; cursor: pointer; transition: all 0.15s; color: #EEF2FF;
 }
 .msgReaction:hover { background: rgba(59,130,246,0.2); }
 .msgReactionCount { font-size: 11px; color: #6B7A9E; }
 
 /* PLAY TEAM LOGO */
-.playHeader {
-  display: flex; align-items: center; gap: 6px;
-}
-
-.playTeamLogo {
-  width: 18px; height: 18px; object-fit: contain; flex-shrink: 0;
-}
+.playHeader { display: flex; align-items: center; gap: 6px; }
+.playTeamLogo { width: 18px; height: 18px; object-fit: contain; flex-shrink: 0; }
 
 /* CHAT EMPTY LOGOS */
 .chatEmptyLogos {
   display: flex; align-items: center; justify-content: center;
   gap: 1rem; margin-bottom: 0.75rem;
 }
-
 .chatEmptyLogo {
   width: 56px; height: 56px; object-fit: contain;
   filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4));
 }
-
 .chatEmptyVs {
   font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 800;
-  color: #3D4A66; background: #151e2e; border-radius: 6px;
-  padding: 4px 8px;
+  color: #3D4A66; background: #151e2e; border-radius: 6px; padding: 4px 8px;
 }
 
 /* PERIOD TABS */
 .periodTabs {
   display: flex; gap: 4px; padding: 0.5rem 1rem;
   border-bottom: 1px solid rgba(255,255,255,0.065);
-  flex-shrink: 0;
-  overflow-x: auto;
-  flex-wrap: nowrap;
+  flex-shrink: 0; overflow-x: auto; flex-wrap: nowrap;
   scrollbar-width: none;
 }
 .periodTabs::-webkit-scrollbar { display: none; }
@@ -464,14 +368,10 @@
   color: #6B7A9E; background: none;
   border: 1px solid rgba(255,255,255,0.065);
   border-radius: 6px; padding: 4px 10px;
-  cursor: pointer; transition: all 0.15s;
-  flex-shrink: 0;
+  cursor: pointer; transition: all 0.15s; flex-shrink: 0;
 }
 .periodTab:hover { color: #EEF2FF; border-color: rgba(59,130,246,0.3); }
-.periodTabActive {
-  color: #EEF2FF; background: #3B82F6;
-  border-color: #3B82F6;
-}
+.periodTabActive { color: #EEF2FF; background: #3B82F6; border-color: #3B82F6; }
 
 /* MAIN STATS TABS */
 .mainStatsTabs {
@@ -483,8 +383,7 @@
   flex: 1; font-size: 12px; font-weight: 700; color: #6B7A9E;
   background: none; border: none; border-bottom: 2px solid transparent;
   padding: 0.75rem 0.5rem; cursor: pointer; transition: all 0.2s;
-  font-family: 'DM Sans', sans-serif;
-  white-space: nowrap;
+  font-family: 'DM Sans', sans-serif; white-space: nowrap;
 }
 .mainStatsTab:hover { color: #EEF2FF; }
 .mainStatsTabActive { color: #EEF2FF; border-bottom-color: #3B82F6; }
@@ -494,31 +393,17 @@
   padding: 1rem 1.25rem;
   border-bottom: 1px solid rgba(255,255,255,0.065);
 }
-
-.teamStatsHeader {
-  display: flex; align-items: center; gap: 8px; margin-bottom: 0.875rem;
-}
-
+.teamStatsHeader { display: flex; align-items: center; gap: 8px; margin-bottom: 0.875rem; }
 .teamStatsLogo { width: 24px; height: 24px; object-fit: contain; }
-.teamStatsName {
-  font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 800; color: #EEF2FF;
-}
-
-.teamStatsGrid {
-  display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem;
-}
-
+.teamStatsName { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 800; color: #EEF2FF; }
+.teamStatsGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
 .teamStatItem { text-align: center; }
-.teamStatValue {
-  font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 800; color: #EEF2FF;
-}
+.teamStatValue { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 800; color: #EEF2FF; }
 .teamStatLabel { font-size: 10px; color: #6B7A9E; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 1px; }
 
 /* BOX SCORE */
 .boxScoreBlock { padding: 0.75rem 0; }
-
 .boxScoreTable { width: 100%; }
-
 .boxScoreRow {
   display: flex; align-items: center;
   padding: 5px 1.25rem; gap: 4px;
@@ -530,21 +415,13 @@
   border-bottom: 1px solid rgba(255,255,255,0.065) !important;
   position: sticky; top: 0; z-index: 2;
 }
-.boxScoreStarter { }
-
-.boxScorePlayer {
-  flex: 2; display: flex; align-items: center; gap: 5px; min-width: 0;
-}
+.boxScorePlayer { flex: 2; display: flex; align-items: center; gap: 5px; min-width: 0; }
 .boxScoreJersey { font-size: 10px; color: #3D4A66; width: 16px; flex-shrink: 0; }
 .boxScoreName { font-size: 12px; color: #EEF2FF; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .boxScorePos { font-size: 10px; color: #3D4A66; flex-shrink: 0; }
 .boxScoreHeader .boxScorePlayer { font-size: 10px; color: #6B7A9E; font-weight: 700; }
-
-.boxScoreStat {
-  flex: 1; text-align: center; font-size: 12px; color: #C4CCDF; min-width: 28px;
-}
+.boxScoreStat { flex: 1; text-align: center; font-size: 12px; color: #C4CCDF; min-width: 28px; }
 .boxScoreHeader .boxScoreStat { font-size: 10px; color: #6B7A9E; font-weight: 700; }
-
 .boxScoreDNP { opacity: 0.45; }
 .boxScoreDNPLabel { font-size: 11px; color: #3D4A66; font-style: italic; }
 
@@ -568,9 +445,7 @@
   }
 
   .backBtn { font-size: 12px; }
-
   .scoreBoard { gap: 0.75rem; flex: 1; }
-
   .teamLogo { width: 26px; height: 26px; }
   .teamAbbr { font-size: 12px; }
   .score { font-size: 20px; }
@@ -579,8 +454,7 @@
   .gameName { font-size: 11px; }
   .gameBroadcast { display: none; }
 
-  /* Debate button: show just the emoji on mobile */
-  .debateBtn { padding: 8px 10px; font-size: 16px; }
+  .debateBtn { padding: 8px 10px; font-size: 13px; }
   .debateBtnFull { display: none; }
   .debateBtnShort { display: inline; }
 
@@ -592,36 +466,41 @@
   .cameraBarText { font-size: 12px; }
   .joinCameraBtn { font-size: 12px; padding: 7px 12px; }
 
-  /* Stack the split pane vertically */
-  .mainContent {
+  /* Show mobile layout, hide desktop */
+  .mobileLayout {
+    display: flex;
     flex-direction: column;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .mainContent {
+    display: none !important;
+  }
+
+  /* Mobile scroll pane for plays/team/box */
+  .mobileScrollPane {
+    flex: 1;
     overflow-y: auto;
-    overflow-x: hidden;
-    height: auto;
-    min-height: 0;
-    flex: none;
+    height: calc(100vh - 280px);
+    scrollbar-width: thin;
+    scrollbar-color: #1c2840 transparent;
   }
 
-  .gamecastCol {
-    width: 100% !important;
-    height: 420px;
+  /* Mobile chat pane fills remaining space */
+  .mobileChatPane {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
     min-height: 0;
-    flex-shrink: 0;
-    border-bottom: 1px solid rgba(255,255,255,0.065);
+    height: calc(100vh - 220px);
   }
 
-  /* Hide the horizontal drag divider on mobile */
-  .divider { display: none; }
-
-  /* Chat: fixed height, pad bottom so input isn't cut off */
-  .chatWrap {
+  .mobileChatPane .chatWrap {
     width: 100% !important;
-    height: 420px;
-    min-height: 0;
-    flex-shrink: 0;
+    flex: 1;
     padding: 0 1rem;
     padding-bottom: env(safe-area-inset-bottom, 0px);
-    border-top: none;
   }
 
   .play { padding: 0.625rem 1rem; }
@@ -630,4 +509,5 @@
   .boxScoreRow { padding: 5px 1rem; min-width: 360px; }
 
   .reactionBtn { padding: 4px 7px; font-size: 15px; }
+  .divider { display: none !important; }
 }
