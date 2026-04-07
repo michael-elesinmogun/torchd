@@ -22,6 +22,16 @@ function formatTime(dateStr) {
   return new Date(dateStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 }
 
+function getPeriodLabel(sport, p) {
+  if (p === 'all') return 'All';
+  const n = Number(p);
+  if (sport === 'mlb') return `Inn ${n}`;
+  if (sport === 'nhl') return n <= 3 ? `P${n}` : `OT${n - 3}`;
+  if (sport === 'nba' || sport === 'wnba') return n <= 4 ? `Q${n}` : `OT${n - 4}`;
+  if (sport === 'nfl' || sport === 'ncaafb') return n <= 4 ? `Q${n}` : `OT${n - 4}`;
+  return n <= 4 ? `Q${n}` : `OT${n - 4}`;
+}
+
 export default function GameRoom() {
   const params = useParams();
   const gameId = params?.gameId;
@@ -94,10 +104,8 @@ export default function GameRoom() {
     if (!user) return;
     setCameraError('');
     setCreatingRoom(true);
-
     try {
       const roomNameForGame = `torchd-game-${gameId}`.replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 60);
-
       const tokenRes = await fetch('/api/livekit-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -111,11 +119,9 @@ export default function GameRoom() {
       if (tokenError) throw new Error(tokenError);
 
       const { Room, RoomEvent, Track } = await import('livekit-client');
-
       if (liveKitRoomRef.current) {
         try { await liveKitRoomRef.current.disconnect(); } catch {}
       }
-
       const room = new Room({ adaptiveStream: true, dynacast: true });
       liveKitRoomRef.current = room;
       liveKitRoomObjectRef.current = { room, Track };
@@ -164,9 +170,7 @@ export default function GameRoom() {
       await room.localParticipant.setMicrophoneEnabled(true);
       isCamEnabledRef.current = true;
       setIsCamEnabled(true);
-
       setCameraOn(true);
-
     } catch (err) {
       console.error('Watch party join error:', err);
       setCameraError('Could not join: ' + err.message);
@@ -203,9 +207,7 @@ export default function GameRoom() {
     const enabled = !isCamEnabled;
     isCamEnabledRef.current = enabled;
     setIsCamEnabled(enabled);
-
     await liveKitRoomRef.current.localParticipant.setCameraEnabled(enabled);
-
     if (!enabled) {
       if (localVideoRef.current) {
         localVideoRef.current.style.display = 'none';
@@ -409,7 +411,10 @@ export default function GameRoom() {
         ) : (
           <div className={styles.scoreBoardLoading}>Loading game...</div>
         )}
-        <Link href="/battle/start" className={styles.debateBtn}>⚔️ Start a debate</Link>
+        <Link href="/battle/start" className={styles.debateBtn}>
+          <span className={styles.debateBtnFull}>⚔️ Start a debate</span>
+          <span className={styles.debateBtnShort}>⚔️</span>
+        </Link>
       </div>
 
       {/* Watch Party */}
@@ -478,7 +483,7 @@ export default function GameRoom() {
                 <div className={styles.periodTabs}>
                   {periods.map(p => (
                     <button key={p} className={`${styles.periodTab} ${activePeriod === p ? styles.periodTabActive : ''}`} onClick={() => setActivePeriod(p)}>
-                      {p === 'all' ? 'All' : p <= 4 ? `Q${p}` : `OT${p - 4}`}
+                      {getPeriodLabel(sport, p)}
                     </button>
                   ))}
                 </div>

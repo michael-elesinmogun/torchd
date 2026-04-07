@@ -84,6 +84,10 @@
 }
 .debateBtn:hover { background: #60A5FA; }
 
+/* Show/hide debate button text on mobile */
+.debateBtnFull { display: inline; }
+.debateBtnShort { display: none; }
+
 /* TWO COLUMN LAYOUT */
 .mainContent {
   flex: 1; display: flex;
@@ -549,7 +553,6 @@
    ============================================================ */
 @media (max-width: 768px) {
 
-  /* Allow full page to scroll on mobile instead of fixed viewport */
   .main {
     height: auto;
     min-height: 100vh;
@@ -557,7 +560,6 @@
     overflow-y: auto;
   }
 
-  /* Score header: tighten up, no wrapping chaos */
   .scoreHeader {
     padding: 0.625rem 1rem;
     gap: 0.5rem;
@@ -565,50 +567,30 @@
     align-items: center;
   }
 
-  .backBtn {
-    font-size: 12px;
-  }
+  .backBtn { font-size: 12px; }
 
-  .scoreBoard {
-    gap: 0.75rem;
-    flex: 1;
-  }
+  .scoreBoard { gap: 0.75rem; flex: 1; }
 
   .teamLogo { width: 26px; height: 26px; }
-
   .teamAbbr { font-size: 12px; }
-
   .score { font-size: 20px; }
-
   .gameInfo { flex: 1; }
-
   .gameStatus { font-size: 11px; }
-
   .gameName { font-size: 11px; }
-
   .gameBroadcast { display: none; }
 
-  /* Make debate button compact icon-style on mobile */
-  .debateBtn {
-    font-size: 11px;
-    padding: 6px 10px;
-  }
+  /* Debate button: show just the emoji on mobile */
+  .debateBtn { padding: 8px 10px; font-size: 16px; }
+  .debateBtnFull { display: none; }
+  .debateBtnShort { display: inline; }
 
-  /* Watch party bar: single line, no wrap */
   .cameraBar {
     flex-wrap: nowrap;
     padding: 0.625rem 1rem;
     gap: 0.75rem;
   }
-
-  .cameraBarText {
-    font-size: 12px;
-  }
-
-  .joinCameraBtn {
-    font-size: 12px;
-    padding: 7px 12px;
-  }
+  .cameraBarText { font-size: 12px; }
+  .joinCameraBtn { font-size: 12px; padding: 7px 12px; }
 
   /* Stack the split pane vertically */
   .mainContent {
@@ -620,7 +602,6 @@
     flex: none;
   }
 
-  /* Gamecast takes fixed height so it doesn't crush chat */
   .gamecastCol {
     width: 100% !important;
     height: 420px;
@@ -630,39 +611,23 @@
   }
 
   /* Hide the horizontal drag divider on mobile */
-  .divider {
-    display: none;
-  }
+  .divider { display: none; }
 
-  /* Chat takes fixed height below gamecast */
+  /* Chat: fixed height, pad bottom so input isn't cut off */
   .chatWrap {
     width: 100% !important;
-    height: 380px;
+    height: 420px;
     min-height: 0;
     flex-shrink: 0;
     padding: 0 1rem;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
     border-top: none;
   }
 
-  /* Plays tab: tighten padding */
-  .play {
-    padding: 0.625rem 1rem;
-  }
+  .play { padding: 0.625rem 1rem; }
 
-  /* Box score: allow horizontal scroll for stat columns */
-  .boxScoreTable {
-    overflow-x: auto;
-    display: block;
-  }
+  .boxScoreTable { overflow-x: auto; display: block; }
+  .boxScoreRow { padding: 5px 1rem; min-width: 360px; }
 
-  .boxScoreRow {
-    padding: 5px 1rem;
-    min-width: 360px;
-  }
-
-  /* Watch party tiles: slightly smaller */
-  .reactionBtn {
-    padding: 4px 7px;
-    font-size: 15px;
-  }
+  .reactionBtn { padding: 4px 7px; font-size: 15px; }
 }
