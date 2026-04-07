@@ -34,6 +34,7 @@ export default function GameRoom() {
 
   const [game, setGame] = useState(null);
   const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
   const [profile, setProfile] = useState(null);
   const [messages, setMessages] = useState([]);
   const [chatInput, setChatInput] = useState('');
@@ -62,11 +63,11 @@ export default function GameRoom() {
   const localTrackRef = useRef(null);
   const audioElementsRef = useRef({});
   const liveKitRoomObjectRef = useRef(null);
-  const isCamEnabledRef = useRef(true); // ref so closures always see current value
+  const isCamEnabledRef = useRef(true);
 
   function attachLocalVideo(track) {
     if (!track?.mediaStreamTrack || !localVideoRef.current) return;
-    if (!isCamEnabledRef.current) return; // don't show if cam is toggled off
+    if (!isCamEnabledRef.current) return;
     try {
       localTrackRef.current = track;
       localVideoRef.current.srcObject = new MediaStream([track.mediaStreamTrack]);
@@ -74,7 +75,6 @@ export default function GameRoom() {
     } catch (e) {}
   }
 
-  // After cameraOn becomes true, retry attaching local video
   useEffect(() => {
     if (!cameraOn) return;
     const tryAttach = () => {
@@ -165,8 +165,6 @@ export default function GameRoom() {
       isCamEnabledRef.current = true;
       setIsCamEnabled(true);
 
-      // Set cameraOn first so React renders the video element,
-      // then the useEffect retry will attach the track
       setCameraOn(true);
 
     } catch (err) {
@@ -209,13 +207,11 @@ export default function GameRoom() {
     await liveKitRoomRef.current.localParticipant.setCameraEnabled(enabled);
 
     if (!enabled) {
-      // Hide local video immediately
       if (localVideoRef.current) {
         localVideoRef.current.style.display = 'none';
         localVideoRef.current.srcObject = null;
       }
     } else if (Track) {
-      // Re-enable — re-attach once track is ready
       const tryReattach = () => {
         const camPub = liveKitRoomRef.current?.localParticipant.getTrackPublication(Track.Source.Camera);
         if (camPub?.track?.mediaStreamTrack && localVideoRef.current) {
@@ -288,15 +284,38 @@ export default function GameRoom() {
   useEffect(() => {
     if (!gameId) return;
     async function init() {
-      const { data: { session } } = await supabase.auth.getSession();
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      if (currentUser) {
-        const { data: profileData } = await supabase
-          .from('profiles').select('username, full_name')
-          .eq('id', currentUser.id).single();
-        setProfile(profileData);
-      }
+      const profileLoadedRef_local = { current: false };
+
+      supabase.auth.onAuthStateChange((_event, session) => {
+        if (!profileLoadedRef_local.current) {
+          profileLoadedRef_local.current = true;
+          const currentUser = session?.user ?? null;
+          setUser(currentUser);
+          setAuthReady(true);
+          if (currentUser) {
+            supabase.from('profiles').select('username, full_name')
+              .eq('id', currentUser.id).single()
+              .then(({ data }) => setProfile(data));
+          }
+        }
+      });
+
+      setTimeout(() => {
+        if (!profileLoadedRef_local.current) {
+          profileLoadedRef_local.current = true;
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            const currentUser = session?.user ?? null;
+            setUser(currentUser);
+            setAuthReady(true);
+            if (currentUser) {
+              supabase.from('profiles').select('username, full_name')
+                .eq('id', currentUser.id).single()
+                .then(({ data }) => setProfile(data));
+            }
+          });
+        }
+      }, 1000);
+
       await fetchGame();
       const { data: existingMessages } = await supabase
         .from('game_chats').select('*')
@@ -409,14 +428,14 @@ export default function GameRoom() {
           </div>
           <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
             <div style={{ position: 'relative', flexShrink: 0 }}>
-  {isCamEnabled ? (
-    <video ref={localVideoRef} autoPlay muted playsInline
-      style={{ width: '140px', height: '100px', objectFit: 'cover', borderRadius: '10px', background: '#111', border: '2px solid rgba(59,130,246,0.4)', transform: 'scaleX(-1)', display: 'none' }} />
-  ) : (
-    <div style={{ width: '140px', height: '100px', borderRadius: '10px', background: '#111', border: '2px solid rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>🚫</div>
-  )}
-  <div style={{ position: 'absolute', bottom: '4px', left: '6px', fontSize: '10px', color: 'white', background: 'rgba(0,0,0,0.6)', borderRadius: '4px', padding: '1px 5px' }}>You</div>
-</div>
+              {isCamEnabled ? (
+                <video ref={localVideoRef} autoPlay muted playsInline
+                  style={{ width: '140px', height: '100px', objectFit: 'cover', borderRadius: '10px', background: '#111', border: '2px solid rgba(59,130,246,0.4)', transform: 'scaleX(-1)', display: 'none' }} />
+              ) : (
+                <div style={{ width: '140px', height: '100px', borderRadius: '10px', background: '#111', border: '2px solid rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>🚫</div>
+              )}
+              <div style={{ position: 'absolute', bottom: '4px', left: '6px', fontSize: '10px', color: 'white', background: 'rgba(0,0,0,0.6)', borderRadius: '4px', padding: '1px 5px' }}>You</div>
+            </div>
             {remoteTracks.map(({ track, participant }) => (
               <RemoteVideoTile key={track.sid} track={track} name={participant.identity} />
             ))}
@@ -432,7 +451,7 @@ export default function GameRoom() {
         <div className={styles.cameraBar}>
           <div className={styles.cameraBarText}>📹 Watch party — react on camera with other fans watching live.</div>
           {cameraError && <div style={{ fontSize: '12px', color: '#F87171', marginRight: '8px' }}>{cameraError}</div>}
-          {user ? (
+          {!authReady ? null : user ? (
             <button className={styles.joinCameraBtn} onClick={joinCamera} disabled={creatingRoom}>
               {creatingRoom ? 'Setting up...' : '🎥 Join watch party'}
             </button>
@@ -644,7 +663,7 @@ export default function GameRoom() {
           )}
 
           <div className={styles.inputRow}>
-            {user ? (
+            {!authReady ? null : user ? (
               <>
                 <input ref={inputRef} className={styles.input}
                   placeholder="Say something about the game..."
