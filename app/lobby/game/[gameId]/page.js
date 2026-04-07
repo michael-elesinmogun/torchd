@@ -61,6 +61,7 @@ export default function GameRoom() {
   const localVideoRef = useRef(null);
   const localTrackRef = useRef(null);
   const audioElementsRef = useRef({});
+  const liveKitRoomObjectRef = useRef(null); // keep room + Track in scope for retries
 
   function attachLocalVideo(track) {
     if (!track?.mediaStreamTrack || !localVideoRef.current) return;
@@ -71,16 +72,31 @@ export default function GameRoom() {
     } catch (e) {}
   }
 
+  // After cameraOn becomes true, retry attaching local video
+  // (video element doesn't exist in DOM until cameraOn=true)
+  useEffect(() => {
+    if (!cameraOn) return;
+    const tryAttach = () => {
+      const { room, Track } = liveKitRoomObjectRef.current || {};
+      if (!room || !Track) return;
+      const camPub = room.localParticipant.getTrackPublication(Track.Source.Camera);
+      if (camPub?.track) attachLocalVideo(camPub.track);
+    };
+    tryAttach();
+    const t1 = setTimeout(tryAttach, 200);
+    const t2 = setTimeout(tryAttach, 700);
+    const t3 = setTimeout(tryAttach, 1500);
+    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3); };
+  }, [cameraOn]);
+
   async function joinCamera() {
     if (!user) return;
     setCameraError('');
     setCreatingRoom(true);
 
     try {
-      // Always create a fresh room name based on gameId
       const roomNameForGame = `torchd-game-${gameId}`.replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 60);
 
-      // Get token — room auto-creates on join in LiveKit
       const tokenRes = await fetch('/api/livekit-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -101,12 +117,12 @@ export default function GameRoom() {
 
       const room = new Room({ adaptiveStream: true, dynacast: true });
       liveKitRoomRef.current = room;
+      liveKitRoomObjectRef.current = { room, Track };
 
       room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
         if (track.kind === Track.Kind.Video) {
           setRemoteTracks(prev => [...prev, { track, participant }]);
         }
-        // Attach audio directly to DOM audio element
         if (track.kind === Track.Kind.Audio) {
           const audioEl = document.createElement('audio');
           audioEl.autoplay = true;
@@ -121,7 +137,6 @@ export default function GameRoom() {
         if (track.kind === Track.Kind.Video) {
           setRemoteTracks(prev => prev.filter(t => t.track !== track));
         }
-        // Remove audio element
         if (track.kind === Track.Kind.Audio && audioElementsRef.current[track.sid]) {
           audioElementsRef.current[track.sid].remove();
           delete audioElementsRef.current[track.sid];
@@ -133,13 +148,13 @@ export default function GameRoom() {
         setRemoteTracks([]);
         localTrackRef.current = null;
         if (localVideoRef.current) localVideoRef.current.srcObject = null;
-        // Clean up audio elements
         Object.values(audioElementsRef.current).forEach(el => el.remove());
         audioElementsRef.current = {};
       });
 
       room.on(RoomEvent.LocalTrackPublished, (publication) => {
         if (publication.source === Track.Source.Camera) {
+          // Try attaching — if video element isn't mounted yet, the useEffect retry will catch it
           attachLocalVideo(publication.track);
         }
       });
@@ -148,15 +163,10 @@ export default function GameRoom() {
       await room.localParticipant.setCameraEnabled(true);
       await room.localParticipant.setMicrophoneEnabled(true);
 
-      const tryAttach = () => {
-        const camPub = room.localParticipant.getTrackPublication(Track.Source.Camera);
-        if (camPub?.track) attachLocalVideo(camPub.track);
-      };
-      tryAttach();
-      setTimeout(tryAttach, 500);
-      setTimeout(tryAttach, 1500);
-
+      // Set cameraOn FIRST so React renders the video element,
+      // then the useEffect above will retry attaching the track
       setCameraOn(true);
+
     } catch (err) {
       console.error('Watch party join error:', err);
       setCameraError('Could not join: ' + err.message);
@@ -169,11 +179,11 @@ export default function GameRoom() {
       try { await liveKitRoomRef.current.disconnect(); } catch {}
       liveKitRoomRef.current = null;
     }
+    liveKitRoomObjectRef.current = null;
     setCameraOn(false);
     setRemoteTracks([]);
     localTrackRef.current = null;
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
-    // Clean up audio elements
     Object.values(audioElementsRef.current).forEach(el => el.remove());
     audioElementsRef.current = {};
   }
@@ -374,9 +384,13 @@ export default function GameRoom() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+            {/* Local video — always rendered when cameraOn=true */}
             <div style={{ position: 'relative', flexShrink: 0 }}>
-              <video ref={localVideoRef} autoPlay muted playsInline
-                style={{ width: '140px', height: '100px', objectFit: 'cover', borderRadius: '10px', background: '#111', border: '2px solid rgba(59,130,246,0.4)', transform: 'scaleX(-1)', display: 'none' }} />
+              <video
+                ref={localVideoRef}
+                autoPlay muted playsInline
+                style={{ width: '140px', height: '100px', objectFit: 'cover', borderRadius: '10px', background: '#111', border: '2px solid rgba(59,130,246,0.4)', transform: 'scaleX(-1)', display: 'none' }}
+              />
               <div style={{ position: 'absolute', bottom: '4px', left: '6px', fontSize: '10px', color: 'white', background: 'rgba(0,0,0,0.6)', borderRadius: '4px', padding: '1px 5px' }}>You</div>
             </div>
             {remoteTracks.map(({ track, participant }) => (
