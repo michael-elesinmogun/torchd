@@ -61,10 +61,12 @@ export default function GameRoom() {
   const localVideoRef = useRef(null);
   const localTrackRef = useRef(null);
   const audioElementsRef = useRef({});
-  const liveKitRoomObjectRef = useRef(null); // keep room + Track in scope for retries
+  const liveKitRoomObjectRef = useRef(null);
+  const isCamEnabledRef = useRef(true); // ref so closures always see current value
 
   function attachLocalVideo(track) {
     if (!track?.mediaStreamTrack || !localVideoRef.current) return;
+    if (!isCamEnabledRef.current) return; // don't show if cam is toggled off
     try {
       localTrackRef.current = track;
       localVideoRef.current.srcObject = new MediaStream([track.mediaStreamTrack]);
@@ -73,7 +75,6 @@ export default function GameRoom() {
   }
 
   // After cameraOn becomes true, retry attaching local video
-  // (video element doesn't exist in DOM until cameraOn=true)
   useEffect(() => {
     if (!cameraOn) return;
     const tryAttach = () => {
@@ -143,6 +144,12 @@ export default function GameRoom() {
         }
       });
 
+      room.on(RoomEvent.LocalTrackPublished, (publication) => {
+        if (publication.source === Track.Source.Camera) {
+          attachLocalVideo(publication.track);
+        }
+      });
+
       room.on(RoomEvent.Disconnected, () => {
         setCameraOn(false);
         setRemoteTracks([]);
@@ -152,19 +159,14 @@ export default function GameRoom() {
         audioElementsRef.current = {};
       });
 
-      room.on(RoomEvent.LocalTrackPublished, (publication) => {
-        if (publication.source === Track.Source.Camera) {
-          // Try attaching — if video element isn't mounted yet, the useEffect retry will catch it
-          attachLocalVideo(publication.track);
-        }
-      });
-
       await room.connect('wss://torchd-kub6j4c8.livekit.cloud', token);
       await room.localParticipant.setCameraEnabled(true);
       await room.localParticipant.setMicrophoneEnabled(true);
+      isCamEnabledRef.current = true;
+      setIsCamEnabled(true);
 
-      // Set cameraOn FIRST so React renders the video element,
-      // then the useEffect above will retry attaching the track
+      // Set cameraOn first so React renders the video element,
+      // then the useEffect retry will attach the track
       setCameraOn(true);
 
     } catch (err) {
@@ -183,6 +185,8 @@ export default function GameRoom() {
     setCameraOn(false);
     setRemoteTracks([]);
     localTrackRef.current = null;
+    isCamEnabledRef.current = true;
+    setIsCamEnabled(true);
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     Object.values(audioElementsRef.current).forEach(el => el.remove());
     audioElementsRef.current = {};
@@ -197,9 +201,32 @@ export default function GameRoom() {
 
   async function toggleCam() {
     if (!liveKitRoomRef.current) return;
+    const { Track } = liveKitRoomObjectRef.current || {};
     const enabled = !isCamEnabled;
-    await liveKitRoomRef.current.localParticipant.setCameraEnabled(enabled);
+    isCamEnabledRef.current = enabled;
     setIsCamEnabled(enabled);
+
+    await liveKitRoomRef.current.localParticipant.setCameraEnabled(enabled);
+
+    if (!enabled) {
+      // Hide local video immediately
+      if (localVideoRef.current) {
+        localVideoRef.current.style.display = 'none';
+        localVideoRef.current.srcObject = null;
+      }
+    } else if (Track) {
+      // Re-enable — re-attach once track is ready
+      const tryReattach = () => {
+        const camPub = liveKitRoomRef.current?.localParticipant.getTrackPublication(Track.Source.Camera);
+        if (camPub?.track?.mediaStreamTrack && localVideoRef.current) {
+          localVideoRef.current.srcObject = new MediaStream([camPub.track.mediaStreamTrack]);
+          localVideoRef.current.style.display = 'block';
+        }
+      };
+      setTimeout(tryReattach, 300);
+      setTimeout(tryReattach, 800);
+      setTimeout(tryReattach, 1500);
+    }
   }
 
   async function fetchGame() {
@@ -368,10 +395,7 @@ export default function GameRoom() {
 
       {/* Watch Party */}
       {cameraOn ? (
-        <div style={{
-          background: '#060912', borderBottom: '1px solid rgba(255,255,255,0.065)',
-          padding: '12px 16px',
-        }}>
+        <div style={{ background: '#060912', borderBottom: '1px solid rgba(255,255,255,0.065)', padding: '12px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '13px', fontWeight: 700, color: '#EEF2FF', fontFamily: 'Syne,sans-serif' }}>📹 Watch Party</span>
@@ -384,13 +408,12 @@ export default function GameRoom() {
             </div>
           </div>
           <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
-            {/* Local video — always rendered when cameraOn=true */}
             <div style={{ position: 'relative', flexShrink: 0 }}>
-              <video
-                ref={localVideoRef}
-                autoPlay muted playsInline
-                style={{ width: '140px', height: '100px', objectFit: 'cover', borderRadius: '10px', background: '#111', border: '2px solid rgba(59,130,246,0.4)', transform: 'scaleX(-1)', display: 'none' }}
-              />
+              <video ref={localVideoRef} autoPlay muted playsInline
+                style={{ width: '140px', height: '100px', objectFit: 'cover', borderRadius: '10px', background: '#111', border: '2px solid rgba(59,130,246,0.4)', transform: 'scaleX(-1)', display: 'none' }} />
+              {!isCamEnabled && (
+                <div style={{ width: '140px', height: '100px', borderRadius: '10px', background: '#111', border: '2px solid rgba(239,68,68,0.3)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>🚫</div>
+              )}
               <div style={{ position: 'absolute', bottom: '4px', left: '6px', fontSize: '10px', color: 'white', background: 'rgba(0,0,0,0.6)', borderRadius: '4px', padding: '1px 5px' }}>You</div>
             </div>
             {remoteTracks.map(({ track, participant }) => (
@@ -421,7 +444,6 @@ export default function GameRoom() {
       {/* Main layout */}
       <div className={styles.mainContent} ref={containerRef}>
 
-        {/* Play-by-play */}
         <div className={styles.gamecastCol} style={{width: `${splitPct}%`}}>
           <div className={styles.mainStatsTabs}>
             <button className={`${styles.mainStatsTab} ${activeStatsTab === 'plays' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('plays')}>▶ Plays</button>
