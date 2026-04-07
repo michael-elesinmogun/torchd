@@ -31,7 +31,6 @@ export default function GameRoom() {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const containerRef = useRef(null);
-  const videoContainerRef = useRef(null);
 
   const [game, setGame] = useState(null);
   const [user, setUser] = useState(null);
@@ -51,18 +50,17 @@ export default function GameRoom() {
   const [reactions, setReactions] = useState({});
   const REACTION_EMOJIS = ['🔥','💀','😤','👑','🐐'];
 
-  // LiveKit watch party state
+  // LiveKit watch party
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const [creatingRoom, setCreatingRoom] = useState(false);
-  const [roomName, setRoomName] = useState(null);
   const [remoteTracks, setRemoteTracks] = useState([]);
   const [isMicOn, setIsMicOn] = useState(true);
   const [isCamEnabled, setIsCamEnabled] = useState(true);
-  const [participantCount, setParticipantCount] = useState(0);
   const liveKitRoomRef = useRef(null);
   const localVideoRef = useRef(null);
   const localTrackRef = useRef(null);
+  const audioElementsRef = useRef({});
 
   function attachLocalVideo(track) {
     if (!track?.mediaStreamTrack || !localVideoRef.current) return;
@@ -79,26 +77,15 @@ export default function GameRoom() {
     setCreatingRoom(true);
 
     try {
-      // Create or get LiveKit room for this game
-      let currentRoomName = roomName;
-      if (!currentRoomName) {
-        const res = await fetch('/api/create-room', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ battleId: `game-${gameId}`, topic: gameId }),
-        });
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
-        currentRoomName = data.roomName;
-        setRoomName(currentRoomName);
-      }
+      // Always create a fresh room name based on gameId
+      const roomNameForGame = `torchd-game-${gameId}`.replace(/[^a-zA-Z0-9-]/g, '-').slice(0, 60);
 
-      // Get token
+      // Get token — room auto-creates on join in LiveKit
       const tokenRes = await fetch('/api/livekit-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          roomName: currentRoomName,
+          roomName: roomNameForGame,
           participantName: profile?.username || `fan-${Date.now()}`,
           canPublish: true,
         }),
@@ -119,18 +106,26 @@ export default function GameRoom() {
         if (track.kind === Track.Kind.Video) {
           setRemoteTracks(prev => [...prev, { track, participant }]);
         }
+        // Attach audio directly to DOM audio element
+        if (track.kind === Track.Kind.Audio) {
+          const audioEl = document.createElement('audio');
+          audioEl.autoplay = true;
+          audioEl.srcObject = new MediaStream([track.mediaStreamTrack]);
+          audioEl.play().catch(() => {});
+          audioElementsRef.current[track.sid] = audioEl;
+          document.body.appendChild(audioEl);
+        }
       });
 
       room.on(RoomEvent.TrackUnsubscribed, (track) => {
-        setRemoteTracks(prev => prev.filter(t => t.track !== track));
-      });
-
-      room.on(RoomEvent.ParticipantConnected, () => {
-        setParticipantCount(c => c + 1);
-      });
-
-      room.on(RoomEvent.ParticipantDisconnected, () => {
-        setParticipantCount(c => Math.max(0, c - 1));
+        if (track.kind === Track.Kind.Video) {
+          setRemoteTracks(prev => prev.filter(t => t.track !== track));
+        }
+        // Remove audio element
+        if (track.kind === Track.Kind.Audio && audioElementsRef.current[track.sid]) {
+          audioElementsRef.current[track.sid].remove();
+          delete audioElementsRef.current[track.sid];
+        }
       });
 
       room.on(RoomEvent.Disconnected, () => {
@@ -138,6 +133,9 @@ export default function GameRoom() {
         setRemoteTracks([]);
         localTrackRef.current = null;
         if (localVideoRef.current) localVideoRef.current.srcObject = null;
+        // Clean up audio elements
+        Object.values(audioElementsRef.current).forEach(el => el.remove());
+        audioElementsRef.current = {};
       });
 
       room.on(RoomEvent.LocalTrackPublished, (publication) => {
@@ -150,7 +148,6 @@ export default function GameRoom() {
       await room.localParticipant.setCameraEnabled(true);
       await room.localParticipant.setMicrophoneEnabled(true);
 
-      // Poll for local track
       const tryAttach = () => {
         const camPub = room.localParticipant.getTrackPublication(Track.Source.Camera);
         if (camPub?.track) attachLocalVideo(camPub.track);
@@ -159,7 +156,6 @@ export default function GameRoom() {
       setTimeout(tryAttach, 500);
       setTimeout(tryAttach, 1500);
 
-      setParticipantCount(room.remoteParticipants.size);
       setCameraOn(true);
     } catch (err) {
       console.error('Watch party join error:', err);
@@ -177,6 +173,9 @@ export default function GameRoom() {
     setRemoteTracks([]);
     localTrackRef.current = null;
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
+    // Clean up audio elements
+    Object.values(audioElementsRef.current).forEach(el => el.remove());
+    audioElementsRef.current = {};
   }
 
   async function toggleMic() {
@@ -288,6 +287,7 @@ export default function GameRoom() {
       if (liveKitRoomRef.current) {
         try { liveKitRoomRef.current.disconnect(); } catch {}
       }
+      Object.values(audioElementsRef.current).forEach(el => el.remove());
     };
   }, [gameId]);
 
@@ -356,93 +356,44 @@ export default function GameRoom() {
         <Link href="/battle/start" className={styles.debateBtn}>⚔️ Start a debate</Link>
       </div>
 
-      {/* Watch Party Camera Section */}
+      {/* Watch Party */}
       {cameraOn ? (
-        <div ref={videoContainerRef} style={{
+        <div style={{
           background: '#060912', borderBottom: '1px solid rgba(255,255,255,0.065)',
           padding: '12px 16px',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span style={{ fontSize: '13px', fontWeight: 700, color: '#EEF2FF', fontFamily: 'Syne,sans-serif' }}>
-                📹 Watch Party
-              </span>
-              <span style={{ fontSize: '12px', color: '#6B7A9E' }}>
-                {remoteTracks.length + 1} on camera
-              </span>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#EEF2FF', fontFamily: 'Syne,sans-serif' }}>📹 Watch Party</span>
+              <span style={{ fontSize: '12px', color: '#6B7A9E' }}>{remoteTracks.length + 1} on camera</span>
             </div>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={toggleMic} style={{
-                width: '34px', height: '34px', borderRadius: '50%', border: 'none',
-                background: isMicOn ? 'rgba(255,255,255,0.1)' : 'rgba(239,68,68,0.4)',
-                fontSize: '15px', cursor: 'pointer',
-              }}>{isMicOn ? '🎤' : '🔇'}</button>
-              <button onClick={toggleCam} style={{
-                width: '34px', height: '34px', borderRadius: '50%', border: 'none',
-                background: isCamEnabled ? 'rgba(255,255,255,0.1)' : 'rgba(239,68,68,0.4)',
-                fontSize: '15px', cursor: 'pointer',
-              }}>{isCamEnabled ? '📹' : '🚫'}</button>
-              <button onClick={leaveCamera} style={{
-                background: '#EF4444', border: 'none', borderRadius: '8px',
-                padding: '6px 14px', color: 'white', fontSize: '13px',
-                fontFamily: 'Syne,sans-serif', fontWeight: 700, cursor: 'pointer',
-              }}>Leave</button>
+              <button onClick={toggleMic} style={{ width: '34px', height: '34px', borderRadius: '50%', border: 'none', background: isMicOn ? 'rgba(255,255,255,0.1)' : 'rgba(239,68,68,0.4)', fontSize: '15px', cursor: 'pointer' }}>{isMicOn ? '🎤' : '🔇'}</button>
+              <button onClick={toggleCam} style={{ width: '34px', height: '34px', borderRadius: '50%', border: 'none', background: isCamEnabled ? 'rgba(255,255,255,0.1)' : 'rgba(239,68,68,0.4)', fontSize: '15px', cursor: 'pointer' }}>{isCamEnabled ? '📹' : '🚫'}</button>
+              <button onClick={leaveCamera} style={{ background: '#EF4444', border: 'none', borderRadius: '8px', padding: '6px 14px', color: 'white', fontSize: '13px', fontFamily: 'Syne,sans-serif', fontWeight: 700, cursor: 'pointer' }}>Leave</button>
             </div>
           </div>
-
-          {/* Video grid */}
-          <div style={{
-            display: 'flex', gap: '8px', overflowX: 'auto',
-            paddingBottom: '4px',
-          }}>
-            {/* Local video */}
+          <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
             <div style={{ position: 'relative', flexShrink: 0 }}>
-              <video
-                ref={localVideoRef}
-                autoPlay muted playsInline
-                style={{
-                  width: '140px', height: '100px', objectFit: 'cover',
-                  borderRadius: '10px', background: '#111',
-                  border: '2px solid rgba(59,130,246,0.4)',
-                  transform: 'scaleX(-1)', display: 'none',
-                }}
-              />
-              <div style={{
-                position: 'absolute', bottom: '4px', left: '6px',
-                fontSize: '10px', color: 'white', background: 'rgba(0,0,0,0.6)',
-                borderRadius: '4px', padding: '1px 5px',
-              }}>You</div>
+              <video ref={localVideoRef} autoPlay muted playsInline
+                style={{ width: '140px', height: '100px', objectFit: 'cover', borderRadius: '10px', background: '#111', border: '2px solid rgba(59,130,246,0.4)', transform: 'scaleX(-1)', display: 'none' }} />
+              <div style={{ position: 'absolute', bottom: '4px', left: '6px', fontSize: '10px', color: 'white', background: 'rgba(0,0,0,0.6)', borderRadius: '4px', padding: '1px 5px' }}>You</div>
             </div>
-
-            {/* Remote videos */}
             {remoteTracks.map(({ track, participant }) => (
               <RemoteVideoTile key={track.sid} track={track} name={participant.identity} />
             ))}
-
-            {/* Empty slots hint */}
             {remoteTracks.length === 0 && (
-              <div style={{
-                width: '140px', height: '100px', borderRadius: '10px',
-                border: '1px dashed rgba(255,255,255,0.1)',
-                display: 'flex', flexDirection: 'column', alignItems: 'center',
-                justifyContent: 'center', gap: '4px', flexShrink: 0,
-              }}>
+              <div style={{ width: '140px', height: '100px', borderRadius: '10px', border: '1px dashed rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '4px', flexShrink: 0 }}>
                 <div style={{ fontSize: '20px' }}>👥</div>
-                <div style={{ fontSize: '11px', color: '#6B7A9E', textAlign: 'center' }}>
-                  Waiting for others
-                </div>
+                <div style={{ fontSize: '11px', color: '#6B7A9E', textAlign: 'center' }}>Waiting for others</div>
               </div>
             )}
           </div>
         </div>
       ) : (
         <div className={styles.cameraBar}>
-          <div className={styles.cameraBarText}>
-            📹 Watch party — react on camera with other fans watching live.
-          </div>
-          {cameraError && (
-            <div style={{ fontSize: '12px', color: '#F87171', marginRight: '8px' }}>{cameraError}</div>
-          )}
+          <div className={styles.cameraBarText}>📹 Watch party — react on camera with other fans watching live.</div>
+          {cameraError && <div style={{ fontSize: '12px', color: '#F87171', marginRight: '8px' }}>{cameraError}</div>}
           {user ? (
             <button className={styles.joinCameraBtn} onClick={joinCamera} disabled={creatingRoom}>
               {creatingRoom ? 'Setting up...' : '🎥 Join watch party'}
@@ -453,7 +404,7 @@ export default function GameRoom() {
         </div>
       )}
 
-      {/* Main two-column layout */}
+      {/* Main layout */}
       <div className={styles.mainContent} ref={containerRef}>
 
         {/* Play-by-play */}
@@ -528,9 +479,8 @@ export default function GameRoom() {
 
           {activeStatsTab === 'team' && (
             <div className={styles.gamecastWrap}>
-              {teamStats.length === 0 ? (
-                <div className={styles.chatLoading}>Loading team stats...</div>
-              ) : teamStats.map(team => (
+              {teamStats.length === 0 ? <div className={styles.chatLoading}>Loading team stats...</div>
+              : teamStats.map(team => (
                 <div key={team.team} className={styles.teamStatsBlock}>
                   <div className={styles.teamStatsHeader}>
                     {team.logo && <img src={team.logo} alt={team.team} className={styles.teamStatsLogo} />}
@@ -551,9 +501,8 @@ export default function GameRoom() {
 
           {activeStatsTab === 'box' && (
             <div className={styles.gamecastWrap}>
-              {players.length === 0 ? (
-                <div className={styles.chatLoading}>Loading box score...</div>
-              ) : players.map(teamPlayers => {
+              {players.length === 0 ? <div className={styles.chatLoading}>Loading box score...</div>
+              : players.map(teamPlayers => {
                 const statGroup = teamPlayers.statistics?.[0];
                 if (!statGroup) return null;
                 const labels = statGroup.labels || [];
@@ -593,7 +542,6 @@ export default function GameRoom() {
           )}
         </div>
 
-        {/* Drag divider */}
         <div className={styles.divider} onMouseDown={startDrag} onTouchStart={startDrag}>
           <div className={styles.dividerHandle}></div>
         </div>
@@ -694,11 +642,7 @@ function RemoteVideoTile({ track, name }) {
     <div style={{ position: 'relative', flexShrink: 0 }}>
       <video ref={videoRef} autoPlay playsInline
         style={{ width: '140px', height: '100px', objectFit: 'cover', borderRadius: '10px', background: '#111', border: '1px solid rgba(255,255,255,0.1)' }} />
-      <div style={{
-        position: 'absolute', bottom: '4px', left: '6px',
-        fontSize: '10px', color: 'white', background: 'rgba(0,0,0,0.6)',
-        borderRadius: '4px', padding: '1px 5px',
-      }}>{name}</div>
+      <div style={{ position: 'absolute', bottom: '4px', left: '6px', fontSize: '10px', color: 'white', background: 'rgba(0,0,0,0.6)', borderRadius: '4px', padding: '1px 5px' }}>{name}</div>
     </div>
   );
 }

@@ -44,6 +44,7 @@ export default function BattleRoom({ params }) {
   const roomRef = useRef(null);
   const localVideoRef = useRef(null);
   const localTrackRef = useRef(null);
+  const audioElementsRef = useRef({});
   const roundStartTimeRef = useRef(null);
   const roundTimerRef = useRef(null);
   const currentRoundRef = useRef(0);
@@ -140,7 +141,6 @@ export default function BattleRoom({ params }) {
 
     init();
 
-    // Also listen for auth state changes to handle mobile session restore
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const currentUser = session?.user ?? null;
       setUser(currentUser);
@@ -176,6 +176,7 @@ export default function BattleRoom({ params }) {
         try { roomRef.current.disconnect(); } catch {}
         roomRef.current = null;
       }
+      Object.values(audioElementsRef.current).forEach(el => el.remove());
     };
   }, [id]);
 
@@ -189,9 +190,7 @@ export default function BattleRoom({ params }) {
       localTrackRef.current = track;
       localVideoRef.current.srcObject = new MediaStream([track.mediaStreamTrack]);
       localVideoRef.current.style.display = 'block';
-    } catch (e) {
-      console.error('Local video attach error:', e);
-    }
+    } catch (e) {}
   }
 
   function startRound(round) {
@@ -241,11 +240,7 @@ export default function BattleRoom({ params }) {
     const b = battleRef.current;
     if (!b || b.status === 'ended') return;
     const winnerUsername = b.player1_username === leavingUsername ? b.player2_username : b.player1_username;
-    await supabase.from('battles').update({
-      status: 'ended',
-      winner: winnerUsername,
-      ended_at: new Date().toISOString(),
-    }).eq('id', id);
+    await supabase.from('battles').update({ status: 'ended', winner: winnerUsername, ended_at: new Date().toISOString() }).eq('id', id);
     setBattleEnded(true);
     setWinner(winnerUsername);
     clearInterval(roundTimerRef.current);
@@ -276,14 +271,8 @@ export default function BattleRoom({ params }) {
   async function joinVideo() {
     const battleData = battleRef.current;
     const profileData = profileRef.current;
-    if (!battleData?.room_name) {
-      setVideoError('Room not ready. Please try again.');
-      return;
-    }
-    if (battleData.status === 'ended') {
-      setVideoError('This battle has ended.');
-      return;
-    }
+    if (!battleData?.room_name) { setVideoError('Room not ready. Please try again.'); return; }
+    if (battleData.status === 'ended') { setVideoError('This battle has ended.'); return; }
 
     setVideoError('');
 
@@ -314,10 +303,25 @@ export default function BattleRoom({ params }) {
         if (track.kind === Track.Kind.Video) {
           setRemoteTracks(prev => [...prev, { track, participant }]);
         }
+        // Attach remote audio directly to a DOM audio element
+        if (track.kind === Track.Kind.Audio) {
+          const audioEl = document.createElement('audio');
+          audioEl.autoplay = true;
+          audioEl.srcObject = new MediaStream([track.mediaStreamTrack]);
+          audioEl.play().catch(() => {});
+          audioElementsRef.current[track.sid] = audioEl;
+          document.body.appendChild(audioEl);
+        }
       });
 
       room.on(RoomEvent.TrackUnsubscribed, (track) => {
-        setRemoteTracks(prev => prev.filter(t => t.track !== track));
+        if (track.kind === Track.Kind.Video) {
+          setRemoteTracks(prev => prev.filter(t => t.track !== track));
+        }
+        if (track.kind === Track.Kind.Audio && audioElementsRef.current[track.sid]) {
+          audioElementsRef.current[track.sid].remove();
+          delete audioElementsRef.current[track.sid];
+        }
       });
 
       room.on(RoomEvent.Disconnected, () => {
@@ -325,6 +329,8 @@ export default function BattleRoom({ params }) {
         setRemoteTracks([]);
         localTrackRef.current = null;
         if (localVideoRef.current) localVideoRef.current.srcObject = null;
+        Object.values(audioElementsRef.current).forEach(el => el.remove());
+        audioElementsRef.current = {};
         clearInterval(roundTimerRef.current);
       });
 
@@ -337,9 +343,7 @@ export default function BattleRoom({ params }) {
       room.on(RoomEvent.ParticipantDisconnected, (participant) => {
         const b = battleRef.current;
         if (!b || b.status === 'ended') return;
-        const isDebaterLeaving =
-          participant.identity === b.player1_username ||
-          participant.identity === b.player2_username;
+        const isDebaterLeaving = participant.identity === b.player1_username || participant.identity === b.player2_username;
         if (isDebaterLeaving && currentRoundRef.current > 0) {
           declareWinnerByForfeit(participant.identity);
         }
@@ -373,12 +377,8 @@ export default function BattleRoom({ params }) {
     const battleData = battleRef.current;
 
     if (profileData && battleData && battleData.status !== 'ended' && currentRoundRef.current > 0) {
-      const isDebater =
-        battleData.player1_username === profileData.username ||
-        battleData.player2_username === profileData.username;
-      if (isDebater) {
-        await declareWinnerByForfeit(profileData.username);
-      }
+      const isDebater = battleData.player1_username === profileData.username || battleData.player2_username === profileData.username;
+      if (isDebater) await declareWinnerByForfeit(profileData.username);
     }
 
     clearInterval(roundTimerRef.current);
@@ -391,6 +391,8 @@ export default function BattleRoom({ params }) {
     setRemoteTracks([]);
     localTrackRef.current = null;
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
+    Object.values(audioElementsRef.current).forEach(el => el.remove());
+    audioElementsRef.current = {};
 
     router.push('/battle');
   }
@@ -461,7 +463,6 @@ export default function BattleRoom({ params }) {
       <div className={styles.layout}>
         <div className={styles.stage}>
 
-          {/* Topic bar */}
           <div className={styles.topicBar}>
             <div className={styles.livePill}>
               <div className={styles.liveDot}></div>
@@ -473,32 +474,18 @@ export default function BattleRoom({ params }) {
             </button>
           </div>
 
-          {/* Round indicator */}
           {currentRound > 0 && !battleEnded && (
-            <div style={{
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-              background: '#0f1623', border: '1px solid rgba(255,255,255,0.065)',
-              borderRadius: '12px', padding: '0.75rem 1.25rem',
-            }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#0f1623', border: '1px solid rgba(255,255,255,0.065)', borderRadius: '12px', padding: '0.75rem 1.25rem' }}>
               <div>
-                <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: '14px', color: '#EEF2FF' }}>
-                  {roundConfig.label} of {TOTAL_ROUNDS}
-                </div>
+                <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: '14px', color: '#EEF2FF' }}>{roundConfig.label} of {TOTAL_ROUNDS}</div>
                 <div style={{ fontSize: '12px', color: '#6B7A9E', marginTop: '2px' }}>{roundConfig.desc}</div>
               </div>
-              <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: '24px', color: roundTimeLeft <= 10 ? '#EF4444' : '#3B82F6' }}>
-                {formatTime(roundTimeLeft)}
-              </div>
+              <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: '24px', color: roundTimeLeft <= 10 ? '#EF4444' : '#3B82F6' }}>{formatTime(roundTimeLeft)}</div>
             </div>
           )}
 
-          {/* Winner banner */}
           {battleEnded && (
-            <div style={{
-              background: winner === 'tie' ? 'rgba(107,114,128,0.15)' : 'rgba(16,185,129,0.1)',
-              border: `1px solid ${winner === 'tie' ? 'rgba(107,114,128,0.3)' : 'rgba(16,185,129,0.3)'}`,
-              borderRadius: '14px', padding: '1.5rem', textAlign: 'center',
-            }}>
+            <div style={{ background: winner === 'tie' ? 'rgba(107,114,128,0.15)' : 'rgba(16,185,129,0.1)', border: `1px solid ${winner === 'tie' ? 'rgba(107,114,128,0.3)' : 'rgba(16,185,129,0.3)'}`, borderRadius: '14px', padding: '1.5rem', textAlign: 'center' }}>
               <div style={{ fontSize: '36px', marginBottom: '0.5rem' }}>{winner === 'tie' ? '🤝' : '🏆'}</div>
               <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: '20px', color: '#EEF2FF', marginBottom: '4px' }}>
                 {winner === 'tie' ? "It's a tie!" : `@${winner} wins!`}
@@ -506,113 +493,54 @@ export default function BattleRoom({ params }) {
               <div style={{ fontSize: '13px', color: '#6B7A9E', marginBottom: '1rem' }}>
                 Final vote: {battle.player1_username} {votes.player1} — {votes.player2} {battle.player2_username}
               </div>
-              <button
-                onClick={() => router.push('/battle')}
-                style={{
-                  background: '#3B82F6', border: 'none', borderRadius: '100px',
-                  padding: '10px 24px', color: 'white',
-                  fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
-                }}
-              >← Back to Battles</button>
+              <button onClick={() => router.push('/battle')} style={{ background: '#3B82F6', border: 'none', borderRadius: '100px', padding: '10px 24px', color: 'white', fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer' }}>
+                ← Back to Battles
+              </button>
             </div>
           )}
 
-          {/* Video */}
           {!battleEnded && videoJoined ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              <div style={{
-                width: '100%', aspectRatio: '16/9', background: '#000',
-                borderRadius: '14px', overflow: 'hidden', position: 'relative',
-              }}>
+              <div style={{ width: '100%', aspectRatio: '16/9', background: '#000', borderRadius: '14px', overflow: 'hidden', position: 'relative' }}>
                 {remoteTracks.length > 0 ? (
                   <RemoteVideoTrack track={remoteTracks[0].track} />
                 ) : (
-                  <div style={{
-                    position: 'absolute', inset: 0, display: 'flex',
-                    flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    color: '#6B7A9E', fontSize: '14px', gap: '8px',
-                  }}>
+                  <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#6B7A9E', fontSize: '14px', gap: '8px' }}>
                     <div style={{ fontSize: '32px' }}>⏳</div>
                     {isPlayer ? 'Waiting for opponent...' : 'Waiting for debaters to join...'}
                   </div>
                 )}
 
                 {remoteTracks.length > 1 && (
-                  <div style={{
-                    position: 'absolute', bottom: '70px', right: '12px',
-                    width: '28%', maxWidth: '180px', aspectRatio: '16/9',
-                    borderRadius: '10px', overflow: 'hidden',
-                    border: '2px solid rgba(255,255,255,0.15)',
-                  }}>
+                  <div style={{ position: 'absolute', bottom: '70px', right: '12px', width: '28%', maxWidth: '180px', aspectRatio: '16/9', borderRadius: '10px', overflow: 'hidden', border: '2px solid rgba(255,255,255,0.15)' }}>
                     <RemoteVideoTrack track={remoteTracks[1].track} />
                   </div>
                 )}
 
                 {isPlayer && (
-                  <video
-                    ref={localVideoRef}
-                    autoPlay muted playsInline
-                    style={{
-                      position: 'absolute',
-                      bottom: remoteTracks.length > 1 ? '140px' : '70px',
-                      right: '12px',
-                      width: '28%', maxWidth: '180px', aspectRatio: '16/9',
-                      objectFit: 'cover', borderRadius: '10px',
-                      border: '2px solid rgba(59,130,246,0.4)',
-                      transform: 'scaleX(-1)',
-                      display: 'none',
-                    }}
-                  />
+                  <video ref={localVideoRef} autoPlay muted playsInline
+                    style={{ position: 'absolute', bottom: remoteTracks.length > 1 ? '140px' : '70px', right: '12px', width: '28%', maxWidth: '180px', aspectRatio: '16/9', objectFit: 'cover', borderRadius: '10px', border: '2px solid rgba(59,130,246,0.4)', transform: 'scaleX(-1)', display: 'none' }} />
                 )}
 
                 {isPlayer && (
-                  <div style={{
-                    position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)',
-                    display: 'flex', gap: '10px', alignItems: 'center',
-                    background: 'rgba(0,0,0,0.7)', borderRadius: '100px',
-                    padding: '8px 16px', backdropFilter: 'blur(10px)',
-                  }}>
-                    <button onClick={toggleMic} style={{
-                      width: '40px', height: '40px', borderRadius: '50%', border: 'none',
-                      background: isMicOn ? 'rgba(255,255,255,0.15)' : 'rgba(239,68,68,0.5)',
-                      fontSize: '18px', cursor: 'pointer',
-                    }}>{isMicOn ? '🎤' : '🔇'}</button>
-                    <button onClick={toggleCam} style={{
-                      width: '40px', height: '40px', borderRadius: '50%', border: 'none',
-                      background: isCamOn ? 'rgba(255,255,255,0.15)' : 'rgba(239,68,68,0.5)',
-                      fontSize: '18px', cursor: 'pointer',
-                    }}>{isCamOn ? '📹' : '🚫'}</button>
-                    <button onClick={leaveVideo} style={{
-                      background: '#EF4444', border: 'none', borderRadius: '100px',
-                      padding: '8px 18px', color: 'white',
-                      fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
-                    }}>Leave</button>
+                  <div style={{ position: 'absolute', bottom: '16px', left: '50%', transform: 'translateX(-50%)', display: 'flex', gap: '10px', alignItems: 'center', background: 'rgba(0,0,0,0.7)', borderRadius: '100px', padding: '8px 16px', backdropFilter: 'blur(10px)' }}>
+                    <button onClick={toggleMic} style={{ width: '40px', height: '40px', borderRadius: '50%', border: 'none', background: isMicOn ? 'rgba(255,255,255,0.15)' : 'rgba(239,68,68,0.5)', fontSize: '18px', cursor: 'pointer' }}>{isMicOn ? '🎤' : '🔇'}</button>
+                    <button onClick={toggleCam} style={{ width: '40px', height: '40px', borderRadius: '50%', border: 'none', background: isCamOn ? 'rgba(255,255,255,0.15)' : 'rgba(239,68,68,0.5)', fontSize: '18px', cursor: 'pointer' }}>{isCamOn ? '📹' : '🚫'}</button>
+                    <button onClick={leaveVideo} style={{ background: '#EF4444', border: 'none', borderRadius: '100px', padding: '8px 18px', color: 'white', fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}>Leave</button>
                   </div>
                 )}
 
                 {!isPlayer && (
-                  <button onClick={leaveVideo} style={{
-                    position: 'absolute', bottom: '16px', right: '16px',
-                    background: 'rgba(239,68,68,0.8)', border: 'none', borderRadius: '100px',
-                    padding: '8px 16px', color: 'white',
-                    fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '13px', cursor: 'pointer',
-                  }}>Leave</button>
+                  <button onClick={leaveVideo} style={{ position: 'absolute', bottom: '16px', right: '16px', background: 'rgba(239,68,68,0.8)', border: 'none', borderRadius: '100px', padding: '8px 16px', color: 'white', fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '13px', cursor: 'pointer' }}>Leave</button>
                 )}
               </div>
 
               <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
                 {isPlayer1 && bothInRoom && currentRound === 0 && !battleEnded && (
-                  <button onClick={handleStartBattle} style={{
-                    background: '#10B981', border: 'none', borderRadius: '100px',
-                    padding: '10px 24px', color: 'white',
-                    fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer',
-                  }}>▶ Start Battle</button>
+                  <button onClick={handleStartBattle} style={{ background: '#10B981', border: 'none', borderRadius: '100px', padding: '10px 24px', color: 'white', fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', cursor: 'pointer' }}>▶ Start Battle</button>
                 )}
                 {!isPlayer1 && isPlayer && bothInRoom && currentRound === 0 && !battleEnded && (
-                  <div style={{
-                    background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)',
-                    borderRadius: '100px', padding: '10px 20px', fontSize: '13px', color: '#60A5FA', fontWeight: 600,
-                  }}>⏳ Waiting for Player 1 to start...</div>
+                  <div style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', borderRadius: '100px', padding: '10px 20px', fontSize: '13px', color: '#60A5FA', fontWeight: 600 }}>⏳ Waiting for Player 1 to start...</div>
                 )}
               </div>
             </div>
@@ -623,16 +551,10 @@ export default function BattleRoom({ params }) {
                 {battle.player2_username ? 'Battle is live' : 'Waiting for opponent'}
               </div>
               <p className={styles.joinVideoSub}>
-                {isPlayer
-                  ? 'Join the room to go live on camera.'
-                  : battle.player2_username
-                    ? 'Watch the debate live and cast your vote.'
-                    : 'Share the link below while you wait.'}
+                {isPlayer ? 'Join the room to go live on camera.' : battle.player2_username ? 'Watch the debate live and cast your vote.' : 'Share the link below while you wait.'}
               </p>
               {videoError && (
-                <div style={{ fontSize: '13px', color: '#F87171', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', padding: '8px 14px' }}>
-                  {videoError}
-                </div>
+                <div style={{ fontSize: '13px', color: '#F87171', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', borderRadius: '8px', padding: '8px 14px' }}>{videoError}</div>
               )}
               {battle.room_name && (battle.player2_username || isPlayer) && (
                 <button className={styles.joinVideoBtn} onClick={joinVideo}>
@@ -642,7 +564,6 @@ export default function BattleRoom({ params }) {
             </div>
           ) : null}
 
-          {/* Vote area */}
           <div className={styles.voteSection}>
             <div className={styles.voteBar}>
               <div className={styles.voteBarFill} style={{ width: `${p1Pct}%` }}></div>
@@ -654,24 +575,15 @@ export default function BattleRoom({ params }) {
             </div>
             {authReady && !voted && user && !isPlayer && !battleEnded && (
               <div className={styles.voteButtons}>
-                <button className={`${styles.voteBtn} ${styles.voteBtnBlue}`} onClick={() => castVote('player1')}>
-                  Vote for {battle.player1_username || 'Player 1'}
-                </button>
-                <button className={`${styles.voteBtn} ${styles.voteBtnRed}`} onClick={() => castVote('player2')}>
-                  Vote for {battle.player2_username || 'Player 2'}
-                </button>
+                <button className={`${styles.voteBtn} ${styles.voteBtnBlue}`} onClick={() => castVote('player1')}>Vote for {battle.player1_username || 'Player 1'}</button>
+                <button className={`${styles.voteBtn} ${styles.voteBtnRed}`} onClick={() => castVote('player2')}>Vote for {battle.player2_username || 'Player 2'}</button>
               </div>
             )}
             {voted && <div className={styles.voteCast}>✓ Vote cast — {voted === 'player1' ? battle.player1_username : battle.player2_username}</div>}
             {isPlayer && !battleEnded && <div className={styles.playerNotice}>You're in this battle — you can't vote on your own debate</div>}
-            {authReady && !user && (
-              <div className={styles.loginPrompt}>
-                <Link href="/login" className={styles.loginLink}>Sign in</Link> to vote
-              </div>
-            )}
+            {authReady && !user && <div className={styles.loginPrompt}><Link href="/login" className={styles.loginLink}>Sign in</Link> to vote</div>}
           </div>
 
-          {/* Waiting card */}
           {(battle.status === 'seeking' || !battle.player2_username) && !battleEnded && (
             <div className={styles.waitingCard}>
               <div className={styles.waitingTitle}>⏳ Waiting for opponent</div>
@@ -685,7 +597,6 @@ export default function BattleRoom({ params }) {
 
         </div>
 
-        {/* Sidebar */}
         <div className={styles.sidebar}>
           <div className={styles.sidebarTitle}>Live Chat</div>
           <div className={styles.chatMessages}>
@@ -699,14 +610,12 @@ export default function BattleRoom({ params }) {
             <div ref={chatBottomRef} />
           </div>
           <div className={styles.chatInputRow}>
-            <input
-              className={styles.chatInput}
+            <input className={styles.chatInput}
               placeholder={user ? 'Say something...' : 'Sign in to chat'}
               value={chatInput}
               onChange={e => setChatInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && sendChat()}
-              disabled={!user}
-            />
+              disabled={!user} />
             <button className={styles.chatSend} onClick={sendChat} disabled={!user}>↑</button>
           </div>
         </div>
@@ -722,12 +631,7 @@ function RemoteVideoTrack({ track }) {
     if (track?.mediaStreamTrack && videoRef.current) {
       videoRef.current.srcObject = new MediaStream([track.mediaStreamTrack]);
     }
-    return () => {
-      if (videoRef.current) videoRef.current.srcObject = null;
-    };
+    return () => { if (videoRef.current) videoRef.current.srcObject = null; };
   }, [track]);
-  return (
-    <video ref={videoRef} autoPlay playsInline
-      style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-  );
+  return <video ref={videoRef} autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />;
 }
