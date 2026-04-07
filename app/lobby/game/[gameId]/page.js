@@ -32,6 +32,13 @@ function getPeriodLabel(sport, p) {
   return n <= 4 ? `Q${n}` : `OT${n - 4}`;
 }
 
+function getSportEmoji(sport) {
+  if (sport === 'mlb') return '⚾';
+  if (sport === 'nhl') return '🏒';
+  if (sport === 'nfl' || sport === 'ncaafb') return '🏈';
+  return '🏀';
+}
+
 export default function GameRoom() {
   const params = useParams();
   const gameId = params?.gameId;
@@ -413,7 +420,7 @@ export default function GameRoom() {
         )}
         <Link href="/battle/start" className={styles.debateBtn}>
           <span className={styles.debateBtnFull}>⚔️ Start a debate</span>
-          <span className={styles.debateBtnShort}>⚔️</span>
+          <span className={styles.debateBtnShort}>Debate</span>
         </Link>
       </div>
 
@@ -473,7 +480,7 @@ export default function GameRoom() {
           <div className={styles.mainStatsTabs}>
             <button className={`${styles.mainStatsTab} ${activeStatsTab === 'plays' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('plays')}>▶ Plays</button>
             <button className={`${styles.mainStatsTab} ${activeStatsTab === 'team' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('team')}>📊 Team</button>
-            <button className={`${styles.mainStatsTab} ${activeStatsTab === 'box' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('box')}>🏀 Box</button>
+            <button className={`${styles.mainStatsTab} ${activeStatsTab === 'box' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('box')}>{getSportEmoji(sport)} Box</button>
           </div>
 
           {activeStatsTab === 'plays' && <>
@@ -482,7 +489,7 @@ export default function GameRoom() {
               return (
                 <div className={styles.periodTabs}>
                   {periods.map(p => (
-                    <button key={p} className={`${styles.periodTab} ${activePeriod === p ? styles.periodTabActive : ''}`} onClick={() => setActivePeriod(p)}>
+                    <button key={p} className={`${styles.periodTab} ${activePeriod === 'all' ? p === 'all' : Number(activePeriod) === Number(p) ? styles.periodTabActive : ''}`} onClick={() => setActivePeriod(p)}>
                       {getPeriodLabel(sport, p)}
                     </button>
                   ))}
@@ -500,7 +507,7 @@ export default function GameRoom() {
                 <div className={styles.chatEmptyTitle}>No plays yet</div>
                 <p className={styles.chatEmptySub}>Play-by-play appears here during the game.</p>
               </div>
-            ) : plays.filter(p => activePeriod === 'all' || p.period === activePeriod).map((play, i) => {
+            ) : plays.filter(p => activePeriod === 'all' || Number(p.period) === Number(activePeriod)).map((play, i) => {
               let scoringClass = '';
               if (play.scoringPlay) {
                 const prevPlayCheck = plays[i + 1];
@@ -548,7 +555,7 @@ export default function GameRoom() {
                     <span className={styles.teamStatsName}>{team.name}</span>
                   </div>
                   <div className={styles.teamStatsGrid}>
-                    {team.statistics?.filter(s => ['FG','3PT','FT','REB','AST','TO','STL','BLK','PTS'].includes(s.abbreviation)).map(stat => (
+                    {team.statistics?.filter(s => ['FG','3PT','FT','REB','AST','TO','STL','BLK','PTS','R','H','E','LOB','HR','BB','SO'].includes(s.abbreviation)).map(stat => (
                       <div key={stat.name} className={styles.teamStatItem}>
                         <div className={styles.teamStatValue}>{stat.displayValue}</div>
                         <div className={styles.teamStatLabel}>{stat.abbreviation || stat.label}</div>
@@ -568,14 +575,16 @@ export default function GameRoom() {
                 if (!statGroup) return null;
                 const labels = statGroup.labels || [];
                 const keyStats = sport === 'mlb'
-  ? ['AB','R','H','RBI','BB','SO','AVG']
-  : sport === 'nhl'
-  ? ['G','A','PTS','+/-','PIM','SOG']
-  : sport === 'nfl' || sport === 'ncaafb'
-  ? ['C/ATT','YDS','TD','INT','SACKS']
-  : ['MIN','PTS','REB','AST','STL','BLK','FG','3PT','TO'];
+                  ? ['AB','R','H','RBI','BB','SO','AVG']
+                  : sport === 'nhl'
+                  ? ['G','A','PTS','+/-','PIM','SOG']
+                  : sport === 'nfl' || sport === 'ncaafb'
+                  ? ['C/ATT','YDS','TD','INT','SACKS']
+                  : ['MIN','PTS','REB','AST','STL','BLK','FG','3PT','TO'];
                 const keyIndices = keyStats.map(k => labels.indexOf(k)).filter(i => i >= 0);
-                const displayLabels = keyIndices.map(i => labels[i]);
+                // If no key stats matched, show all labels
+                const finalIndices = keyIndices.length > 0 ? keyIndices : labels.map((_, i) => i).slice(0, 8);
+                const displayLabels = finalIndices.map(i => labels[i]);
                 return (
                   <div key={teamPlayers.team} className={styles.boxScoreBlock}>
                     <div className={styles.teamStatsHeader}>
@@ -596,7 +605,7 @@ export default function GameRoom() {
                           </div>
                           {athlete.didNotPlay ? (
                             <div className={styles.boxScoreDNPLabel} style={{flex:4,textAlign:'left',paddingLeft:'4px'}}>{athlete.reason || 'DNP'}</div>
-                          ) : keyIndices.map((ki, idx) => (
+                          ) : finalIndices.map((ki, idx) => (
                             <div key={idx} className={styles.boxScoreStat}>{athlete.stats?.[ki] || '—'}</div>
                           ))}
                         </div>
