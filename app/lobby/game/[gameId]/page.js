@@ -590,7 +590,15 @@ export default function GameRoom() {
     };
 
     const renderAB = (group, key) => {
-      const { pitches, result, play: abPlay, scoringPlay } = group;
+      const { pitches, play: abPlay, scoringPlay } = group;
+      let { result } = group;
+      // If no result but the AB starter itself is an outcome, promote it
+      if (!result && abPlay) {
+        const at = (abPlay.text || '').toLowerCase();
+        if (/struck out|grounded|flied|lined|popped|fouled out|singled|doubled|tripled|homered|walked|hit by pitch|sacrifice|fielder.s choice|error|reaches|safe at/.test(at)) {
+          result = abPlay;
+        }
+      }
       const displayPlay = result || abPlay;
       if (!displayPlay) return null;
       const dt = (displayPlay.text || '').trim();
