@@ -795,6 +795,7 @@ export default function GameRoom() {
               }
 
               if (group.type === 'event') {
+                if (!group.play?.text?.trim()) return null;
                 return renderPlay(group.play, gi, filtered);
               }
 
@@ -802,9 +803,9 @@ export default function GameRoom() {
               const { pitches, result, play: abPlay, scoringPlay } = group;
               const displayPlay = result || abPlay;
               if (!displayPlay) return null;
-              // Skip if the only text is just a "pitches to" starter with no result
-              const displayText = (displayPlay.text || '').toLowerCase();
-              if (!result && displayText.match(/pitches to|steps in|batting/)) return null;
+              // Skip incomplete ABs: no result and either no text or just a starter line
+              const displayText = (displayPlay.text || '').trim();
+              if (!result && (!displayText || displayText.match(/pitches to|steps in|batting/i))) return null;
 
               const { logo: teamLogo, color: teamColor } = getPlayTeam(displayPlay, gi, filtered);
               const isScoring = scoringPlay || displayPlay.scoringPlay;
