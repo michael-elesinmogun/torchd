@@ -50,7 +50,7 @@ function getSportEmoji(sport) {
 
 const TEAM_COLORS = {
   mlb: {
-    'SD': '2F241D', 'PIT': 'FDB827', 'NYY': '003087', 'LAD': '005A9C',
+    'SD': '2F241D', 'PIT': 'FFD026', 'NYY': '003087', 'LAD': '005A9C',
     'BOS': 'BD3039', 'CHC': '0E3386', 'ATL': 'CE1141', 'HOU': 'EB6E1F',
     'NYM': 'FF5910', 'STL': 'C41E3A', 'SF': 'FD5A1E', 'PHI': 'E81828',
     'MIL': '12294A', 'MIN': '002B5C', 'CLE': 'E31937', 'DET': '0C2340',
@@ -84,8 +84,8 @@ const TEAM_COLORS = {
     'CGY': 'C8102E', 'CAR': 'CC0000', 'CHI': 'CF0A2C', 'COL': '6F263D',
     'CBJ': '002654', 'DAL': '006847', 'DET': 'CE1126', 'EDM': 'FC4C02',
     'FLA': 'C8102E', 'LAK': '111111', 'MIN': '154734', 'MTL': 'AF1E2D',
-    'NSH': 'FFB81C', 'NJD': 'CE1126', 'NYI': '003087', 'NYR': '0038A8',
-    'OTT': 'E4173E', 'PHI': 'F74902', 'PIT': 'FCB514', 'SEA': '001628',
+    'NSH': 'FFD026', 'NJD': 'CE1126', 'NYI': '003087', 'NYR': '0038A8',
+    'OTT': 'E4173E', 'PHI': 'F74902', 'PIT': 'FFD026', 'SEA': '001628',
     'SJS': '006D75', 'STL': '002F87', 'TBL': '002868', 'TOR': '00205B',
     'VAN': '00843D', 'VGK': 'B4975A', 'WSH': 'CF0A2C', 'WPG': '041E42',
   },
@@ -95,24 +95,42 @@ function getVisibleTeamColor(hexColor) {
   if (!hexColor) return '#EEF2FF';
   const hex = hexColor.replace('#', '');
   if (hex.length !== 6) return '#EEF2FF';
-  const r = parseInt(hex.slice(0, 2), 16);
-  const g = parseInt(hex.slice(2, 4), 16);
-  const b = parseInt(hex.slice(4, 6), 16);
-  const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-  // Distance from the dark background #060912
-  const distFromBg = Math.sqrt((r-6)**2 + (g-9)**2 + (b-18)**2);
-  // Too dark or too close to background — boost it
-  if (luminance < 80 || distFromBg < 100) {
-    const scale = Math.max(3.0, 220 / Math.max(luminance, 1));
-    const nr = Math.min(255, Math.round(r * scale));
-    const ng = Math.min(255, Math.round(g * scale));
-    const nb = Math.min(255, Math.round(b * scale));
-    const newLum = 0.299 * nr + 0.587 * ng + 0.114 * nb;
-    if (newLum < 100) return '#C4CCDF';
-    return `#${nr.toString(16).padStart(2,'0')}${ng.toString(16).padStart(2,'0')}${nb.toString(16).padStart(2,'0')}`;
+  const r = parseInt(hex.slice(0, 2), 16) / 255;
+  const g = parseInt(hex.slice(2, 4), 16) / 255;
+  const b = parseInt(hex.slice(4, 6), 16) / 255;
+
+  // Convert to HSL
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+  let h = 0, s = 0, l = (mx + mn) / 2;
+  if (mx !== mn) {
+    const d = mx - mn;
+    s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
+    if (mx === r) h = ((g - b) / d + (g < b ? 6 : 0)) / 6;
+    else if (mx === g) h = ((b - r) / d + 2) / 6;
+    else h = ((r - g) / d + 4) / 6;
   }
-  // Color is bright enough — return as-is
-  return hexColor;
+
+  // Near-gray or black — return neutral
+  if (s < 0.08) return '#C4CCDF';
+
+  // Boost saturation and ensure minimum lightness for dark bg visibility
+  s = Math.min(1, s * 1.3);
+  l = Math.max(0.55, Math.min(0.75, l * 1.25));
+
+  // Convert back to RGB
+  const hue = (p, q, t) => {
+    const tt = ((t % 1) + 1) % 1;
+    if (tt < 1/6) return p + (q - p) * 6 * tt;
+    if (tt < 1/2) return q;
+    if (tt < 2/3) return p + (q - p) * (2/3 - tt) * 6;
+    return p;
+  };
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+  const p = 2 * l - q;
+  const nr = Math.round(hue(p, q, h + 1/3) * 255);
+  const ng = Math.round(hue(p, q, h) * 255);
+  const nb = Math.round(hue(p, q, h - 1/3) * 255);
+  return `#${nr.toString(16).padStart(2,'0')}${ng.toString(16).padStart(2,'0')}${nb.toString(16).padStart(2,'0')}`;
 }
 
 function getPlayType(play, sport) {
