@@ -118,8 +118,8 @@ export async function GET(request) {
     // MLB: ESPN sends empty statistics — build from players boxscore instead
     if (sport === 'mlb' && teamStats.every(t => t.statistics.length === 0)) {
       teamStats = boxscorePlayers.map(teamPlayers => {
-        const battingGroup = teamPlayers.statistics?.find(s => s.name === 'batting');
-        const pitchingGroup = teamPlayers.statistics?.find(s => s.name === 'pitching');
+        const battingGroup = teamPlayers.statistics?.find(s => s.name === 'batting' || (s.labels || []).includes('AB'));
+        const pitchingGroup = teamPlayers.statistics?.find(s => s.name === 'pitching' || (s.labels || []).includes('ERA'));
         const battingLabels = battingGroup?.labels || [];
         const stats = [];
 
