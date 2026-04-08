@@ -16,23 +16,28 @@ function getStatusColor(type) {
   return '#3B82F6';
 }
 
+function getGameTime(game) {
+  // Try status detail first
+  if (game.status.detail) {
+    const d = new Date(game.status.detail);
+    if (!isNaN(d)) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+  }
+  // Fall back to game.date
+  if (game.date) {
+    const d = new Date(game.date);
+    if (!isNaN(d)) return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
+  }
+  return 'Upcoming';
+}
+
 function getStatusLabel(status) {
   if (status.type === 'STATUS_IN_PROGRESS') return status.detail || status.clock || 'LIVE';
   if (status.type === 'STATUS_FINAL') return 'Final';
-  if (status.type === 'STATUS_SCHEDULED') {
-    const date = new Date(status.detail || '');
-    return isNaN(date) ? 'Upcoming' : date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  }
-  return status.description || 'Upcoming';
+  return null; // upcoming — handled separately with getGameTime
 }
 
-function isLive(status) {
-  return status.type === 'STATUS_IN_PROGRESS';
-}
-
-function isFinal(status) {
-  return status.type === 'STATUS_FINAL';
-}
+function isLive(status) { return status.type === 'STATUS_IN_PROGRESS'; }
+function isFinal(status) { return status.type === 'STATUS_FINAL'; }
 
 export default function Lobby() {
   const [activeSport, setActiveSport] = useState('nba');
@@ -60,8 +65,6 @@ export default function Lobby() {
     setLoading(true);
     setGames([]);
     fetchGames(activeSport);
-
-    // Refresh every 30 seconds
     const interval = setInterval(() => fetchGames(activeSport), 30000);
     return () => clearInterval(interval);
   }, [activeSport, fetchGames]);
@@ -73,8 +76,6 @@ export default function Lobby() {
   return (
     <main className={styles.main}>
       <div className={styles.page}>
-
-        {/* Header */}
         <div className={styles.header}>
           <div>
             <div className={styles.eyebrow}>
@@ -88,35 +89,21 @@ export default function Lobby() {
               </div>
             )}
           </div>
-          <Link href="/battle/start" className={styles.startBattleBtn}>
-            ⚔️ Start a Battle
-          </Link>
+          <Link href="/battle/start" className={styles.startBattleBtn}>⚔️ Start a Battle</Link>
         </div>
 
-        {/* Sport tabs */}
         <div className={styles.sportTabs}>
           {SPORTS.map(s => (
-            <button
-              key={s.key}
-              className={`${styles.sportTab} ${activeSport === s.key ? styles.sportTabActive : ''}`}
-              onClick={() => setActiveSport(s.key)}
-            >
+            <button key={s.key} className={`${styles.sportTab} ${activeSport === s.key ? styles.sportTabActive : ''}`} onClick={() => setActiveSport(s.key)}>
               <span>{s.icon}</span> {s.label}
             </button>
           ))}
         </div>
 
-        {/* Content */}
         {loading ? (
-          <div className={styles.loadingState}>
-            <div className={styles.spinner}></div>
-            <div>Loading {SPORTS.find(s => s.key === activeSport)?.label} scores...</div>
-          </div>
+          <div className={styles.loadingState}><div className={styles.spinner}></div><div>Loading {SPORTS.find(s => s.key === activeSport)?.label} scores...</div></div>
         ) : error ? (
-          <div className={styles.errorState}>
-            <div>⚠️ {error}</div>
-            <button className={styles.retryBtn} onClick={() => fetchGames(activeSport)}>Try again</button>
-          </div>
+          <div className={styles.errorState}><div>⚠️ {error}</div><button className={styles.retryBtn} onClick={() => fetchGames(activeSport)}>Try again</button></div>
         ) : games.length === 0 ? (
           <div className={styles.emptyState}>
             <div className={styles.emptyIcon}>📅</div>
@@ -125,45 +112,24 @@ export default function Lobby() {
           </div>
         ) : (
           <div className={styles.gamesWrap}>
-
-            {/* Live games */}
             {liveGames.length > 0 && (
               <div className={styles.gameGroup}>
-                <div className={styles.groupLabel}>
-                  <span className={styles.liveDot}></span> Live now
-                </div>
-                <div className={styles.gameGrid}>
-                  {liveGames.map(game => (
-                    <GameCard key={game.id} game={game} sport={activeSport} />
-                  ))}
-                </div>
+                <div className={styles.groupLabel}><span className={styles.liveDot}></span> Live now</div>
+                <div className={styles.gameGrid}>{liveGames.map(game => <GameCard key={game.id} game={game} sport={activeSport} />)}</div>
               </div>
             )}
-
-            {/* Upcoming games */}
             {upcomingGames.length > 0 && (
               <div className={styles.gameGroup}>
                 <div className={styles.groupLabel}>Upcoming</div>
-                <div className={styles.gameGrid}>
-                  {upcomingGames.map(game => (
-                    <GameCard key={game.id} game={game} sport={activeSport} />
-                  ))}
-                </div>
+                <div className={styles.gameGrid}>{upcomingGames.map(game => <GameCard key={game.id} game={game} sport={activeSport} />)}</div>
               </div>
             )}
-
-            {/* Final games */}
             {finalGames.length > 0 && (
               <div className={styles.gameGroup}>
                 <div className={styles.groupLabel}>Final</div>
-                <div className={styles.gameGrid}>
-                  {finalGames.map(game => (
-                    <GameCard key={game.id} game={game} sport={activeSport} />
-                  ))}
-                </div>
+                <div className={styles.gameGrid}>{finalGames.map(game => <GameCard key={game.id} game={game} sport={activeSport} />)}</div>
               </div>
             )}
-
           </div>
         )}
       </div>
@@ -174,26 +140,22 @@ export default function Lobby() {
 function GameCard({ game, sport }) {
   const live = isLive(game.status);
   const final = isFinal(game.status);
+  const upcoming = !live && !final;
   const statusLabel = getStatusLabel(game.status);
   const statusColor = getStatusColor(game.status.type);
-
+  const gameTime = upcoming ? getGameTime(game) : null;
   const gameRoomUrl = `/lobby/game/${sport}-${game.id}`;
 
   return (
     <div className={`${styles.gameCard} ${live ? styles.gameCardLive : ''}`}>
-
-      {/* Status */}
       <div className={styles.gameCardTop}>
         <div className={styles.gameStatus} style={{ color: statusColor }}>
           {live && <span className={styles.liveDotSmall}></span>}
-          {statusLabel}
+          {statusLabel || (upcoming ? gameTime : 'Upcoming')}
         </div>
-        {game.broadcast && (
-          <div className={styles.gameBroadcast}>{game.broadcast}</div>
-        )}
+        {game.broadcast && <div className={styles.gameBroadcast}>{game.broadcast}</div>}
       </div>
 
-      {/* Teams & Score */}
       <div className={styles.gameTeams}>
         <div className={styles.teamRow}>
           {game.away.logo && <img src={game.away.logo} alt={game.away.abbr} className={styles.teamLogo} />}
@@ -202,12 +164,9 @@ function GameCard({ game, sport }) {
             {game.away.record && <div className={styles.teamRecord}>{game.away.record}</div>}
           </div>
           {(live || final) && (
-            <div className={`${styles.teamScore} ${game.away.score > game.home.score ? styles.scoreLeading : ''}`}>
-              {game.away.score ?? '—'}
-            </div>
+            <div className={`${styles.teamScore} ${game.away.score > game.home.score ? styles.scoreLeading : ''}`}>{game.away.score ?? '—'}</div>
           )}
         </div>
-
         <div className={styles.teamRow}>
           {game.home.logo && <img src={game.home.logo} alt={game.home.abbr} className={styles.teamLogo} />}
           <div className={styles.teamInfo}>
@@ -215,21 +174,17 @@ function GameCard({ game, sport }) {
             {game.home.record && <div className={styles.teamRecord}>{game.home.record}</div>}
           </div>
           {(live || final) && (
-            <div className={`${styles.teamScore} ${game.home.score > game.away.score ? styles.scoreLeading : ''}`}>
-              {game.home.score ?? '—'}
-            </div>
+            <div className={`${styles.teamScore} ${game.home.score > game.away.score ? styles.scoreLeading : ''}`}>{game.home.score ?? '—'}</div>
           )}
         </div>
       </div>
 
-      {/* Footer */}
       <div className={styles.gameCardBottom}>
-        {game.venue && <div className={styles.gameVenue}>{game.venue}</div>}
-        <Link href={gameRoomUrl} className={styles.debateBtn}>
-          💬 Join chat
-        </Link>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1, minWidth: 0 }}>
+          {game.venue && <div className={styles.gameVenue}>{game.venue}</div>}
+        </div>
+        <Link href={gameRoomUrl} className={styles.debateBtn}>💬 Join chat</Link>
       </div>
-
     </div>
   );
 }
