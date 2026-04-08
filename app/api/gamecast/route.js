@@ -37,7 +37,6 @@ export async function GET(request) {
 
     const espnPlays = (data.plays || []).map(play => {
       let periodNumber = null;
-
       if (play.period?.number && play.period.number > 0) {
         periodNumber = play.period.number;
       }
@@ -52,7 +51,6 @@ export async function GET(request) {
       if (!periodNumber && headerPeriod) {
         periodNumber = headerPeriod;
       }
-
       return {
         id: String(play.id),
         game_id: gameId,
@@ -72,14 +70,14 @@ export async function GET(request) {
       };
     });
 
-    // Upsert all ESPN plays into Supabase (insert new, update existing)
+    // Upsert plays to Supabase for persistence
     if (espnPlays.length > 0) {
       await supabaseAdmin
         .from('game_plays')
         .upsert(espnPlays, { onConflict: 'id,game_id', ignoreDuplicates: false });
     }
 
-    // Fetch the full play history from Supabase (all innings)
+    // Fetch full play history from Supabase
     const { data: allPlays } = await supabaseAdmin
       .from('game_plays')
       .select('*')
@@ -105,22 +103,85 @@ export async function GET(request) {
 
     const boxscore = data.boxscore || {};
     const teams = boxscore.teams || [];
+    const boxscorePlayers = boxscore.players || [];
 
-    const teamStats = teams.map(team => ({
+    // Build team stats — ESPN sends real displayValues for NBA/NFL/NHL
+    // but for MLB the statistics array has no values, so we build from players
+    let teamStats = teams.map(team => ({
       team: team.team?.abbreviation,
       name: team.team?.displayName,
       logo: team.team?.logo,
       color: team.team?.color,
       homeAway: team.homeAway,
-      statistics: (team.statistics || []).map(s => ({
-        name: s.name,
-        displayValue: s.displayValue,
-        label: s.label,
-        abbreviation: s.abbreviation,
-      })),
+      statistics: (team.statistics || [])
+        .filter(s => s.displayValue)
+        .map(s => ({
+          name: s.name,
+          displayValue: s.displayValue,
+          label: s.label,
+          abbreviation: s.abbreviation,
+        })),
     }));
 
-    const players = (boxscore.players || []).map(teamPlayers => ({
+    // For MLB: build team batting totals from players boxscore
+    if (sport === 'mlb' && teamStats.every(t => t.statistics.length === 0)) {
+      teamStats = boxscorePlayers.map(teamPlayers => {
+        const battingGroup = teamPlayers.statistics?.find(s => s.name === 'batting');
+        const pitchingGroup = teamPlayers.statistics?.find(s => s.name === 'pitching');
+
+        const battingLabels = battingGroup?.labels || [];
+        const battingStats = [];
+
+        // Sum up key batting stats across all athletes
+        const keyBattingStats = ['AB','R','H','RBI','BB','SO','HR'];
+        keyBattingStats.forEach(stat => {
+          const idx = battingLabels.indexOf(stat);
+          if (idx === -1) return;
+          const total = (battingGroup?.athletes || []).reduce((sum, athlete) => {
+            const val = parseFloat(athlete.stats?.[idx]);
+            return sum + (isNaN(val) ? 0 : val);
+          }, 0);
+          battingStats.push({
+            name: stat,
+            displayValue: String(Math.round(total)),
+            label: stat,
+            abbreviation: stat,
+          });
+        });
+
+        // Get ERA and IP from pitching
+        const pitchingLabels = pitchingGroup?.labels || [];
+        const eraIdx = pitchingLabels.indexOf('ERA');
+        const ipIdx = pitchingLabels.indexOf('IP');
+        const kIdx = pitchingLabels.indexOf('K');
+
+        if (ipIdx !== -1) {
+          const ipTotal = (pitchingGroup?.athletes || []).reduce((sum, a) => {
+            const val = parseFloat(a.stats?.[ipIdx]);
+            return sum + (isNaN(val) ? 0 : val);
+          }, 0);
+          battingStats.push({ name: 'IP', displayValue: ipTotal.toFixed(1), label: 'IP', abbreviation: 'IP' });
+        }
+        if (kIdx !== -1) {
+          const kTotal = (pitchingGroup?.athletes || []).reduce((sum, a) => {
+            const val = parseFloat(a.stats?.[kIdx]);
+            return sum + (isNaN(val) ? 0 : val);
+          }, 0);
+          battingStats.push({ name: 'K', displayValue: String(Math.round(kTotal)), label: 'K', abbreviation: 'K' });
+        }
+
+        return {
+          team: teamPlayers.team?.abbreviation,
+          name: teamPlayers.team?.displayName,
+          logo: teamPlayers.team?.logo,
+          color: teamPlayers.team?.color,
+          homeAway: teamPlayers.homeAway,
+          statistics: battingStats,
+        };
+      });
+    }
+
+    const players = boxscorePlayers.map(teamPlayers => ({
       team: teamPlayers.team?.abbreviation,
       teamName: teamPlayers.team?.displayName,
       teamLogo: teamPlayers.team?.logo,
