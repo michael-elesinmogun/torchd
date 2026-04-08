@@ -510,18 +510,29 @@ export default function GameRoom() {
 
   const PlaysList = ({ scrollable }) => {
     const filtered = (() => {
-      const seen = new Set();
+      const seenIds = new Set();
+      const seenText = new Set();
       return plays.filter(p => {
-        if (!p.id) return true;
-        if (seen.has(p.id)) return false;
-        seen.add(p.id);
+        // Dedup by ID
+        if (p.id) {
+          if (seenIds.has(p.id)) return false;
+          seenIds.add(p.id);
+        }
+        // Dedup by text+period (ESPN sometimes sends same play with different IDs)
+        const textKey = `${p.period}|${(p.text||'').trim()}`;
+        if (textKey.length > 2) {
+          if (seenText.has(textKey)) return false;
+          seenText.add(textKey);
+        }
         return true;
       }).filter(p => activePeriod === 'all' || Number(p.period) === Number(activePeriod));
     })();
     const wrapClass = scrollable ? styles.mobileScrollPane : styles.gamecastWrap;
     const toHex = (c) => !c ? null : c.startsWith('#') ? c : `#${c}`;
-    const awayColor = getVisibleTeamColor(toHex(game?.away?.color) || '#3B82F6');
-    const homeColor = getVisibleTeamColor(toHex(game?.home?.color) || '#10B981');
+    const rawAway = game?.away?.color || game?.away?.alternateColor;
+    const rawHome = game?.home?.color || game?.home?.alternateColor;
+    const awayColor = getVisibleTeamColor(toHex(rawAway) || '#3B82F6');
+    const homeColor = getVisibleTeamColor(toHex(rawHome) || '#10B981');
 
     // Single pass: build play->half map oldest-first
     const playHalfMap = {};
