@@ -602,16 +602,24 @@ export default function GameRoom() {
     const homeColor = getVisibleTeamColor(game?.home?.color ? `#${game.home.color}` : '#10B981');
 
     // Helper: get team color/logo from a play using inning half inference
+    // In baseball: TOP = away team bats, BOTTOM = home team bats
     function getPlayTeam(play, idx, list) {
       if (play.team) {
         if (game?.away?.abbr === play.team) return { logo: game.away.logo, color: awayColor };
         if (game?.home?.abbr === play.team) return { logo: game.home.logo, color: homeColor };
       }
       if (sport === 'mlb') {
-        const pt = (play.periodText || '').toLowerCase();
         const tx = (play.text || '').toLowerCase();
+        // Fielding/pitching events belong to the FIELDING team (opposite of batting)
+        // Don't try to color these — they'll just get no logo and blend in
+        const isFieldingEvent = tx.match(/pitches to|relieved|in (center|left|right) field|to the mound|warming up/);
+        if (isFieldingEvent) return { logo: null, color: null };
+
+        const pt = (play.periodText || '').toLowerCase();
         if (pt.includes('top') || tx.includes('top of')) return { logo: game?.away?.logo, color: awayColor };
         if (pt.includes('bottom') || tx.includes('bottom of')) return { logo: game?.home?.logo, color: homeColor };
+
+        // Scan nearby plays for inning half context
         for (let j = idx + 1; j < Math.min(idx + 40, list.length); j++) {
           const pt2 = (list[j].periodText || '').toLowerCase();
           const tx2 = (list[j].text || '').toLowerCase();
@@ -723,12 +731,12 @@ export default function GameRoom() {
           background: bgColor, opacity,
           display: 'flex', flexDirection: 'column', gap: '4px',
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {playTeamLogo && <img src={playTeamLogo} alt="" style={{ width: '16px', height: '16px', objectFit: 'contain', flexShrink: 0 }} />}
-            <div className={styles.playClock}>{play.clock} {play.periodText}</div>
-          </div>
-          <div className={styles.playText} style={{ color: playType === 'scoring' ? '#EEF2FF' : playType === 'dim' ? '#6B7A9E' : '#C4CCDF', fontWeight: playType === 'scoring' ? 600 : 400 }}>
-            {play.text}
+          <div className={styles.playClock}>{play.clock} {play.periodText}</div>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '7px' }}>
+            {playTeamLogo && <img src={playTeamLogo} alt="" style={{ width: '16px', height: '16px', objectFit: 'contain', flexShrink: 0, marginTop: '2px' }} />}
+            <div className={styles.playText} style={{ color: playType === 'scoring' ? '#EEF2FF' : playType === 'dim' ? '#6B7A9E' : '#C4CCDF', fontWeight: playType === 'scoring' ? 600 : 400 }}>
+              {play.text}
+            </div>
           </div>
           {play.scoringPlay && game && (
             <div className={styles.playScore}>
