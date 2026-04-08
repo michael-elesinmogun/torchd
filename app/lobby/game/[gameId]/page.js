@@ -646,9 +646,9 @@ export default function GameRoom() {
           </div>
           {play.scoringPlay && game && (
             <div className={styles.playScore}>
-              <span className={styles.scoreTeamPill} style={{ background: `${awayColor}22`, border: `1px solid ${awayColor}55`, color: '#EEF2FF' }}>{game.away?.abbr} {play.awayScore}</span>
+              <span className={styles.scoreTeamPill} style={{ background: `${awayColor}20`, border: `2px solid ${awayColor}`, color: awayColor, fontWeight: 800 }}>{game.away?.abbr} {play.awayScore}</span>
               <span style={{color:'#3D4A66',margin:'0 4px'}}>–</span>
-              <span className={styles.scoreTeamPill} style={{ background: `${homeColor}22`, border: `1px solid ${homeColor}55`, color: '#EEF2FF' }}>{game.home?.abbr} {play.homeScore}</span>
+              <span className={styles.scoreTeamPill} style={{ background: `${homeColor}22`, border: `1px solid ${homeColor}55`, color: homeColor, fontWeight: 800 }}>{game.home?.abbr} {play.homeScore}</span>
             </div>
           )}
         </div>
