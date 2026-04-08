@@ -1,4 +1,4 @@
-// TORCHD_PROFILE_V7
+// TORCHD_PROFILE_V8
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
@@ -55,7 +55,7 @@ export default function Profile({ params }) {
   const [profile, setProfile] = useState(null);
   const [displayName, setDisplayName] = useState('');
   const [initials, setInitials] = useState('?');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // only true until profile loaded
 
   const [editingHandle, setEditingHandle] = useState(false);
   const [handleInput, setHandleInput] = useState(username);
@@ -98,11 +98,8 @@ export default function Profile({ params }) {
   const [stats, setStats] = useState({ wins: 0, losses: 0, battles_count: 0, rank: null });
 
   useEffect(() => {
-    async function fetchData() {
-      setLoading(true);
-      setListsLoading(true);
-      setBattlesLoading(true);
-
+    async function fetchProfile() {
+      // PHASE 1: load auth + profile immediately → unblock render
       const { data: { session } } = await supabase.auth.getSession();
       const currentUser = session?.user;
       setUser(currentUser);
@@ -138,64 +135,72 @@ export default function Profile({ params }) {
         const wins = profileData.wins || 0;
         const losses = profileData.losses || 0;
         const battles = profileData.battles_count || 0;
+        // Set stats immediately without rank — rank loads async below
+        setStats({ wins, losses, battles_count: battles, rank: null });
 
-        const { count } = await supabase
-          .from('profiles').select('id', { count: 'exact', head: true })
-          .eq('show_on_leaderboard', true).eq('is_public', true).gt('wins', wins);
+        // PHASE 2: fire all remaining queries in parallel, don't block render
+        Promise.all([
+          // Rank (expensive COUNT query)
+          supabase.from('profiles').select('id', { count: 'exact', head: true })
+            .eq('show_on_leaderboard', true).eq('is_public', true).gt('wins', wins)
+            .then(({ count }) => setStats(s => ({ ...s, rank: (count ?? 0) + 1 }))),
 
-        setStats({ wins, losses, battles_count: battles, rank: (count ?? 0) + 1 });
+          // Battles
+          Promise.all([
+            supabase.from('battles').select('*').eq('player1_username', username).eq('status', 'ended').order('ended_at', { ascending: false }).limit(50),
+            supabase.from('battles').select('*').eq('player2_username', username).eq('status', 'ended').order('ended_at', { ascending: false }).limit(50),
+          ]).then(([{ data: p1 }, { data: p2 }]) => {
+            const all = [...(p1 || []), ...(p2 || [])].sort((a, b) => new Date(b.ended_at || b.created_at) - new Date(a.ended_at || a.created_at));
+            setBattleHistory(all);
+            setBattlesLoading(false);
+          }),
+
+          // Followers
+          supabase.from('follows').select('follower_id').eq('following_username', username)
+            .then(async ({ data: followersRaw }) => {
+              const ids = followersRaw?.map(f => f.follower_id) || [];
+              setFollowerCount(ids.length);
+              if (ids.length > 0) {
+                const { data: fp } = await supabase.from('profiles').select('username, full_name').in('id', ids);
+                setFollowerList(fp || []);
+              } else {
+                setFollowerList([]);
+              }
+            }),
+
+          // Following
+          profileData.id
+            ? supabase.from('follows').select('following_username').eq('follower_id', profileData.id)
+                .then(async ({ data: followingRaw }) => {
+                  const usernames = followingRaw?.map(f => f.following_username) || [];
+                  setFollowingCount(usernames.length);
+                  if (usernames.length > 0) {
+                    const { data: fp } = await supabase.from('profiles').select('username, full_name').in('username', usernames);
+                    setFollowingList(fp || []);
+                  } else {
+                    setFollowingList([]);
+                  }
+                })
+            : Promise.resolve(),
+
+          // Is following
+          currentUser
+            ? supabase.from('follows').select('id').eq('follower_id', currentUser.id).eq('following_username', username).maybeSingle()
+                .then(({ data }) => setIsFollowing(!!data))
+            : Promise.resolve(),
+        ]).finally(() => setListsLoading(false));
+
       } else {
         setDisplayName(username.split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
         setInitials(username.slice(0, 2).toUpperCase());
+        setBattlesLoading(false);
+        setListsLoading(false);
       }
 
-      // Fetch battle history
-      const { data: p1Battles } = await supabase
-        .from('battles').select('*').eq('player1_username', username).eq('status', 'ended').order('ended_at', { ascending: false }).limit(50);
-      const { data: p2Battles } = await supabase
-        .from('battles').select('*').eq('player2_username', username).eq('status', 'ended').order('ended_at', { ascending: false }).limit(50);
-
-      const allBattles = [...(p1Battles || []), ...(p2Battles || [])]
-        .sort((a, b) => new Date(b.ended_at || b.created_at) - new Date(a.ended_at || a.created_at));
-      setBattleHistory(allBattles);
-      setBattlesLoading(false);
-
-      const { data: followersRaw } = await supabase
-        .from('follows').select('follower_id').eq('following_username', username);
-      const followerIds = followersRaw?.map(f => f.follower_id) || [];
-      setFollowerCount(followerIds.length);
-      if (followerIds.length > 0) {
-        const { data: followerProfiles } = await supabase
-          .from('profiles').select('username, full_name').in('id', followerIds);
-        setFollowerList(followerProfiles || []);
-      } else {
-        setFollowerList([]);
-      }
-
-      if (profileData?.id) {
-        const { data: followingRaw } = await supabase
-          .from('follows').select('following_username').eq('follower_id', profileData.id);
-        const followingUsernames = followingRaw?.map(f => f.following_username) || [];
-        setFollowingCount(followingUsernames.length);
-        if (followingUsernames.length > 0) {
-          const { data: followingProfiles } = await supabase
-            .from('profiles').select('username, full_name').in('username', followingUsernames);
-          setFollowingList(followingProfiles || []);
-        } else {
-          setFollowingList([]);
-        }
-      }
-
-      if (currentUser) {
-        const { data: existingFollow } = await supabase
-          .from('follows').select('id').eq('follower_id', currentUser.id).eq('following_username', username).maybeSingle();
-        setIsFollowing(!!existingFollow);
-      }
-
-      setListsLoading(false);
-      setLoading(false);
+      setLoading(false); // profile loaded — show page
     }
-    fetchData();
+
+    fetchProfile();
   }, [username]);
 
   const isOwner = user && profile && user.id === profile.id;
@@ -205,12 +210,10 @@ export default function Profile({ params }) {
     if (followLoading) return;
     setFollowLoading(true);
     if (isFollowing) {
-      setIsFollowing(false);
-      setFollowerCount(c => c - 1);
+      setIsFollowing(false); setFollowerCount(c => c - 1);
       await supabase.from('follows').delete().eq('follower_id', user.id).eq('following_username', username);
     } else {
-      setIsFollowing(true);
-      setFollowerCount(c => c + 1);
+      setIsFollowing(true); setFollowerCount(c => c + 1);
       await supabase.from('follows').insert({ follower_id: user.id, following_username: username });
     }
     setFollowLoading(false);
@@ -241,8 +244,7 @@ export default function Profile({ params }) {
   async function saveHandle() {
     if (handleInput.length < 3) { setHandleError('Min 3 characters'); return; }
     if (!/^[a-z0-9_]+$/.test(handleInput)) { setHandleError('Only letters, numbers and underscores'); return; }
-    setSavingHandle(true);
-    setHandleError('');
+    setSavingHandle(true); setHandleError('');
     const { data: existing } = await supabase.from('profiles').select('username').eq('username', handleInput).maybeSingle();
     if (existing) { setHandleError('That username is already taken'); setSavingHandle(false); return; }
     const { error } = await supabase.from('profiles').update({ username: handleInput }).eq('id', user.id);
@@ -259,9 +261,8 @@ export default function Profile({ params }) {
     const { error } = await supabase.storage.from('avatars').upload(fileName, file, { upsert: true });
     if (error) { setUploading(false); return; }
     const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
-    const avatarUrl = urlData.publicUrl;
-    setPhotoUrl(avatarUrl);
-    await supabase.from('profiles').update({ avatar_url: avatarUrl }).eq('username', username);
+    setPhotoUrl(urlData.publicUrl);
+    await supabase.from('profiles').update({ avatar_url: urlData.publicUrl }).eq('username', username);
     setUploading(false);
   }
 
@@ -292,12 +293,9 @@ export default function Profile({ params }) {
 
           <div className={styles.sidebar}>
             <div className={styles.profileCard}>
-
               <div className={styles.avatarWrap}>
                 <div className={styles.avatarContainer} onClick={() => isOwner && fileInputRef.current?.click()}>
-                  {photoUrl
-                    ? <img src={photoUrl} alt="Profile" className={styles.avatarImg} />
-                    : <div className={styles.avatar}>{initials}</div>}
+                  {photoUrl ? <img src={photoUrl} alt="Profile" className={styles.avatarImg} /> : <div className={styles.avatar}>{initials}</div>}
                   {isOwner && <div className={styles.avatarOverlay}>{uploading ? '⏳' : '📷'}</div>}
                 </div>
                 {isOwner && <input ref={fileInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePhotoUpload} />}
@@ -427,7 +425,9 @@ export default function Profile({ params }) {
                   <div className={styles.statLabel}>Win Rate</div>
                 </div>
                 <div className={styles.statItem}>
-                  <div className={styles.statNum} style={{ color: stats.rank ? '#F59E0B' : '#3D4A66' }}>{stats.rank && stats.battles_count > 0 ? `#${stats.rank}` : '—'}</div>
+                  <div className={styles.statNum} style={{ color: stats.rank ? '#F59E0B' : '#3D4A66' }}>
+                    {stats.rank === null ? '...' : stats.rank && stats.battles_count > 0 ? `#${stats.rank}` : '—'}
+                  </div>
                   <div className={styles.statLabel}>Rank</div>
                 </div>
               </div>
@@ -441,7 +441,6 @@ export default function Profile({ params }) {
           </div>
 
           <div className={styles.mainContent}>
-
             <div className={styles.tabs}>
               <button className={`${styles.tab} ${activeTab === 'battles' ? styles.tabActive : ''}`} onClick={() => setActiveTab('battles')}>
                 Battles ({battleHistory.length})
@@ -454,7 +453,6 @@ export default function Profile({ params }) {
               </button>
             </div>
 
-            {/* BATTLES TAB */}
             {activeTab === 'battles' && (
               battlesLoading ? (
                 <div className={styles.emptyState}><div style={{ color: '#6B7A9E', fontSize: '14px' }}>Loading...</div></div>
@@ -471,52 +469,22 @@ export default function Profile({ params }) {
                     const isP1 = battle.player1_username === username;
                     const opponent = isP1 ? battle.player2_username : battle.player1_username;
                     const myStance = isP1 ? battle.player1_stance : battle.player2_stance;
-                    let result = 'pending';
-                    let resultLabel = '—';
-                    let resultColor = '#6B7A9E';
+                    let result = 'pending', resultLabel = '—', resultColor = '#6B7A9E';
                     if (battle.winner) {
-                      if (battle.winner === 'tie') {
-                        result = 'tie';
-                        resultLabel = 'Tie';
-                        resultColor = '#F59E0B';
-                      } else if (battle.winner === username) {
-                        result = 'win';
-                        resultLabel = 'Win';
-                        resultColor = '#10B981';
-                      } else {
-                        result = 'loss';
-                        resultLabel = 'Loss';
-                        resultColor = '#EF4444';
-                      }
+                      if (battle.winner === 'tie') { result = 'tie'; resultLabel = 'Tie'; resultColor = '#F59E0B'; }
+                      else if (battle.winner === username) { result = 'win'; resultLabel = 'Win'; resultColor = '#10B981'; }
+                      else { result = 'loss'; resultLabel = 'Loss'; resultColor = '#EF4444'; }
                     }
                     return (
                       <Link key={battle.id} href={`/battle/room/${battle.id}`} style={{ textDecoration: 'none' }}>
-                        <div style={{
-                          background: '#0f1623',
-                          border: `1px solid ${result === 'win' ? 'rgba(16,185,129,0.2)' : result === 'loss' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.065)'}`,
-                          borderRadius: '14px', padding: '1rem 1.25rem',
-                          transition: 'border-color 0.2s',
-                          display: 'flex', flexDirection: 'column', gap: '8px',
-                        }}>
+                        <div style={{ background: '#0f1623', border: `1px solid ${result === 'win' ? 'rgba(16,185,129,0.2)' : result === 'loss' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.065)'}`, borderRadius: '14px', padding: '1rem 1.25rem', transition: 'border-color 0.2s', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', color: '#EEF2FF', lineHeight: 1.4, marginBottom: '4px' }}>
-                                "{battle.topic}"
-                              </div>
-                              {myStance && (
-                                <div style={{ fontSize: '12px', color: '#6B7A9E' }}>
-                                  Your stance: <span style={{ color: '#C4CCDF' }}>{myStance}</span>
-                                </div>
-                              )}
+                              <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', color: '#EEF2FF', lineHeight: 1.4, marginBottom: '4px' }}>"{battle.topic}"</div>
+                              {myStance && <div style={{ fontSize: '12px', color: '#6B7A9E' }}>Your stance: <span style={{ color: '#C4CCDF' }}>{myStance}</span></div>}
                             </div>
-                            <div style={{
-                              fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: '13px',
-                              color: resultColor,
-                              background: result === 'win' ? 'rgba(16,185,129,0.1)' : result === 'loss' ? 'rgba(239,68,68,0.1)' : result === 'tie' ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.05)',
-                              border: `1px solid ${result === 'win' ? 'rgba(16,185,129,0.25)' : result === 'loss' ? 'rgba(239,68,68,0.2)' : result === 'tie' ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.08)'}`,
-                              borderRadius: '100px', padding: '3px 12px', flexShrink: 0,
-                            }}>
-                              {result === 'win' ? '🏆 ' : result === 'loss' ? '' : result === 'tie' ? '🤝 ' : ''}{resultLabel}
+                            <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: '13px', color: resultColor, background: result === 'win' ? 'rgba(16,185,129,0.1)' : result === 'loss' ? 'rgba(239,68,68,0.1)' : result === 'tie' ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.05)', border: `1px solid ${result === 'win' ? 'rgba(16,185,129,0.25)' : result === 'loss' ? 'rgba(239,68,68,0.2)' : result === 'tie' ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '100px', padding: '3px 12px', flexShrink: 0 }}>
+                              {result === 'win' ? '🏆 ' : result === 'tie' ? '🤝 ' : ''}{resultLabel}
                             </div>
                           </div>
                           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', color: '#6B7A9E' }}>
@@ -531,11 +499,9 @@ export default function Profile({ params }) {
               )
             )}
 
-            {/* FOLLOWERS TAB */}
             {activeTab === 'followers' && (
-              listsLoading ? (
-                <div className={styles.emptyState}><div style={{ color: '#6B7A9E', fontSize: '14px' }}>Loading...</div></div>
-              ) : followerList.length === 0 ? (
+              listsLoading ? <div className={styles.emptyState}><div style={{ color: '#6B7A9E', fontSize: '14px' }}>Loading...</div></div>
+              : followerList.length === 0 ? (
                 <div className={styles.emptyState}>
                   <div className={styles.emptyIcon}>👥</div>
                   <div className={styles.emptyTitle}>No followers yet</div>
@@ -543,17 +509,13 @@ export default function Profile({ params }) {
                   <Link href="/battle" className={styles.emptyBtn}>Start building your rep →</Link>
                 </div>
               ) : (
-                <div className={styles.followList}>
-                  {followerList.map((u, i) => <UserCard key={u.username} u={u} index={i} styles={styles} />)}
-                </div>
+                <div className={styles.followList}>{followerList.map((u, i) => <UserCard key={u.username} u={u} index={i} styles={styles} />)}</div>
               )
             )}
 
-            {/* FOLLOWING TAB */}
             {activeTab === 'following' && (
-              listsLoading ? (
-                <div className={styles.emptyState}><div style={{ color: '#6B7A9E', fontSize: '14px' }}>Loading...</div></div>
-              ) : followingList.length === 0 ? (
+              listsLoading ? <div className={styles.emptyState}><div style={{ color: '#6B7A9E', fontSize: '14px' }}>Loading...</div></div>
+              : followingList.length === 0 ? (
                 <div className={styles.emptyState}>
                   <div className={styles.emptyIcon}>👀</div>
                   <div className={styles.emptyTitle}>Not following anyone yet</div>
@@ -561,9 +523,7 @@ export default function Profile({ params }) {
                   <Link href="/leaderboard" className={styles.emptyBtn}>Find debaters to follow →</Link>
                 </div>
               ) : (
-                <div className={styles.followList}>
-                  {followingList.map((u, i) => <UserCard key={u.username} u={u} index={i} styles={styles} />)}
-                </div>
+                <div className={styles.followList}>{followingList.map((u, i) => <UserCard key={u.username} u={u} index={i} styles={styles} />)}</div>
               )
             )}
 
@@ -617,7 +577,6 @@ export default function Profile({ params }) {
                 </div>
               </div>
             )}
-
           </div>
         </div>
       </div>
