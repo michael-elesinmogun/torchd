@@ -620,9 +620,18 @@ export default function GameRoom() {
         if (pt.includes('top') || tx.includes('top of')) return { logo: game?.away?.logo, color: awayColor };
         if (pt.includes('bottom') || tx.includes('bottom of')) return { logo: game?.home?.logo, color: homeColor };
 
-        // Scan the full filtered play list for nearest inning half marker
+        // Plays are newest-first. Scan BACKWARD (toward newer = lower index) first,
+        // then forward (toward older = higher index) to find the nearest inning half marker.
         const playIdx = filtered.findIndex(p => p.id === play.id);
         const start = playIdx >= 0 ? playIdx : 0;
+        // Scan backward toward newer plays
+        for (let j = start - 1; j >= Math.max(0, start - 60); j--) {
+          const pt2 = (filtered[j].periodText || '').toLowerCase();
+          const tx2 = (filtered[j].text || '').toLowerCase();
+          if (pt2.includes('top') || tx2.includes('top of')) return { logo: game?.away?.logo, color: awayColor };
+          if (pt2.includes('bottom') || tx2.includes('bottom of')) return { logo: game?.home?.logo, color: homeColor };
+        }
+        // Scan forward toward older plays
         for (let j = start + 1; j < Math.min(start + 60, filtered.length); j++) {
           const pt2 = (filtered[j].periodText || '').toLowerCase();
           const tx2 = (filtered[j].text || '').toLowerCase();
