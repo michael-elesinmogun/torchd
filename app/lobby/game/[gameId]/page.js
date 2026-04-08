@@ -607,7 +607,6 @@ export default function GameRoom() {
             let playTeamColor = null;
 
             if (play.team) {
-              // ESPN gave us the team abbr on the play
               if (game?.away?.abbr === play.team || game?.away?.name?.includes(play.team)) {
                 playTeamLogo = game.away.logo;
                 playTeamColor = awayColor;
@@ -617,7 +616,35 @@ export default function GameRoom() {
               }
             }
 
-            // For scoring plays, infer from score change
+            // MLB: infer team from inning half (Top = away batting, Bottom = home batting)
+            if (!playTeamColor && sport === 'mlb') {
+              const periodText = (play.periodText || '').toLowerCase();
+              const playText = (play.text || '').toLowerCase();
+              if (periodText.includes('top') || playText.includes('top of')) {
+                playTeamLogo = game?.away?.logo;
+                playTeamColor = awayColor;
+              } else if (periodText.includes('bottom') || playText.includes('bottom of')) {
+                playTeamLogo = game?.home?.logo;
+                playTeamColor = homeColor;
+              } else {
+                // Scan back through nearby plays to find nearest inning half marker
+                for (let j = i + 1; j < Math.min(i + 30, filtered.length); j++) {
+                  const pt = (filtered[j].periodText || '').toLowerCase();
+                  const tx = (filtered[j].text || '').toLowerCase();
+                  if (pt.includes('top') || tx.includes('top of')) {
+                    playTeamLogo = game?.away?.logo;
+                    playTeamColor = awayColor;
+                    break;
+                  } else if (pt.includes('bottom') || tx.includes('bottom of')) {
+                    playTeamLogo = game?.home?.logo;
+                    playTeamColor = homeColor;
+                    break;
+                  }
+                }
+              }
+            }
+
+            // Scoring plays: infer from score change
             if (play.scoringPlay && prevPlay && !playTeamColor) {
               if (play.awayScore > prevPlay.awayScore) {
                 playTeamLogo = game?.away?.logo;
