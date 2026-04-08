@@ -455,18 +455,24 @@ export default function GameRoom() {
     </div>
   );
 
-  // Reusable team stats block — shows ALL stats ESPN returns, no filtering
+  // Team stats block — uses team color for accent bar
   function TeamStatsBlock({ team }) {
+    const teamColor = team.color ? `#${team.color}` : '#3B82F6';
     return (
       <div className={styles.teamStatsBlock}>
+        {/* Colored accent bar at top */}
+        <div style={{ height: '3px', background: teamColor, borderRadius: '3px 3px 0 0', marginBottom: '1rem' }} />
         <div className={styles.teamStatsHeader}>
-          {team.logo && <img src={team.logo} alt={team.team} className={styles.teamStatsLogo} />}
+          {team.logo && (
+            <img src={team.logo} alt={team.team}
+              style={{ width: '36px', height: '36px', objectFit: 'contain' }} />
+          )}
           <span className={styles.teamStatsName}>{team.name}</span>
         </div>
         <div className={styles.teamStatsGrid}>
           {team.statistics?.map(stat => (
             <div key={stat.name} className={styles.teamStatItem}>
-              <div className={styles.teamStatValue}>{stat.displayValue}</div>
+              <div className={styles.teamStatValue} style={{ color: teamColor }}>{stat.displayValue}</div>
               <div className={styles.teamStatLabel}>{stat.abbreviation || stat.label}</div>
             </div>
           ))}
@@ -475,7 +481,7 @@ export default function GameRoom() {
     );
   }
 
-  // Reusable box score block
+  // Box score block
   function BoxScoreBlock({ teamPlayers }) {
     const statGroup = teamPlayers.statistics?.[0];
     if (!statGroup) return null;
@@ -490,10 +496,15 @@ export default function GameRoom() {
     const keyIndices = keyStats.map(k => labels.indexOf(k)).filter(i => i >= 0);
     const finalIndices = keyIndices.length > 0 ? keyIndices : labels.map((_, i) => i).slice(0, 8);
     const displayLabels = finalIndices.map(i => labels[i]);
+    const teamColor = teamPlayers.teamColor ? `#${teamPlayers.teamColor}` : '#3B82F6';
     return (
       <div className={styles.boxScoreBlock}>
-        <div className={styles.teamStatsHeader}>
-          {teamPlayers.teamLogo && <img src={teamPlayers.teamLogo} alt={teamPlayers.team} className={styles.teamStatsLogo} />}
+        <div style={{ height: '3px', background: teamColor, margin: '0 1.25rem 0.75rem', borderRadius: '3px' }} />
+        <div className={styles.teamStatsHeader} style={{ padding: '0 1.25rem', marginBottom: '0' }}>
+          {teamPlayers.teamLogo && (
+            <img src={teamPlayers.teamLogo} alt={teamPlayers.team}
+              style={{ width: '28px', height: '28px', objectFit: 'contain' }} />
+          )}
           <span className={styles.teamStatsName}>{teamPlayers.teamName}</span>
         </div>
         <div className={styles.boxScoreTable}>
@@ -520,7 +531,7 @@ export default function GameRoom() {
     );
   }
 
-  // Reusable plays list
+  // Plays list
   function PlaysList({ scrollable = false }) {
     const filtered = plays.filter(p => activePeriod === 'all' || Number(p.period) === Number(activePeriod));
     const wrapClass = scrollable ? styles.mobileScrollPane : styles.gamecastWrap;
@@ -677,7 +688,7 @@ export default function GameRoom() {
         </div>
       )}
 
-      {/* MOBILE: single column with chat as a tab */}
+      {/* MOBILE */}
       <div className={styles.mobileLayout}>
         <div className={styles.mainStatsTabs}>
           <button className={`${styles.mainStatsTab} ${activeStatsTab === 'chat' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('chat')}>💬 Chat</button>
@@ -709,7 +720,7 @@ export default function GameRoom() {
         )}
       </div>
 
-      {/* DESKTOP: side-by-side split layout */}
+      {/* DESKTOP */}
       <div className={styles.mainContent} ref={containerRef}>
         <div className={styles.gamecastCol} style={{width: `${splitPct}%`}}>
           <div className={styles.mainStatsTabs}>
