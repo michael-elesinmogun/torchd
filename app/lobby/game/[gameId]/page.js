@@ -56,16 +56,19 @@ function getVisibleTeamColor(hexColor) {
   const g = parseInt(hex.slice(2, 4), 16);
   const b = parseInt(hex.slice(4, 6), 16);
   const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+  // Distance from the dark background #060912
   const distFromBg = Math.sqrt((r-6)**2 + (g-9)**2 + (b-18)**2);
-  if (luminance < 60 || distFromBg < 80) {
-    const scale = Math.max(2.5, 180 / Math.max(luminance, 1));
+  // Too dark or too close to background — boost it
+  if (luminance < 80 || distFromBg < 100) {
+    const scale = Math.max(3.0, 220 / Math.max(luminance, 1));
     const nr = Math.min(255, Math.round(r * scale));
     const ng = Math.min(255, Math.round(g * scale));
     const nb = Math.min(255, Math.round(b * scale));
     const newLum = 0.299 * nr + 0.587 * ng + 0.114 * nb;
-    if (newLum < 80) return '#C4CCDF';
+    if (newLum < 100) return '#C4CCDF';
     return `#${nr.toString(16).padStart(2,'0')}${ng.toString(16).padStart(2,'0')}${nb.toString(16).padStart(2,'0')}`;
   }
+  // Color is bright enough — return as-is
   return hexColor;
 }
 
@@ -665,7 +668,7 @@ export default function GameRoom() {
             <div className={styles.teamBlock}>
               {game.away.logo && <img src={game.away.logo} alt={game.away.abbr} className={styles.teamLogo} />}
               <div className={styles.teamAbbr}>{game.away.abbr}</div>
-              {showScore(game.status) && <div className={`${styles.score} ${game.away.score > game.home.score ? styles.scoreLeading : ''}`}>{game.away.score}</div>}
+              {showScore(game.status) && <div className={`${styles.score} ${game.away.score > game.home.score ? styles.scoreLeading : ''}`}>{game.away.score ?? 0}</div>}
             </div>
             <div className={styles.gameInfo}>
               <div className={`${styles.gameStatus} ${live ? styles.gameStatusLive : ''}`}>
@@ -678,7 +681,7 @@ export default function GameRoom() {
             <div className={styles.teamBlock}>
               {game.home.logo && <img src={game.home.logo} alt={game.home.abbr} className={styles.teamLogo} />}
               <div className={styles.teamAbbr}>{game.home.abbr}</div>
-              {showScore(game.status) && <div className={`${styles.score} ${game.home.score > game.away.score ? styles.scoreLeading : ''}`}>{game.home.score}</div>}
+              {showScore(game.status) && <div className={`${styles.score} ${game.home.score > game.away.score ? styles.scoreLeading : ''}`}>{game.home.score ?? 0}</div>}
             </div>
           </div>
         ) : <div className={styles.scoreBoardLoading}>Loading game...</div>}
