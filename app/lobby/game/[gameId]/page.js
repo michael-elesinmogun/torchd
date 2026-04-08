@@ -669,6 +669,9 @@ export default function GameRoom() {
               }
               if (group.type === 'event') {
                 if (!group.play?.text?.trim()) return null;
+                const et = (group.play.text || '').toLowerCase();
+                // Skip raw pitch events — they show as dots in at-bat groups
+                if (/^pitch \d|^ball \d|^strike \d|ball in play|foul ball|foul tip|swinging strike/i.test(et)) return null;
                 return renderPlay(group.play, group.play.id || gi);
               }
               return renderAB(group, gi);
