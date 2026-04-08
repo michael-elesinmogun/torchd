@@ -601,132 +601,48 @@ export default function GameRoom() {
     const awayColor = getVisibleTeamColor(game?.away?.color ? `#${game.away.color}` : '#3B82F6');
     const homeColor = getVisibleTeamColor(game?.home?.color ? `#${game.home.color}` : '#10B981');
 
-    // Helper: get team color/logo from a play using inning half inference
-    // In baseball: TOP = away team bats, BOTTOM = home team bats
-    // Plays are NEWEST-FIRST. To find which half a play is in, scan FORWARD
-    // (higher index = older plays) to find the nearest "Top of" or "Bottom of" separator
-    // that came just before this play chronologically.
+    // Build a play->half map in ONE pass through filtered (newest-first).
+    // Reverse to process chronologically, track current half as we go.
+    // Top = away bats, Bottom = home bats. Dead simple.
+    const playHalfMap = React.useMemo(() => {
+      const map = {}; // play.id -> 'top' | 'bottom'
+      let currentHalf = null;
+      // Process oldest-first (reverse of newest-first filtered)
+      for (let i = filtered.length - 1; i >= 0; i--) {
+        const p = filtered[i];
+        const tx = (p.text || '').toLowerCase();
+        if (tx.includes('top of')) currentHalf = 'top';
+        else if (tx.includes('bottom of')) currentHalf = 'bottom';
+        if (p.id && currentHalf) map[p.id] = currentHalf;
+      }
+      return map;
+    }, [filtered]);
+
+    // Helper: get team color/logo for a play
     function getPlayTeam(play) {
+      // If ESPN gave us the team directly, use it
       if (play.team) {
         if (game?.away?.abbr === play.team) return { logo: game.away.logo, color: awayColor };
         if (game?.home?.abbr === play.team) return { logo: game.home.logo, color: homeColor };
       }
       if (sport === 'mlb') {
         const tx = (play.text || '').toLowerCase();
-        // Pure pitching/fielding position events — no batting team
+        // Skip pure fielding/pitching events
         const isFieldingOnly = tx.startsWith('pitches to') || tx.startsWith('relieved') ||
           tx.startsWith('to the mound') || tx.startsWith('warming up') ||
-          tx.endsWith('in center field.') || tx.endsWith('in left field.') || tx.endsWith('in right field.');
+          /in (center|left|right) field/.test(tx);
         if (isFieldingOnly) return { logo: null, color: null };
 
-        // If the play itself says top/bottom, use that directly
-        const pt = (play.periodText || '').toLowerCase();
-        if (pt.includes('top') || tx.includes('top of')) return { logo: game?.away?.logo, color: awayColor };
-        if (pt.includes('bottom') || tx.includes('bottom of')) return { logo: game?.home?.logo, color: homeColor };
+        // Check play's own text first
+        if (tx.includes('top of')) return { logo: game?.away?.logo, color: awayColor };
+        if (tx.includes('bottom of')) return { logo: game?.home?.logo, color: homeColor };
 
-        // Find the nearest inning half separator for this play's period.
-        // Search the entire filtered list for "Top of the Nth" and "Bottom of the Nth"
-        // that match this play's period, then pick the one closest in index.
-        const playIdx = filtered.findIndex(p => p.id === play.id);
-        const start = playIdx >= 0 ? playIdx : 0;
-
-        let topIdx = -1;
-        let bottomIdx = -1;
-        for (let j = 0; j < filtered.length; j++) {
-          const tx2 = (filtered[j].text || '').toLowerCase();
-          const sameOrAdjacentPeriod = !play.period || !filtered[j].period ||
-            Math.abs(filtered[j].period - play.period) <= 1;
-          if (sameOrAdjacentPeriod && tx2.includes('top of') && topIdx === -1) topIdx = j;
-          if (sameOrAdjacentPeriod && tx2.includes('bottom of') && bottomIdx === -1) bottomIdx = j;
-          // Once we have both, stop
-          if (topIdx !== -1 && bottomIdx !== -1) break;
-        }
-
-        // The separator that is CLOSEST to this play (smallest index diff)
-        // AND comes from the same period wins
-        const topDist = topIdx >= 0 ? Math.abs(topIdx - start) : Infinity;
-        const bottomDist = bottomIdx >= 0 ? Math.abs(bottomIdx - start) : Infinity;
-
-        // But we must also check: in newest-first order, the correct separator
-        // is the one with a HIGHER index (older) that is closest to this play.
-        // If both are at higher index, nearest wins.
-        // If both are at lower index (newer than this play), use the farthest one (oldest nearest to this play chronologically).
-        const topAfter = topIdx > start;
-        const bottomAfter = bottomIdx > start;
-
-        if (topAfter && bottomAfter) {
-          // Both older than play — nearest wins
-          return topDist < bottomDist
-            ? { logo: game?.away?.logo, color: awayColor }
-            : { logo: game?.home?.logo, color: homeColor };
-        } else if (topAfter) {
-          return { logo: game?.away?.logo, color: awayColor };
-        } else if (bottomAfter) {
-          return { logo: game?.home?.logo, color: homeColor };
-        }
-        // Both newer than play (unusual) — use nearest
-        return topDist <= bottomDist
-          ? { logo: game?.away?.logo, color: awayColor }
-          : { logo: game?.home?.logo, color: homeColor };
+        // Use the pre-built half map — most reliable
+        const half = playHalfMap[play.id];
+        if (half === 'top') return { logo: game?.away?.logo, color: awayColor };
+        if (half === 'bottom') return { logo: game?.home?.logo, color: homeColor };
       }
       return { logo: null, color: null };
-    }
-
-    // MLB: group plays into at-bats
-    function groupMLBAtBats(plays) {
-      const groups = [];
-      let current = null;
-
-      // plays are newest-first, reverse to process chronologically
-      const chronological = [...plays].reverse();
-
-      for (const play of chronological) {
-        const text = (play.text || '').toLowerCase();
-        const type = (play.type || '').toLowerCase();
-
-        // Inning separator
-        if (text.includes('end of') || text.includes('top of') || text.includes('bottom of') || text.includes('start of')) {
-          if (current) { groups.unshift(current); current = null; }
-          groups.unshift({ type: 'inning', play });
-          continue;
-        }
-
-        // AB starter: "X pitches to Y"
-        const isABStart = text.match(/pitches to|batting|steps in/i);
-        if (isABStart) {
-          if (current) groups.unshift(current);
-          current = { type: 'ab', pitches: [], result: null, play };
-          continue;
-        }
-
-        // Pitch
-        const isPitch = text.match(/^pitch \d|^ball \d|^strike \d|ball in play|foul ball|foul tip|swinging strike/i);
-        if (isPitch && current) {
-          current.pitches.unshift(play); // newest first within AB
-          continue;
-        }
-
-        // AB result (out, hit, walk, etc)
-        const isResult = text.match(/struck out|strikeout|grounded|flied|lined|popped|singled|doubled|tripled|homered|walked|hit by pitch|sacrifice|fielder.s choice|error|reaches|safe at/i);
-        if (isResult) {
-          if (current) {
-            current.result = play;
-            if (play.scoringPlay) current.scoringPlay = true;
-            groups.unshift(current);
-            current = null;
-          } else {
-            // Result without a preceding AB start — treat as standalone
-            groups.unshift({ type: 'ab', pitches: [], result: play, play, scoringPlay: play.scoringPlay });
-          }
-          continue;
-        }
-
-        // Anything else — standalone event
-        if (current) { groups.unshift(current); current = null; }
-        groups.unshift({ type: 'event', play });
-      }
-      if (current) groups.unshift(current);
-      return groups;
     }
 
     // Render pitch sequence as colored dots
