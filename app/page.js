@@ -27,7 +27,7 @@ export default function Home() {
           <div className={styles.navLinks}>
             <Link href="/lobby" className={styles.navLink}>Game Lobby</Link>
             <Link href="/leaderboard" className={styles.navLink}>Leaderboard</Link>
-            <Link href="/login" className={styles.navCta}>Sign up free</Link>
+            <Link href="/signup" className={styles.navCta}>Join now →</Link>
           </div>
         </div>
       </nav>
@@ -48,7 +48,7 @@ export default function Home() {
             The crowd votes. Your rank rises. This is Torchd.
           </p>
           <div className={styles.heroCtas}>
-            <Link href="/signup" className={styles.ctaPrimary}>Start debating free →</Link>
+            <Link href="/signup" className={styles.ctaPrimary}>Join now →</Link>
             <Link href="/lobby" className={styles.ctaSecondary}>Watch live games</Link>
           </div>
           <div className={styles.heroStats}>
@@ -186,7 +186,7 @@ export default function Home() {
           <h2 className={styles.ctaTitle}>Your takes deserve a verdict.</h2>
           <p className={styles.ctaSub}>Sign up free. No credit card. Start debating in 60 seconds.</p>
           <Link href="/signup" className={styles.ctaPrimary} style={{fontSize:'18px', padding:'16px 40px'}}>
-            Create your account →
+            Join now — it's free →
           </Link>
           <p className={styles.ctaFine}>Already have an account? <Link href="/login" style={{color:'#60A5FA', textDecoration:'none'}}>Sign in</Link></p>
         </div>
@@ -204,6 +204,7 @@ export default function Home() {
             <Link href="/battle" className={styles.footerLink}>Battle Mode</Link>
             <Link href="/leaderboard" className={styles.footerLink}>Leaderboard</Link>
             <Link href="/login" className={styles.footerLink}>Sign in</Link>
+            <Link href="/signup" className={styles.footerLink}>Join free</Link>
           </div>
           <p className={styles.footerCopy}>© 2026 Torchd. All rights reserved.</p>
         </div>
