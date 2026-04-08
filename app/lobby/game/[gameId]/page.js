@@ -627,8 +627,8 @@ export default function GameRoom() {
     const rawHome = game?.home?.color || game?.home?.alternateColor || sportColors[game?.home?.abbr];
     const awayColor = getVisibleTeamColor(toHex(rawAway) || '#3B82F6');
     const homeColor = getVisibleTeamColor(toHex(rawHome) || '#10B981');
-    const awayBorder = darkenForBorder(toHex(rawAway) || '#3B82F6');
-    const homeBorder = darkenForBorder(toHex(rawHome) || '#10B981');
+    const awayBorder = toHex(rawAway) || '#3B82F6';
+    const homeBorder = toHex(rawHome) || '#10B981';
 
     // Single pass: build play->half map oldest-first
     const playHalfMap = {};
