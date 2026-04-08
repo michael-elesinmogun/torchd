@@ -624,18 +624,50 @@ export default function GameRoom() {
         if (pt.includes('top') || tx.includes('top of')) return { logo: game?.away?.logo, color: awayColor };
         if (pt.includes('bottom') || tx.includes('bottom of')) return { logo: game?.home?.logo, color: homeColor };
 
-        // Plays are newest-first. The inning half separator for this play is OLDER
-        // than the play itself, meaning it has a HIGHER index in filtered[].
-        // Scan forward (higher index = older) to find nearest "Top of" / "Bottom of".
+        // Find the nearest inning half separator for this play's period.
+        // Search the entire filtered list for "Top of the Nth" and "Bottom of the Nth"
+        // that match this play's period, then pick the one closest in index.
         const playIdx = filtered.findIndex(p => p.id === play.id);
         const start = playIdx >= 0 ? playIdx : 0;
-        for (let j = start + 1; j < Math.min(start + 120, filtered.length); j++) {
+
+        let topIdx = -1;
+        let bottomIdx = -1;
+        for (let j = 0; j < filtered.length; j++) {
           const tx2 = (filtered[j].text || '').toLowerCase();
-          if (tx2.includes('top of')) return { logo: game?.away?.logo, color: awayColor };
-          if (tx2.includes('bottom of')) return { logo: game?.home?.logo, color: homeColor };
-          // Stop if we hit a different period — don't bleed into prior innings
-          if (filtered[j].period && play.period && filtered[j].period < play.period - 1) break;
+          const sameOrAdjacentPeriod = !play.period || !filtered[j].period ||
+            Math.abs(filtered[j].period - play.period) <= 1;
+          if (sameOrAdjacentPeriod && tx2.includes('top of') && topIdx === -1) topIdx = j;
+          if (sameOrAdjacentPeriod && tx2.includes('bottom of') && bottomIdx === -1) bottomIdx = j;
+          // Once we have both, stop
+          if (topIdx !== -1 && bottomIdx !== -1) break;
         }
+
+        // The separator that is CLOSEST to this play (smallest index diff)
+        // AND comes from the same period wins
+        const topDist = topIdx >= 0 ? Math.abs(topIdx - start) : Infinity;
+        const bottomDist = bottomIdx >= 0 ? Math.abs(bottomIdx - start) : Infinity;
+
+        // But we must also check: in newest-first order, the correct separator
+        // is the one with a HIGHER index (older) that is closest to this play.
+        // If both are at higher index, nearest wins.
+        // If both are at lower index (newer than this play), use the farthest one (oldest nearest to this play chronologically).
+        const topAfter = topIdx > start;
+        const bottomAfter = bottomIdx > start;
+
+        if (topAfter && bottomAfter) {
+          // Both older than play — nearest wins
+          return topDist < bottomDist
+            ? { logo: game?.away?.logo, color: awayColor }
+            : { logo: game?.home?.logo, color: homeColor };
+        } else if (topAfter) {
+          return { logo: game?.away?.logo, color: awayColor };
+        } else if (bottomAfter) {
+          return { logo: game?.home?.logo, color: homeColor };
+        }
+        // Both newer than play (unusual) — use nearest
+        return topDist <= bottomDist
+          ? { logo: game?.away?.logo, color: awayColor }
+          : { logo: game?.home?.logo, color: homeColor };
       }
       return { logo: null, color: null };
     }
