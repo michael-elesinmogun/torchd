@@ -798,10 +798,13 @@ export default function GameRoom() {
                 return renderPlay(group.play, gi, filtered);
               }
 
-              // AB group
+              // AB group — only show if there's a meaningful result
               const { pitches, result, play: abPlay, scoringPlay } = group;
               const displayPlay = result || abPlay;
               if (!displayPlay) return null;
+              // Skip if the only text is just a "pitches to" starter with no result
+              const displayText = (displayPlay.text || '').toLowerCase();
+              if (!result && displayText.match(/pitches to|steps in|batting/)) return null;
 
               const { logo: teamLogo, color: teamColor } = getPlayTeam(displayPlay, gi, filtered);
               const isScoring = scoringPlay || displayPlay.scoringPlay;
