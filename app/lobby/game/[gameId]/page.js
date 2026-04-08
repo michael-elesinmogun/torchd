@@ -603,26 +603,29 @@ export default function GameRoom() {
 
     // Helper: get team color/logo from a play using inning half inference
     // In baseball: TOP = away team bats, BOTTOM = home team bats
-    function getPlayTeam(play, idx, list) {
+    // Always scans the full filtered array, not the grouped array
+    function getPlayTeam(play) {
       if (play.team) {
         if (game?.away?.abbr === play.team) return { logo: game.away.logo, color: awayColor };
         if (game?.home?.abbr === play.team) return { logo: game.home.logo, color: homeColor };
       }
       if (sport === 'mlb') {
         const tx = (play.text || '').toLowerCase();
-        // Fielding/pitching events belong to the FIELDING team (opposite of batting)
-        // Don't try to color these — they'll just get no logo and blend in
-        const isFieldingEvent = tx.match(/pitches to|relieved|in (center|left|right) field|to the mound|warming up/);
-        if (isFieldingEvent) return { logo: null, color: null };
+        // Pure pitching/fielding position events — no batting team
+        const isFieldingOnly = tx.match(/^(pitches to|relieved|to the mound|warming up)/) ||
+          tx.match(/in (center|left|right) field\.?$/);
+        if (isFieldingOnly) return { logo: null, color: null };
 
         const pt = (play.periodText || '').toLowerCase();
         if (pt.includes('top') || tx.includes('top of')) return { logo: game?.away?.logo, color: awayColor };
         if (pt.includes('bottom') || tx.includes('bottom of')) return { logo: game?.home?.logo, color: homeColor };
 
-        // Scan nearby plays for inning half context
-        for (let j = idx + 1; j < Math.min(idx + 40, list.length); j++) {
-          const pt2 = (list[j].periodText || '').toLowerCase();
-          const tx2 = (list[j].text || '').toLowerCase();
+        // Scan the full filtered play list for nearest inning half marker
+        const playIdx = filtered.findIndex(p => p.id === play.id);
+        const start = playIdx >= 0 ? playIdx : 0;
+        for (let j = start + 1; j < Math.min(start + 60, filtered.length); j++) {
+          const pt2 = (filtered[j].periodText || '').toLowerCase();
+          const tx2 = (filtered[j].text || '').toLowerCase();
           if (pt2.includes('top') || tx2.includes('top of')) return { logo: game?.away?.logo, color: awayColor };
           if (pt2.includes('bottom') || tx2.includes('bottom of')) return { logo: game?.home?.logo, color: homeColor };
         }
@@ -713,7 +716,7 @@ export default function GameRoom() {
     }
 
     const renderPlay = (play, i, list) => {
-      const { logo: playTeamLogo, color: playTeamColor } = getPlayTeam(play, i, list);
+      const { logo: playTeamLogo, color: playTeamColor } = getPlayTeam(play);
       const playType = getPlayType(play, sport);
       let borderColor = 'transparent';
       let bgColor = 'transparent';
@@ -807,12 +810,13 @@ export default function GameRoom() {
               const displayText = (displayPlay.text || '').trim();
               if (!result && (!displayText || displayText.match(/pitches to|steps in|batting/i))) return null;
 
-              const { logo: teamLogo, color: teamColor } = getPlayTeam(displayPlay, gi, filtered);
+              const { logo: teamLogo, color: teamColor } = getPlayTeam(displayPlay);
               const isScoring = scoringPlay || displayPlay.scoringPlay;
               const text = (displayPlay.text || '').toLowerCase();
               const isOut = text.match(/struck out|grounded|flied|lined|popped|fielder.s choice/);
               const isHit = text.match(/singled|doubled|tripled|homered|hit by pitch|safe at/);
               const isWalk = text.match(/walked|walk/);
+              const isPH = text.match(/hit for|pinch.hit|pinch hit/);
 
               let borderColor = teamColor ? `${teamColor}33` : 'rgba(255,255,255,0.06)';
               let bgColor = 'transparent';
@@ -843,11 +847,11 @@ export default function GameRoom() {
                     <div style={{
                       fontSize: '10px', fontWeight: 700, fontFamily: 'Syne,sans-serif',
                       padding: '2px 7px', borderRadius: '100px',
-                      background: isScoring ? `${teamColor || awayColor}22` : isHit ? `${teamColor || '#10B981'}18` : isWalk ? 'rgba(96,165,250,0.12)' : 'rgba(255,255,255,0.05)',
-                      color: isScoring ? (teamColor || awayColor) : isHit ? (teamColor || '#10B981') : isWalk ? '#60A5FA' : '#6B7A9E',
-                      border: `1px solid ${isScoring ? `${teamColor || awayColor}55` : isHit ? `${teamColor || '#10B981'}44` : isWalk ? 'rgba(96,165,250,0.25)' : 'rgba(255,255,255,0.08)'}`,
+                      background: isScoring ? `${teamColor || awayColor}22` : isPH ? 'rgba(167,139,250,0.15)' : isHit ? `${teamColor || '#10B981'}18` : isWalk ? 'rgba(96,165,250,0.12)' : 'rgba(255,255,255,0.05)',
+                      color: isScoring ? (teamColor || awayColor) : isPH ? '#A78BFA' : isHit ? (teamColor || '#10B981') : isWalk ? '#60A5FA' : '#6B7A9E',
+                      border: `1px solid ${isScoring ? `${teamColor || awayColor}55` : isPH ? 'rgba(167,139,250,0.35)' : isHit ? `${teamColor || '#10B981'}44` : isWalk ? 'rgba(96,165,250,0.25)' : 'rgba(255,255,255,0.08)'}`,
                     }}>
-                      {isScoring ? '⚾ Scores' : isHit ? 'Hit' : isWalk ? 'Walk' : isOut ? 'Out' : ''}
+                      {isScoring ? '⚾ Scores' : isPH ? 'PH' : isHit ? 'Hit' : isWalk ? 'Walk' : isOut ? 'Out' : ''}
                     </div>
                   </div>
                   {/* Result row: logo + player text */}
