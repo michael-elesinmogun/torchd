@@ -237,4 +237,16 @@
   letter-spacing: -0.02em; color: #EEF2FF;
   margin: 0;
 }
-.heroBreak { display: block; } 
+.heroBreak { display: block; }
+
+/* SOCIAL PROOF */
+.socialProof {
+  display: flex; align-items: center; gap: 10px;
+}
+.socialAvatars { display: flex; align-items: center; }
+.socialAvatar {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 2px solid #060912; position: relative;
+}
+.socialText { font-size: 14px; color: #6B7A9E; }
+.socialText strong { color: #EEF2FF; font-weight: 600; }

@@ -1,4 +1,4 @@
-'use client';
+ 'use client';
 import Link from 'next/link';
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
@@ -35,6 +35,14 @@ export default function Home() {
           <div className={styles.heroCtas}>
             <Link href="/signup" className={styles.ctaPrimary}>Join now →</Link>
             <Link href="/lobby" className={styles.ctaSecondary}>Watch live games</Link>
+          </div>
+          <div className={styles.socialProof}>
+            <div className={styles.socialAvatars}>
+              {['#3B82F6','#10B981','#F59E0B','#8B5CF6','#EF4444'].map((c,i) => (
+                <div key={i} className={styles.socialAvatar} style={{background:c, marginLeft: i===0?0:'-8px', zIndex:5-i}}></div>
+              ))}
+            </div>
+            <span className={styles.socialText}><strong>2,400+ fans</strong> already debating</span>
           </div>
           <div className={styles.heroStats}>
             <div className={styles.heroStat}>
@@ -173,6 +181,14 @@ export default function Home() {
           <Link href="/signup" className={styles.ctaPrimary} style={{fontSize:'18px', padding:'16px 40px'}}>
             Join now — it's free →
           </Link>
+          <div className={styles.socialProof} style={{justifyContent:'center', marginTop:'1rem'}}>
+            <div className={styles.socialAvatars}>
+              {['#3B82F6','#10B981','#F59E0B','#8B5CF6','#EF4444'].map((c,i) => (
+                <div key={i} className={styles.socialAvatar} style={{background:c, marginLeft: i===0?0:'-8px', zIndex:5-i}}></div>
+              ))}
+            </div>
+            <span className={styles.socialText}><strong>2,400+ fans</strong> already debating</span>
+          </div>
           <p className={styles.ctaFine}>Already have an account? <Link href="/login" style={{color:'#60A5FA', textDecoration:'none'}}>Sign in</Link></p>
         </div>
       </section>
