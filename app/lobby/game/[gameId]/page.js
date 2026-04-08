@@ -61,7 +61,9 @@ export default function GameRoom() {
   const [plays, setPlays] = useState([]);
   const [gamcastLoading, setGamecastLoading] = useState(false);
   const [activePeriod, setActivePeriod] = useState('all');
-  const [activeStatsTab, setActiveStatsTab] = useState('chat');
+  const [activeStatsTab, setActiveStatsTab] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth <= 768 ? 'chat' : 'plays'
+  );
   const [teamStats, setTeamStats] = useState([]);
   const [players, setPlayers] = useState([]);
   const [splitPct, setSplitPct] = useState(50);
