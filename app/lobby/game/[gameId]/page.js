@@ -49,42 +49,46 @@ function getSportEmoji(sport) {
 }
 
 const TEAM_COLORS = {
-  // MLB
-  'SD': '2F241D', 'PIT': 'FDB827', 'NYY': '003087', 'LAD': '005A9C',
-  'BOS': 'BD3039', 'CHC': '0E3386', 'ATL': 'CE1141', 'HOU': 'EB6E1F',
-  'NYM': 'FF5910', 'STL': 'C41E3A', 'SF': 'FD5A1E', 'PHI': 'E81828',
-  'MIL': '12294A', 'MIN': '002B5C', 'CLE': 'E31937', 'DET': '0C2340',
-  'TOR': '134A8E', 'BAL': 'DF4601', 'CWS': '27251F', 'KC': '004687',
-  'TEX': 'C0111F', 'SEA': '0C2C56', 'LAA': 'BA0021', 'OAK': '003831',
-  'TB': '092C5C', 'COL': '33006F', 'ARI': 'A71930', 'MIA': '00A3E0',
-  'WSH': 'AB0003', 'CIN': 'C6011F',
-  // NBA
-  'BOS': '007A33', 'BKN': '000000', 'NYK': 'F58426', 'PHI': '006BB6',
-  'TOR': 'CE1141', 'CHI': 'CE1141', 'CLE': '860038', 'DET': 'C8102E',
-  'IND': '002D62', 'MIL': '00471B', 'ATL': 'E03A3E', 'CHA': '1D1160',
-  'MIA': '98002E', 'ORL': '0077C0', 'WAS': '002B5C', 'DEN': '0E2240',
-  'MIN': '0C2340', 'OKC': '007AC1', 'POR': 'E03A3E', 'UTA': '002B5C',
-  'GSW': '1D428A', 'LAC': 'C8102E', 'LAL': '552583', 'PHX': '1D1160',
-  'SAC': '5A2D81', 'DAL': '00538C', 'HOU': 'CE1141', 'MEM': '5D76A9',
-  'NOP': '0C2340', 'SAS': 'C4CED4',
-  // NFL
-  'ARI': '97233F', 'ATL': 'A71930', 'BAL': '241773', 'BUF': '00338D',
-  'CAR': '0085CA', 'CHI': '0B162A', 'CIN': 'FB4F14', 'CLE': '311D00',
-  'DAL': '003594', 'DEN': 'FB4F14', 'DET': '0076B6', 'GB': '203731',
-  'HOU': '03202F', 'IND': '002C5F', 'JAX': '006778', 'KC': 'E31837',
-  'LV': '000000', 'LAC': '0080C6', 'LAR': '003594', 'MIA': '008E97',
-  'MIN': '4F2683', 'NE': '002244', 'NO': 'D3BC8D', 'NYG': '0B2265',
-  'NYJ': '125740', 'PHI': '004C54', 'PIT': 'FFB612', 'SF': 'AA0000',
-  'SEA': '002244', 'TB': 'D50A0A', 'TEN': '0C2340', 'WAS': '5A1414',
-  // NHL
-  'ANA': 'FC4C02', 'ARI': '8C2633', 'BOS': 'FCB514', 'BUF': '003087',
-  'CGY': 'C8102E', 'CAR': 'CC0000', 'CHI': 'CF0A2C', 'COL': '6F263D',
-  'CBJ': '002654', 'DAL': '006847', 'DET': 'CE1126', 'EDM': 'FC4C02',
-  'FLA': 'C8102E', 'LAK': '111111', 'MIN': '154734', 'MTL': 'AF1E2D',
-  'NSH': 'FFB81C', 'NJD': 'CE1126', 'NYI': '003087', 'NYR': '0038A8',
-  'OTT': 'E4173E', 'PHI': 'F74902', 'PIT': 'FCB514', 'SEA': '001628',
-  'SJS': '006D75', 'STL': '002F87', 'TBL': '002868', 'TOR': '00205B',
-  'VAN': '00843D', 'VGK': 'B4975A', 'WSH': 'CF0A2C', 'WPG': '041E42',
+  mlb: {
+    'SD': '2F241D', 'PIT': 'FDB827', 'NYY': '003087', 'LAD': '005A9C',
+    'BOS': 'BD3039', 'CHC': '0E3386', 'ATL': 'CE1141', 'HOU': 'EB6E1F',
+    'NYM': 'FF5910', 'STL': 'C41E3A', 'SF': 'FD5A1E', 'PHI': 'E81828',
+    'MIL': '12294A', 'MIN': '002B5C', 'CLE': 'E31937', 'DET': '0C2340',
+    'TOR': '134A8E', 'BAL': 'DF4601', 'CWS': '27251F', 'KC': '004687',
+    'TEX': 'C0111F', 'SEA': '0C2C56', 'LAA': 'BA0021', 'OAK': '003831',
+    'TB': '092C5C', 'COL': '33006F', 'ARI': 'A71930', 'MIA': '00A3E0',
+    'WSH': 'AB0003', 'CIN': 'C6011F',
+  },
+  nba: {
+    'BOS': '007A33', 'BKN': '000000', 'NYK': 'F58426', 'PHI': '006BB6',
+    'TOR': 'CE1141', 'CHI': 'CE1141', 'CLE': '860038', 'DET': 'C8102E',
+    'IND': '002D62', 'MIL': '00471B', 'ATL': 'E03A3E', 'CHA': '1D1160',
+    'MIA': '98002E', 'ORL': '0077C0', 'WAS': '002B5C', 'DEN': '0E2240',
+    'MIN': '0C2340', 'OKC': '007AC1', 'POR': 'E03A3E', 'UTA': '002B5C',
+    'GSW': '1D428A', 'LAC': 'C8102E', 'LAL': '552583', 'PHX': '1D1160',
+    'SAC': '5A2D81', 'DAL': '00538C', 'HOU': 'CE1141', 'MEM': '5D76A9',
+    'NOP': '0C2340', 'SAS': 'C4CED4',
+  },
+  nfl: {
+    'ARI': '97233F', 'ATL': 'A71930', 'BAL': '241773', 'BUF': '00338D',
+    'CAR': '0085CA', 'CHI': '0B162A', 'CIN': 'FB4F14', 'CLE': '311D00',
+    'DAL': '003594', 'DEN': 'FB4F14', 'DET': '0076B6', 'GB': '203731',
+    'HOU': '03202F', 'IND': '002C5F', 'JAX': '006778', 'KC': 'E31837',
+    'LV': '000000', 'LAC': '0080C6', 'LAR': '003594', 'MIA': '008E97',
+    'MIN': '4F2683', 'NE': '002244', 'NO': 'D3BC8D', 'NYG': '0B2265',
+    'NYJ': '125740', 'PHI': '004C54', 'PIT': 'FFB612', 'SF': 'AA0000',
+    'SEA': '002244', 'TB': 'D50A0A', 'TEN': '0C2340', 'WSH': '5A1414',
+  },
+  nhl: {
+    'ANA': 'FC4C02', 'ARI': '8C2633', 'BOS': 'FCB514', 'BUF': '003087',
+    'CGY': 'C8102E', 'CAR': 'CC0000', 'CHI': 'CF0A2C', 'COL': '6F263D',
+    'CBJ': '002654', 'DAL': '006847', 'DET': 'CE1126', 'EDM': 'FC4C02',
+    'FLA': 'C8102E', 'LAK': '111111', 'MIN': '154734', 'MTL': 'AF1E2D',
+    'NSH': 'FFB81C', 'NJD': 'CE1126', 'NYI': '003087', 'NYR': '0038A8',
+    'OTT': 'E4173E', 'PHI': 'F74902', 'PIT': 'FCB514', 'SEA': '001628',
+    'SJS': '006D75', 'STL': '002F87', 'TBL': '002868', 'TOR': '00205B',
+    'VAN': '00843D', 'VGK': 'B4975A', 'WSH': 'CF0A2C', 'WPG': '041E42',
+  },
 };
 
 function getVisibleTeamColor(hexColor) {
@@ -568,8 +572,9 @@ export default function GameRoom() {
     })();
     const wrapClass = scrollable ? styles.mobileScrollPane : styles.gamecastWrap;
     const toHex = (c) => !c ? null : c.startsWith('#') ? c : `#${c}`;
-    const rawAway = game?.away?.color || game?.away?.alternateColor || TEAM_COLORS[game?.away?.abbr];
-    const rawHome = game?.home?.color || game?.home?.alternateColor || TEAM_COLORS[game?.home?.abbr];
+    const sportColors = TEAM_COLORS[sport] || TEAM_COLORS.mlb;
+    const rawAway = game?.away?.color || game?.away?.alternateColor || sportColors[game?.away?.abbr];
+    const rawHome = game?.home?.color || game?.home?.alternateColor || sportColors[game?.home?.abbr];
     const awayColor = getVisibleTeamColor(toHex(rawAway) || '#3B82F6');
     const homeColor = getVisibleTeamColor(toHex(rawHome) || '#10B981');
 
