@@ -50,7 +50,7 @@ function getSportEmoji(sport) {
 
 const TEAM_COLORS = {
   mlb: {
-    'SD': '2F241D', 'PIT': 'FFD026', 'NYY': '003087', 'LAD': '005A9C',
+    'SD': '2F241D', 'PIT': 'FFB612', 'NYY': '003087', 'LAD': '005A9C',
     'BOS': 'BD3039', 'CHC': '0E3386', 'ATL': 'CE1141', 'HOU': 'EB6E1F',
     'NYM': 'FF5910', 'STL': 'C41E3A', 'SF': 'FD5A1E', 'PHI': 'E81828',
     'MIL': '12294A', 'MIN': '002B5C', 'CLE': 'E31937', 'DET': '0C2340',
@@ -85,7 +85,7 @@ const TEAM_COLORS = {
     'CBJ': '002654', 'DAL': '006847', 'DET': 'CE1126', 'EDM': 'FC4C02',
     'FLA': 'C8102E', 'LAK': '111111', 'MIN': '154734', 'MTL': 'AF1E2D',
     'NSH': 'FFD026', 'NJD': 'CE1126', 'NYI': '003087', 'NYR': '0038A8',
-    'OTT': 'E4173E', 'PHI': 'F74902', 'PIT': 'FFD026', 'SEA': '001628',
+    'OTT': 'E4173E', 'PHI': 'F74902', 'PIT': 'FFB612', 'SEA': '001628',
     'SJS': '006D75', 'STL': '002F87', 'TBL': '002868', 'TOR': '00205B',
     'VAN': '00843D', 'VGK': 'B4975A', 'WSH': 'CF0A2C', 'WPG': '041E42',
   },
@@ -117,8 +117,8 @@ function getVisibleTeamColor(hexColor) {
   s = Math.min(1, s * 1.3);
   // Only boost lightness for dark colors — bright colors get washed out if pushed higher
   if (l < 0.45) l = Math.max(0.55, l * 1.4);
-  // Cap at 0.65 to prevent pale/washed look on already-bright colors
-  l = Math.min(0.65, l);
+  else if (s > 0.7) { /* already vivid - don't touch lightness */ }
+  else l = Math.min(0.65, l);
 
   // Convert back to RGB
   const hue = (p, q, t) => {
@@ -715,9 +715,9 @@ export default function GameRoom() {
           )}
           {isScoring && game && (
             <div className={styles.playScore}>
-              <span className={styles.scoreTeamPill} style={{ background: `${awayColor}30`, border: `1px solid ${awayColor}`, color: awayColor }}>{game.away?.abbr} {displayPlay.awayScore}</span>
+              <span className={styles.scoreTeamPill} style={{ background: `${awayColor}25`, border: `2px solid ${awayColor}`, color: '#EEF2FF', fontWeight: 800 }}>{game.away?.abbr} {displayPlay.awayScore}</span>
               <span style={{color:'#3D4A66',margin:'0 4px'}}>–</span>
-              <span className={styles.scoreTeamPill} style={{ background: `${homeColor}30`, border: `1px solid ${homeColor}`, color: homeColor }}>{game.home?.abbr} {displayPlay.homeScore}</span>
+              <span className={styles.scoreTeamPill} style={{ background: `${homeColor}25`, border: `2px solid ${homeColor}`, color: '#EEF2FF', fontWeight: 800 }}>{game.home?.abbr} {displayPlay.homeScore}</span>
             </div>
           )}
         </div>
