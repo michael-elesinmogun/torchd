@@ -116,7 +116,7 @@ function groupMLBAtBats(plays) {
       current.pitches.unshift(play);
       continue;
     }
-    if (/struck out|strikeout|grounded|flied|lined|popped|singled|doubled|tripled|homered|walked|hit by pitch|sacrifice|fielder.s choice|error|reaches|safe at/i.test(text)) {
+    if (/struck out|strikeout|grounded|flied|lined|popped|fouled out|singled|doubled|tripled|homered|walked|hit by pitch|sacrifice|fielder.s choice|error|reaches|safe at/i.test(text)) {
       if (current) { current.result = play; if (play.scoringPlay) current.scoringPlay = true; groups.unshift(current); current = null; }
       else { groups.unshift({ type: 'ab', pitches: [], result: play, play, scoringPlay: play.scoringPlay }); }
       continue;
@@ -577,7 +577,7 @@ export default function GameRoom() {
       const isScoring = scoringPlay || displayPlay.scoringPlay;
       const isHit = /singled|doubled|tripled|homered|hit by pitch|safe at/.test(tx);
       const isWalk = /walked|walk/.test(tx);
-      const isOut = /struck out|grounded|flied|lined|popped|fielder.s choice/.test(tx);
+      const isOut = /struck out|grounded|flied|lined|popped|fouled out|fielder.s choice/.test(tx);
       const isPH = /hit for|pinch.hit|pinch hit/.test(tx);
       let bc = tc ? `${tc}33` : 'rgba(255,255,255,0.06)', bg = 'transparent';
       if (isScoring) { bc = tc || awayColor; bg = `${bc}18`; }
