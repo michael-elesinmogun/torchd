@@ -17,6 +17,64 @@ const ROUND_CONFIG = {
   3: { label: 'Round 3', desc: 'Open mic — both players speak freely', speaker: 'both' },
 };
 
+async function sendBattleNotifications(battleId, winnerUsername, player1Username, player2Username, isForfeit = false) {
+  const loserUsername = winnerUsername === player1Username ? player2Username : player1Username;
+
+  const notifications = [];
+
+  if (winnerUsername === 'tie') {
+    // Both get a tie notification
+    for (const username of [player1Username, player2Username]) {
+      const opponent = username === player1Username ? player2Username : player1Username;
+      const { data: profile } = await supabase
+        .from('profiles').select('id').eq('username', username).single();
+      if (profile?.id) {
+        notifications.push({
+          user_id: profile.id,
+          type: 'battle_result',
+          message: `Your battle against @${opponent} ended in a tie!`,
+          from_username: opponent,
+          read: false,
+        });
+      }
+    }
+  } else {
+    // Winner notification
+    const { data: winnerProfile } = await supabase
+      .from('profiles').select('id').eq('username', winnerUsername).single();
+    if (winnerProfile?.id) {
+      notifications.push({
+        user_id: winnerProfile.id,
+        type: 'battle_result',
+        message: isForfeit
+          ? `🏆 You won your battle against @${loserUsername} (opponent forfeited)`
+          : `🏆 You won your battle against @${loserUsername}!`,
+        from_username: loserUsername,
+        read: false,
+      });
+    }
+
+    // Loser notification
+    const { data: loserProfile } = await supabase
+      .from('profiles').select('id').eq('username', loserUsername).single();
+    if (loserProfile?.id) {
+      notifications.push({
+        user_id: loserProfile.id,
+        type: 'battle_result',
+        message: isForfeit
+          ? `You forfeited your battle against @${winnerUsername}`
+          : `You lost your battle against @${winnerUsername}`,
+        from_username: winnerUsername,
+        read: false,
+      });
+    }
+  }
+
+  if (notifications.length > 0) {
+    await supabase.from('notifications').insert(notifications);
+  }
+}
+
 export default function BattleRoom({ params }) {
   const { id } = use(params);
   const router = useRouter();
@@ -230,20 +288,38 @@ export default function BattleRoom({ params }) {
     const b = battleRef.current;
     if (!b || b.status === 'ended') return;
     const winnerUsername = v.player1 > v.player2 ? b.player1_username : v.player2 > v.player1 ? b.player2_username : 'tie';
-    await supabase.from('battles').update({ status: 'ended', winner: winnerUsername, ended_at: new Date().toISOString() }).eq('id', id);
+
+    await supabase.from('battles').update({
+      status: 'ended',
+      winner: winnerUsername,
+      ended_at: new Date().toISOString(),
+    }).eq('id', id);
+
     setBattleEnded(true);
     setWinner(winnerUsername);
     clearInterval(roundTimerRef.current);
+
+    // Send notifications to both players
+    await sendBattleNotifications(id, winnerUsername, b.player1_username, b.player2_username, false);
   }
 
   async function declareWinnerByForfeit(leavingUsername) {
     const b = battleRef.current;
     if (!b || b.status === 'ended') return;
     const winnerUsername = b.player1_username === leavingUsername ? b.player2_username : b.player1_username;
-    await supabase.from('battles').update({ status: 'ended', winner: winnerUsername, ended_at: new Date().toISOString() }).eq('id', id);
+
+    await supabase.from('battles').update({
+      status: 'ended',
+      winner: winnerUsername,
+      ended_at: new Date().toISOString(),
+    }).eq('id', id);
+
     setBattleEnded(true);
     setWinner(winnerUsername);
     clearInterval(roundTimerRef.current);
+
+    // Send forfeit notifications to both players
+    await sendBattleNotifications(id, winnerUsername, b.player1_username, b.player2_username, true);
   }
 
   async function loadVotes() {
@@ -303,7 +379,6 @@ export default function BattleRoom({ params }) {
         if (track.kind === Track.Kind.Video) {
           setRemoteTracks(prev => [...prev, { track, participant }]);
         }
-        // Attach remote audio directly to a DOM audio element
         if (track.kind === Track.Kind.Audio) {
           const audioEl = document.createElement('audio');
           audioEl.autoplay = true;
