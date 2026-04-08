@@ -5,10 +5,17 @@ import { useParams } from 'next/navigation';
 import { supabase } from '../../../supabase';
 import styles from './gameroom.module.css';
 
-function getStatusLabel(status) {
+function getStatusLabel(status, sport) {
   if (status.type === 'STATUS_IN_PROGRESS') return status.detail || status.clock || 'LIVE';
   if (status.type === 'STATUS_HALFTIME') return 'Halftime';
-  if (status.type === 'STATUS_END_PERIOD') return status.detail || 'End of Period';
+  if (status.type === 'STATUS_END_PERIOD') {
+    const p = status.period;
+    if (sport === 'mlb') return p ? `End of Inn ${p}` : 'End of Inning';
+    if (sport === 'nhl') return p ? `End of P${p}` : 'End of Period';
+    if (sport === 'nfl' || sport === 'ncaafb') return p ? `End of Q${p}` : 'End of Quarter';
+    // NBA/WNBA default
+    return p ? `End of Q${p}` : 'End of Quarter';
+  }
   if (status.type === 'STATUS_FINAL') return 'Final';
   const date = new Date(status.detail || '');
   return isNaN(date) ? status.description || 'Upcoming' : date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
@@ -16,6 +23,10 @@ function getStatusLabel(status) {
 
 function isLive(status) {
   return ['STATUS_IN_PROGRESS', 'STATUS_HALFTIME', 'STATUS_END_PERIOD'].includes(status.type);
+}
+
+function showScore(status) {
+  return ['STATUS_IN_PROGRESS', 'STATUS_HALFTIME', 'STATUS_END_PERIOD', 'STATUS_FINAL'].includes(status.type);
 }
 
 function formatTime(dateStr) {
@@ -37,6 +48,42 @@ function getSportEmoji(sport) {
   if (sport === 'nhl') return '🏒';
   if (sport === 'nfl' || sport === 'ncaafb') return '🏈';
   return '🏀';
+}
+
+// Classify a play type for visual weight
+function getPlayType(play, sport) {
+  const text = (play.text || '').toLowerCase();
+  const type = (play.type || '').toLowerCase();
+  if (play.scoringPlay) return 'scoring';
+  // MLB
+  if (sport === 'mlb') {
+    if (text.includes('home run') || text.includes('homered')) return 'scoring';
+    if (text.includes('hit') || text.includes('singled') || text.includes('doubled') || text.includes('tripled')) return 'hit';
+    if (text.includes('walk') || text.includes('walked')) return 'hit';
+    if (text.includes('stolen') || text.includes('stole')) return 'hit';
+    if (text.includes('struck out') || text.includes('strikeout') || text.includes('strike')) return 'dim';
+    if (text.includes('ball') || text.includes('pitch')) return 'dim';
+    if (text.includes('end of') || text.includes('start of') || text.includes('top of') || text.includes('bottom of')) return 'period';
+  }
+  // NBA
+  if (sport === 'nba' || sport === 'wnba') {
+    if (text.includes('makes') || text.includes('dunk') || text.includes('layup')) return 'hit';
+    if (text.includes('misses') || text.includes('turnover') || text.includes('foul')) return 'dim';
+    if (text.includes('end of') || text.includes('start of')) return 'period';
+  }
+  // NHL
+  if (sport === 'nhl') {
+    if (text.includes('goal') || text.includes('scores')) return 'scoring';
+    if (text.includes('shot') || text.includes('save')) return 'hit';
+    if (text.includes('penalty') || text.includes('miss')) return 'dim';
+  }
+  // NFL
+  if (sport === 'nfl' || sport === 'ncaafb') {
+    if (text.includes('touchdown') || text.includes('field goal')) return 'scoring';
+    if (text.includes('pass') || text.includes('rush') || text.includes('yards')) return 'hit';
+    if (text.includes('incomplete') || text.includes('penalty') || text.includes('timeout')) return 'dim';
+  }
+  return 'normal';
 }
 
 export default function GameRoom() {
@@ -284,7 +331,6 @@ export default function GameRoom() {
     if (!gameId) return;
     async function init() {
       const profileLoadedRef_local = { current: false };
-
       supabase.auth.onAuthStateChange((_event, session) => {
         if (!profileLoadedRef_local.current) {
           profileLoadedRef_local.current = true;
@@ -298,7 +344,6 @@ export default function GameRoom() {
           }
         }
       });
-
       setTimeout(() => {
         if (!profileLoadedRef_local.current) {
           profileLoadedRef_local.current = true;
@@ -455,18 +500,13 @@ export default function GameRoom() {
     </div>
   );
 
-  // Team stats block — uses team color for accent bar
   function TeamStatsBlock({ team }) {
     const teamColor = team.color ? `#${team.color}` : '#3B82F6';
     return (
       <div className={styles.teamStatsBlock}>
-        {/* Colored accent bar at top */}
         <div style={{ height: '3px', background: teamColor, borderRadius: '3px 3px 0 0', marginBottom: '1rem' }} />
         <div className={styles.teamStatsHeader}>
-          {team.logo && (
-            <img src={team.logo} alt={team.team}
-              style={{ width: '36px', height: '36px', objectFit: 'contain' }} />
-          )}
+          {team.logo && <img src={team.logo} alt={team.team} style={{ width: '36px', height: '36px', objectFit: 'contain' }} />}
           <span className={styles.teamStatsName}>{team.name}</span>
         </div>
         <div className={styles.teamStatsGrid}>
@@ -481,7 +521,6 @@ export default function GameRoom() {
     );
   }
 
-  // Box score block
   function BoxScoreBlock({ teamPlayers }) {
     const statGroup = teamPlayers.statistics?.[0];
     if (!statGroup) return null;
@@ -501,10 +540,7 @@ export default function GameRoom() {
       <div className={styles.boxScoreBlock}>
         <div style={{ height: '3px', background: teamColor, margin: '0 1.25rem 0.75rem', borderRadius: '3px' }} />
         <div className={styles.teamStatsHeader} style={{ padding: '0 1.25rem', marginBottom: '0' }}>
-          {teamPlayers.teamLogo && (
-            <img src={teamPlayers.teamLogo} alt={teamPlayers.team}
-              style={{ width: '28px', height: '28px', objectFit: 'contain' }} />
-          )}
+          {teamPlayers.teamLogo && <img src={teamPlayers.teamLogo} alt={teamPlayers.team} style={{ width: '28px', height: '28px', objectFit: 'contain' }} />}
           <span className={styles.teamStatsName}>{teamPlayers.teamName}</span>
         </div>
         <div className={styles.boxScoreTable}>
@@ -531,10 +567,13 @@ export default function GameRoom() {
     );
   }
 
-  // Plays list
   function PlaysList({ scrollable = false }) {
     const filtered = plays.filter(p => activePeriod === 'all' || Number(p.period) === Number(activePeriod));
     const wrapClass = scrollable ? styles.mobileScrollPane : styles.gamecastWrap;
+
+    const awayColor = game?.away?.color ? `#${game.away.color}` : '#3B82F6';
+    const homeColor = game?.home?.color ? `#${game.home.color}` : '#10B981';
+
     return (
       <>
         {plays.length > 0 && (() => {
@@ -559,31 +598,76 @@ export default function GameRoom() {
               <p className={styles.chatEmptySub}>Play-by-play appears here during the game.</p>
             </div>
           ) : filtered.map((play, i) => {
-            let scoringClass = '';
-            if (play.scoringPlay) {
-              const prevPlayCheck = plays[i + 1];
-              const awayDiff = prevPlayCheck ? (play.awayScore - prevPlayCheck.awayScore) : 0;
-              const homeDiff = prevPlayCheck ? (play.homeScore - prevPlayCheck.homeScore) : 0;
-              if (awayDiff > 0) scoringClass = styles.playScoringAway;
-              else if (homeDiff > 0) scoringClass = styles.playScoringHome;
-              else scoringClass = styles.playScoring;
+            const playType = getPlayType(play, sport);
+
+            // Determine which team this play belongs to
+            // First try the play's own team field, then fall back to score diff
+            const prevPlay = filtered[i + 1];
+            let playTeamLogo = null;
+            let playTeamColor = null;
+
+            if (play.team) {
+              // ESPN gave us the team abbr on the play
+              if (game?.away?.abbr === play.team || game?.away?.name?.includes(play.team)) {
+                playTeamLogo = game.away.logo;
+                playTeamColor = awayColor;
+              } else if (game?.home?.abbr === play.team || game?.home?.name?.includes(play.team)) {
+                playTeamLogo = game.home.logo;
+                playTeamColor = homeColor;
+              }
             }
-            const awayColor = game?.away?.color ? `#${game.away.color}` : '#3B82F6';
-            const homeColor = game?.home?.color ? `#${game.home.color}` : '#10B981';
-            const prevPlay = plays[i + 1];
-            let scoringLogo = null;
-            if (play.scoringPlay && prevPlay) {
-              if (play.awayScore > prevPlay.awayScore) scoringLogo = game?.away?.logo;
-              else if (play.homeScore > prevPlay.homeScore) scoringLogo = game?.home?.logo;
+
+            // For scoring plays, infer from score change
+            if (play.scoringPlay && prevPlay && !playTeamColor) {
+              if (play.awayScore > prevPlay.awayScore) {
+                playTeamLogo = game?.away?.logo;
+                playTeamColor = awayColor;
+              } else if (play.homeScore > prevPlay.homeScore) {
+                playTeamLogo = game?.home?.logo;
+                playTeamColor = homeColor;
+              }
             }
+
+            // Border and bg based on play type + team color
+            let borderColor = 'transparent';
+            let bgColor = 'transparent';
+            let opacity = 1;
+
+            if (playType === 'scoring') {
+              borderColor = playTeamColor || awayColor;
+              bgColor = `${borderColor}15`;
+            } else if (playType === 'hit') {
+              borderColor = playTeamColor ? `${playTeamColor}88` : 'rgba(255,255,255,0.1)';
+              bgColor = playTeamColor ? `${playTeamColor}08` : 'transparent';
+            } else if (playType === 'dim') {
+              opacity = 0.45;
+            } else if (playType === 'period') {
+              borderColor = 'rgba(255,255,255,0.15)';
+              bgColor = 'rgba(255,255,255,0.03)';
+            }
+
             return (
-              <div key={play.id || i} className={`${styles.play} ${scoringClass}`}
-                style={{ animationDelay: `${Math.min(i, 10) * 80}ms`, '--away-color': awayColor, '--home-color': homeColor }}>
-                <div className={styles.playHeader}>
-                  {scoringLogo && <img src={scoringLogo} alt="" className={styles.playTeamLogo} />}
+              <div key={play.id || i}
+                style={{
+                  padding: '0.625rem 1.25rem 0.625rem calc(1.25rem - 3px)',
+                  borderBottom: '1px solid rgba(255,255,255,0.04)',
+                  borderLeft: `3px solid ${borderColor}`,
+                  background: bgColor,
+                  opacity,
+                  display: 'flex', flexDirection: 'column', gap: '4px',
+                  animationDelay: `${Math.min(i, 10) * 80}ms`,
+                  transition: 'background 0.15s',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {playTeamLogo && (
+                    <img src={playTeamLogo} alt="" style={{ width: '16px', height: '16px', objectFit: 'contain', flexShrink: 0 }} />
+                  )}
                   <div className={styles.playClock}>{play.clock} {play.periodText}</div>
                 </div>
-                <div className={styles.playText}>{play.text}</div>
+                <div className={styles.playText} style={{ color: playType === 'scoring' ? '#EEF2FF' : playType === 'dim' ? '#6B7A9E' : '#C4CCDF', fontWeight: playType === 'scoring' ? 600 : 400 }}>
+                  {play.text}
+                </div>
                 {play.scoringPlay && game && (
                   <div className={styles.playScore}>
                     <span className={styles.scoreTeamPill} style={{ background: `${awayColor}22`, border: `1px solid ${awayColor}55`, color: '#EEF2FF' }}>{game.away?.abbr} {play.awayScore}</span>
@@ -602,7 +686,6 @@ export default function GameRoom() {
   return (
     <main className={styles.main}>
 
-      {/* Score header */}
       <div className={styles.scoreHeader}>
         <Link href="/lobby" className={styles.backBtn}>← Game Lobby</Link>
         {game ? (
@@ -610,14 +693,14 @@ export default function GameRoom() {
             <div className={styles.teamBlock}>
               {game.away.logo && <img src={game.away.logo} alt={game.away.abbr} className={styles.teamLogo} />}
               <div className={styles.teamAbbr}>{game.away.abbr}</div>
-              {(live || game.status.type === 'STATUS_FINAL') && (
+              {showScore(game.status) && (
                 <div className={`${styles.score} ${game.away.score > game.home.score ? styles.scoreLeading : ''}`}>{game.away.score}</div>
               )}
             </div>
             <div className={styles.gameInfo}>
               <div className={`${styles.gameStatus} ${live ? styles.gameStatusLive : ''}`}>
                 {live && <span className={styles.liveDot}></span>}
-                {getStatusLabel(game.status)}
+                {getStatusLabel(game.status, sport)}
               </div>
               <div className={styles.gameName}>{game.away.abbr} vs {game.home.abbr}</div>
               {game.broadcast && <div className={styles.gameBroadcast}>{game.broadcast}</div>}
@@ -625,7 +708,7 @@ export default function GameRoom() {
             <div className={styles.teamBlock}>
               {game.home.logo && <img src={game.home.logo} alt={game.home.abbr} className={styles.teamLogo} />}
               <div className={styles.teamAbbr}>{game.home.abbr}</div>
-              {(live || game.status.type === 'STATUS_FINAL') && (
+              {showScore(game.status) && (
                 <div className={`${styles.score} ${game.home.score > game.away.score ? styles.scoreLeading : ''}`}>{game.home.score}</div>
               )}
             </div>
@@ -639,7 +722,6 @@ export default function GameRoom() {
         </Link>
       </div>
 
-      {/* Watch Party */}
       {cameraOn ? (
         <div style={{ background: '#060912', borderBottom: '1px solid rgba(255,255,255,0.065)', padding: '12px 16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
@@ -696,25 +778,19 @@ export default function GameRoom() {
           <button className={`${styles.mainStatsTab} ${activeStatsTab === 'plays' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('plays')}>▶ Plays</button>
           <button className={`${styles.mainStatsTab} ${activeStatsTab === 'team' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('team')}>📊 Team</button>
         </div>
-
         {activeStatsTab === 'plays' && <PlaysList scrollable={true} />}
-
         {activeStatsTab === 'team' && (
           <div className={styles.mobileScrollPane}>
-            {teamStats.length === 0
-              ? <div className={styles.chatLoading}>Loading team stats...</div>
+            {teamStats.length === 0 ? <div className={styles.chatLoading}>Loading team stats...</div>
               : teamStats.map(team => <TeamStatsBlock key={team.team} team={team} />)}
           </div>
         )}
-
         {activeStatsTab === 'box' && (
           <div className={styles.mobileScrollPane}>
-            {players.length === 0
-              ? <div className={styles.chatLoading}>Loading box score...</div>
+            {players.length === 0 ? <div className={styles.chatLoading}>Loading box score...</div>
               : players.map(tp => <BoxScoreBlock key={tp.team} teamPlayers={tp} />)}
           </div>
         )}
-
         {activeStatsTab === 'chat' && (
           <div className={styles.mobileChatPane}>{chatPanel}</div>
         )}
@@ -728,21 +804,16 @@ export default function GameRoom() {
             <button className={`${styles.mainStatsTab} ${activeStatsTab === 'team' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('team')}>📊 Team</button>
             <button className={`${styles.mainStatsTab} ${activeStatsTab === 'box' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('box')}>{getSportEmoji(sport)} Box</button>
           </div>
-
           {activeStatsTab === 'plays' && <PlaysList scrollable={false} />}
-
           {activeStatsTab === 'team' && (
             <div className={styles.gamecastWrap}>
-              {teamStats.length === 0
-                ? <div className={styles.chatLoading}>Loading team stats...</div>
+              {teamStats.length === 0 ? <div className={styles.chatLoading}>Loading team stats...</div>
                 : teamStats.map(team => <TeamStatsBlock key={team.team} team={team} />)}
             </div>
           )}
-
           {activeStatsTab === 'box' && (
             <div className={styles.gamecastWrap}>
-              {players.length === 0
-                ? <div className={styles.chatLoading}>Loading box score...</div>
+              {players.length === 0 ? <div className={styles.chatLoading}>Loading box score...</div>
                 : players.map(tp => <BoxScoreBlock key={tp.team} teamPlayers={tp} />)}
             </div>
           )}
