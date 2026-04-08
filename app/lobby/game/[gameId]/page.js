@@ -802,10 +802,18 @@ export default function GameRoom() {
               const isHit = text.match(/singled|doubled|tripled|homered|hit by pitch|safe at/);
               const isWalk = text.match(/walked|walk/);
 
-              let borderColor = teamColor ? `${teamColor}44` : 'rgba(255,255,255,0.08)';
+              let borderColor = teamColor ? `${teamColor}33` : 'rgba(255,255,255,0.06)';
               let bgColor = 'transparent';
-              if (isScoring) { borderColor = teamColor || awayColor; bgColor = `${borderColor}15`; }
-              else if (isHit || isWalk) { borderColor = teamColor ? `${teamColor}99` : 'rgba(255,255,255,0.15)'; bgColor = teamColor ? `${teamColor}0a` : 'transparent'; }
+              if (isScoring) {
+                borderColor = teamColor || awayColor;
+                bgColor = `${teamColor || awayColor}18`;
+              } else if (isHit) {
+                borderColor = teamColor || '#10B981';
+                bgColor = `${teamColor || '#10B981'}10`;
+              } else if (isWalk) {
+                borderColor = 'rgba(96,165,250,0.6)';
+                bgColor = 'rgba(96,165,250,0.06)';
+              }
 
               return (
                 <div key={displayPlay.id || gi} style={{
@@ -814,25 +822,28 @@ export default function GameRoom() {
                   borderLeft: `3px solid ${borderColor}`,
                   background: bgColor,
                   display: 'flex', flexDirection: 'column', gap: '5px',
+                  transition: 'background 0.15s',
                 }}>
+                  {/* Header row: inning label + outcome badge */}
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      {teamLogo && <img src={teamLogo} alt="" style={{ width: '16px', height: '16px', objectFit: 'contain', flexShrink: 0 }} />}
-                      <div className={styles.playClock}>{displayPlay.periodText}</div>
-                    </div>
+                    <div className={styles.playClock}>{displayPlay.periodText}</div>
                     {/* Outcome badge */}
                     <div style={{
                       fontSize: '10px', fontWeight: 700, fontFamily: 'Syne,sans-serif',
                       padding: '2px 7px', borderRadius: '100px',
-                      background: isScoring ? `${teamColor || awayColor}22` : isHit ? 'rgba(16,185,129,0.12)' : isWalk ? 'rgba(96,165,250,0.12)' : 'rgba(255,255,255,0.05)',
-                      color: isScoring ? (teamColor || awayColor) : isHit ? '#10B981' : isWalk ? '#60A5FA' : '#6B7A9E',
-                      border: `1px solid ${isScoring ? `${teamColor || awayColor}44` : isHit ? 'rgba(16,185,129,0.25)' : isWalk ? 'rgba(96,165,250,0.25)' : 'rgba(255,255,255,0.08)'}`,
+                      background: isScoring ? `${teamColor || awayColor}22` : isHit ? `${teamColor || '#10B981'}18` : isWalk ? 'rgba(96,165,250,0.12)' : 'rgba(255,255,255,0.05)',
+                      color: isScoring ? (teamColor || awayColor) : isHit ? (teamColor || '#10B981') : isWalk ? '#60A5FA' : '#6B7A9E',
+                      border: `1px solid ${isScoring ? `${teamColor || awayColor}55` : isHit ? `${teamColor || '#10B981'}44` : isWalk ? 'rgba(96,165,250,0.25)' : 'rgba(255,255,255,0.08)'}`,
                     }}>
                       {isScoring ? '⚾ Scores' : isHit ? 'Hit' : isWalk ? 'Walk' : isOut ? 'Out' : ''}
                     </div>
                   </div>
-                  <div style={{ fontSize: '13px', color: isScoring ? '#EEF2FF' : isHit ? '#EEF2FF' : '#C4CCDF', fontWeight: isScoring || isHit ? 600 : 400, lineHeight: 1.5 }}>
-                    {displayPlay.text}
+                  {/* Result row: logo + player text */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '7px' }}>
+                    {teamLogo && <img src={teamLogo} alt="" style={{ width: '18px', height: '18px', objectFit: 'contain', flexShrink: 0, marginTop: '1px' }} />}
+                    <div style={{ fontSize: '13px', color: isScoring ? '#EEF2FF' : isHit ? '#EEF2FF' : '#C4CCDF', fontWeight: isScoring || isHit ? 600 : 400, lineHeight: 1.5 }}>
+                      {displayPlay.text}
+                    </div>
                   </div>
                   {pitches.length > 0 && <PitchDots pitches={pitches} />}
                   {isScoring && game && (
