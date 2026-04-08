@@ -672,17 +672,29 @@ export default function GameRoom() {
       const isWalk = /walked|walk/.test(tx);
       const isOut = /struck out|grounded|flied|lined|popped|fouled out|fielder.s choice/.test(tx);
       const isPH = /hit for|pinch.hit|pinch hit/.test(tx);
-      let bc = tc ? `${tc}33` : 'rgba(255,255,255,0.06)', bg = 'transparent';
-      if (isScoring) { bc = tc || awayColor; bg = `${bc}18`; }
-      else if (isHit) { bc = tc || '#10B981'; bg = `${bc}10`; }
-      else if (isWalk) { bc = 'rgba(96,165,250,0.6)'; bg = 'rgba(96,165,250,0.06)'; }
+      let bc = tc ? `${tc}55` : 'rgba(255,255,255,0.08)', bg = 'transparent';
+      if (isScoring) { bc = tc || awayColor; bg = `${bc}20`; }
+      else if (isHit) { bc = tc ? `${tc}99` : '#10B981'; bg = tc ? `${tc}12` : 'rgba(16,185,129,0.06)'; }
+      else if (isWalk) { bc = 'rgba(251,191,36,0.6)'; bg = 'rgba(251,191,36,0.06)'; }
+      else if (isOut) { bc = 'rgba(239,68,68,0.4)'; bg = 'rgba(239,68,68,0.04)'; }
       const bColor = isScoring ? (tc || awayColor) : isPH ? '#A78BFA' : isHit ? (tc || '#10B981') : isWalk ? '#60A5FA' : '#6B7A9E';
       const badgeLabel = isScoring ? '⚾ Scores' : isPH ? 'PH' : isHit ? 'Hit' : isWalk ? 'Walk' : isOut ? 'Out' : '';
+      const badgeStyle = isScoring
+        ? { bg: `${bColor}22`, border: `${bColor}55`, text: bColor }
+        : isOut
+        ? { bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.5)', text: '#F87171' }
+        : isWalk
+        ? { bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.4)', text: '#FBB924' }
+        : isHit
+        ? { bg: `${bColor}18`, border: `${bColor}44`, text: bColor }
+        : isPH
+        ? { bg: 'rgba(167,139,250,0.15)', border: 'rgba(167,139,250,0.35)', text: '#A78BFA' }
+        : { bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.08)', text: '#6B7A9E' };
       return (
         <div key={key} style={{ padding: '0.75rem 1.25rem 0.75rem calc(1.25rem - 3px)', borderBottom: '1px solid rgba(255,255,255,0.04)', borderLeft: `3px solid ${bc}`, background: bg, display: 'flex', flexDirection: 'column', gap: '5px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div className={styles.playClock}>{displayPlay.periodText}</div>
-            {badgeLabel ? <div style={{ fontSize: '10px', fontWeight: 700, fontFamily: 'Syne,sans-serif', padding: '2px 7px', borderRadius: '100px', background: `${bColor}20`, color: bColor, border: `1px solid ${bColor}44` }}>{badgeLabel}</div> : null}
+            {badgeLabel ? <div style={{ fontSize: '10px', fontWeight: 700, fontFamily: 'Syne,sans-serif', padding: '2px 7px', borderRadius: '100px', background: badgeStyle.bg, color: badgeStyle.text, border: `1px solid ${badgeStyle.border}` }}>{badgeLabel}</div> : null}
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '7px' }}>
             {logo && <img src={logo} alt="" style={{ width: '18px', height: '18px', objectFit: 'contain', flexShrink: 0, marginTop: '1px' }} />}
