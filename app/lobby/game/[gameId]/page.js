@@ -712,7 +712,7 @@ export default function GameRoom() {
       let bc = tc ? `${tc}55` : 'rgba(255,255,255,0.08)', bg = 'transparent';
       if (isScoring) { bc = tc ? `${tc}99` : awayColor; bg = tc ? `${tc}15` : `${awayColor}15`; }
       else if (isHit) { bc = tc ? `${tc}99` : '#10B981'; bg = tc ? `${tc}12` : 'rgba(16,185,129,0.06)'; }
-      else if (isWalk) { bc = 'rgba(251,191,36,0.6)'; bg = 'rgba(251,191,36,0.06)'; }
+      else if (isWalk) { bc = 'rgba(16,185,129,0.6)'; bg = 'rgba(16,185,129,0.06)'; }
       else if (isOut) { bc = 'rgba(239,68,68,0.4)'; bg = 'rgba(239,68,68,0.04)'; }
       const bColor = isScoring ? (tc || awayColor) : isPH ? '#A78BFA' : isHit ? (tc || '#10B981') : isWalk ? '#60A5FA' : '#6B7A9E';
       const badgeLabel = isScoring ? '⚾ Scores' : isPH ? 'PH' : isHit ? 'Hit' : isWalk ? 'Walk' : isOut ? 'Out' : '';
@@ -721,7 +721,7 @@ export default function GameRoom() {
         : isOut
         ? { bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.5)', text: '#F87171' }
         : isWalk
-        ? { bg: 'rgba(251,191,36,0.12)', border: 'rgba(251,191,36,0.4)', text: '#FBB924' }
+        ? { bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.4)', text: '#10B981' }
         : isHit
         ? { bg: `${bColor}18`, border: `${bColor}44`, text: bColor }
         : isPH
