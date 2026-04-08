@@ -51,6 +51,34 @@ function getSportEmoji(sport) {
 }
 
 // Classify a play type for visual weight
+// Returns a version of teamColor that's guaranteed to be visible against the dark #060912 bg.
+// If the color is too dark/navy, brightens it or falls back to white.
+function getVisibleTeamColor(hexColor) {
+  if (!hexColor) return '#EEF2FF';
+  const hex = hexColor.replace('#', '');
+  if (hex.length !== 6) return '#EEF2FF';
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  // Perceived luminance (0-255 scale)
+  const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+  // Check similarity to background #060912 (r=6, g=9, b=18)
+  const distFromBg = Math.sqrt((r-6)**2 + (g-9)**2 + (b-18)**2);
+  // If too dark (luminance < 60) or too close to bg (dist < 80), brighten
+  if (luminance < 60 || distFromBg < 80) {
+    // Boost luminance: scale up toward white
+    const scale = Math.max(2.5, 180 / Math.max(luminance, 1));
+    const nr = Math.min(255, Math.round(r * scale));
+    const ng = Math.min(255, Math.round(g * scale));
+    const nb = Math.min(255, Math.round(b * scale));
+    // If still too dark after scaling, fall back to a light tint of the hue
+    const newLum = 0.299 * nr + 0.587 * ng + 0.114 * nb;
+    if (newLum < 80) return '#C4CCDF'; // neutral light fallback
+    return `#${nr.toString(16).padStart(2,'0')}${ng.toString(16).padStart(2,'0')}${nb.toString(16).padStart(2,'0')}`;
+  }
+  return hexColor;
+}
+
 function getPlayType(play, sport) {
   const text = (play.text || '').toLowerCase();
   const type = (play.type || '').toLowerCase();
@@ -501,7 +529,7 @@ export default function GameRoom() {
   );
 
   function TeamStatsBlock({ team }) {
-    const teamColor = team.color ? `#${team.color}` : '#3B82F6';
+    const teamColor = getVisibleTeamColor(team.color ? `#${team.color}` : '#3B82F6');
     return (
       <div className={styles.teamStatsBlock}>
         <div style={{ height: '3px', background: teamColor, borderRadius: '3px 3px 0 0', marginBottom: '1rem' }} />
@@ -535,7 +563,7 @@ export default function GameRoom() {
     const keyIndices = keyStats.map(k => labels.indexOf(k)).filter(i => i >= 0);
     const finalIndices = keyIndices.length > 0 ? keyIndices : labels.map((_, i) => i).slice(0, 8);
     const displayLabels = finalIndices.map(i => labels[i]);
-    const teamColor = teamPlayers.teamColor ? `#${teamPlayers.teamColor}` : '#3B82F6';
+    const teamColor = getVisibleTeamColor(teamPlayers.teamColor ? `#${teamPlayers.teamColor}` : '#3B82F6');
     return (
       <div className={styles.boxScoreBlock}>
         <div style={{ height: '3px', background: teamColor, margin: '0 1.25rem 0.75rem', borderRadius: '3px' }} />
@@ -570,8 +598,8 @@ export default function GameRoom() {
   function PlaysList({ scrollable = false }) {
     const filtered = plays.filter(p => activePeriod === 'all' || Number(p.period) === Number(activePeriod));
     const wrapClass = scrollable ? styles.mobileScrollPane : styles.gamecastWrap;
-    const awayColor = game?.away?.color ? `#${game.away.color}` : '#3B82F6';
-    const homeColor = game?.home?.color ? `#${game.home.color}` : '#10B981';
+    const awayColor = getVisibleTeamColor(game?.away?.color ? `#${game.away.color}` : '#3B82F6');
+    const homeColor = getVisibleTeamColor(game?.home?.color ? `#${game.home.color}` : '#10B981');
 
     // Helper: get team color/logo from a play using inning half inference
     function getPlayTeam(play, idx, list) {
