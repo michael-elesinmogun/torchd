@@ -117,8 +117,9 @@ function getVisibleTeamColor(hexColor) {
   s = Math.min(1, s * 1.3);
   // Only boost lightness for dark colors — bright colors get washed out if pushed higher
   if (l < 0.45) l = Math.max(0.55, l * 1.4);
-  else if (s > 0.7) { /* already vivid - don't touch lightness */ }
-  else l = Math.min(0.65, l);
+  // For bright vivid colors (like PIT gold), pull lightness DOWN slightly so they read as color not white
+  else if (l > 0.55) l = 0.52;
+  l = Math.max(0.45, Math.min(0.60, l));
 
   // Convert back to RGB
   const hue = (p, q, t) => {
@@ -715,9 +716,9 @@ export default function GameRoom() {
           )}
           {isScoring && game && (
             <div className={styles.playScore}>
-              <span className={styles.scoreTeamPill} style={{ background: `${awayColor}25`, border: `2px solid ${awayColor}`, color: '#EEF2FF', fontWeight: 800 }}>{game.away?.abbr} {displayPlay.awayScore}</span>
+              <span className={styles.scoreTeamPill} style={{ background: `${awayColor}20`, border: `2px solid ${awayColor}`, color: awayColor, fontWeight: 800 }}>{game.away?.abbr} {displayPlay.awayScore}</span>
               <span style={{color:'#3D4A66',margin:'0 4px'}}>–</span>
-              <span className={styles.scoreTeamPill} style={{ background: `${homeColor}25`, border: `2px solid ${homeColor}`, color: '#EEF2FF', fontWeight: 800 }}>{game.home?.abbr} {displayPlay.homeScore}</span>
+              <span className={styles.scoreTeamPill} style={{ background: `${homeColor}20`, border: `2px solid ${homeColor}`, color: homeColor, fontWeight: 800 }}>{game.home?.abbr} {displayPlay.homeScore}</span>
             </div>
           )}
         </div>
