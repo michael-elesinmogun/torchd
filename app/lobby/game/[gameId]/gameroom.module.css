@@ -172,7 +172,6 @@
 }
 
 .messageBody { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
-
 .messageUsername { font-size: 11px; color: #6B7A9E; padding: 0 4px; }
 
 .messageBubble {
@@ -390,16 +389,55 @@
 
 /* TEAM STATS */
 .teamStatsBlock {
-  padding: 1rem 1.25rem;
+  padding: 1.25rem 1.25rem 1rem;
   border-bottom: 1px solid rgba(255,255,255,0.065);
 }
-.teamStatsHeader { display: flex; align-items: center; gap: 8px; margin-bottom: 0.875rem; }
-.teamStatsLogo { width: 24px; height: 24px; object-fit: contain; }
-.teamStatsName { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 800; color: #EEF2FF; }
-.teamStatsGrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; }
-.teamStatItem { text-align: center; }
-.teamStatValue { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 800; color: #EEF2FF; }
-.teamStatLabel { font-size: 10px; color: #6B7A9E; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 1px; }
+.teamStatsHeader {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 1rem;
+}
+.teamStatsLogo { width: 28px; height: 28px; object-fit: contain; }
+.teamStatsName {
+  font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 800; color: #EEF2FF;
+}
+
+/* Clean stat grid — 5 columns, generous spacing */
+.teamStatsGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0;
+  background: #0a0f1e;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.065);
+}
+
+.teamStatItem {
+  text-align: center;
+  padding: 0.75rem 0.5rem;
+  border-right: 1px solid rgba(255,255,255,0.05);
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+/* Remove right border on last in each row */
+.teamStatItem:nth-child(5n) { border-right: none; }
+/* Remove bottom border on last row */
+.teamStatItem:nth-last-child(-n+5) { border-bottom: none; }
+
+.teamStatValue {
+  font-family: 'Syne', sans-serif;
+  font-size: 18px;
+  font-weight: 800;
+  color: #EEF2FF;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+.teamStatLabel {
+  font-size: 10px;
+  color: #6B7A9E;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
 
 /* BOX SCORE */
 .boxScoreBlock { padding: 0.75rem 0; }
@@ -504,6 +542,16 @@
   }
 
   .play { padding: 0.625rem 1rem; }
+
+  /* Team stats — 3 columns on mobile */
+  .teamStatsGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .teamStatItem:nth-child(5n) { border-right: 1px solid rgba(255,255,255,0.05); }
+  .teamStatItem:nth-child(3n) { border-right: none; }
+  .teamStatItem:nth-last-child(-n+5) { border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .teamStatItem:nth-last-child(-n+3) { border-bottom: none; }
+  .teamStatValue { font-size: 16px; }
 
   .boxScoreTable { overflow-x: auto; display: block; }
   .boxScoreRow { padding: 5px 1rem; min-width: 360px; }
