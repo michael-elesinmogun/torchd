@@ -509,10 +509,19 @@ export default function GameRoom() {
   };
 
   const PlaysList = ({ scrollable }) => {
-    const filtered = plays.filter(p => activePeriod === 'all' || Number(p.period) === Number(activePeriod));
+    const filtered = (() => {
+      const seen = new Set();
+      return plays.filter(p => {
+        if (!p.id) return true;
+        if (seen.has(p.id)) return false;
+        seen.add(p.id);
+        return true;
+      }).filter(p => activePeriod === 'all' || Number(p.period) === Number(activePeriod));
+    })();
     const wrapClass = scrollable ? styles.mobileScrollPane : styles.gamecastWrap;
-    const awayColor = getVisibleTeamColor(game?.away?.color ? `#${game.away.color}` : '#3B82F6');
-    const homeColor = getVisibleTeamColor(game?.home?.color ? `#${game.home.color}` : '#10B981');
+    const toHex = (c) => !c ? null : c.startsWith('#') ? c : `#${c}`;
+    const awayColor = getVisibleTeamColor(toHex(game?.away?.color) || '#3B82F6');
+    const homeColor = getVisibleTeamColor(toHex(game?.home?.color) || '#10B981');
 
     // Single pass: build play->half map oldest-first
     const playHalfMap = {};
