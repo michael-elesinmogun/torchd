@@ -14,12 +14,19 @@ export async function GET(request) {
     return Response.json({ error: 'Invalid sport' }, { status: 400 });
   }
 
-  // Force today's date for MLB (and all sports) so ESPN doesn't return
-  // a different week's games. Format: YYYYMMDD
-  const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
-const dateStr = today.getFullYear().toString() +
-  String(today.getMonth() + 1).padStart(2, '0') +
-  String(today.getDate()).padStart(2, '0');
+  // Use Eastern time, but don't roll to next day until 6 AM ET
+  // so late-night games (midnight–6 AM) still show on the correct date
+  const nowET = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+  const hourET = nowET.getHours();
+
+  // If before 6 AM ET, use yesterday's date
+  if (hourET < 6) {
+    nowET.setDate(nowET.getDate() - 1);
+  }
+
+  const dateStr = nowET.getFullYear().toString() +
+    String(nowET.getMonth() + 1).padStart(2, '0') +
+    String(nowET.getDate()).padStart(2, '0');
 
   const url = `${base}?dates=${dateStr}`;
 
