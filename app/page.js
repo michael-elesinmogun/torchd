@@ -1,7 +1,19 @@
+'use client';
 import Link from 'next/link';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from './supabase';
 import styles from './landing.module.css';
 
 export default function Home() {
+  const router = useRouter();
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) router.replace('/lobby');
+    });
+  }, []);
+
   return (
     <main className={styles.main}>
 
@@ -28,8 +40,8 @@ export default function Home() {
             Live debates. Real sports fans.
           </div>
           <h1 className={styles.heroTitle}>
-            Your take is<br />
-            <span className={styles.heroAccent}>worth fighting for.</span>
+            Your take is worth<br className={styles.heroBreak} />
+            <span className={styles.heroAccent}> fighting for.</span>
           </h1>
           <p className={styles.heroSub}>
             Get on camera. Pick a stance. Debate live against someone who disagrees.
@@ -57,35 +69,34 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Mock battle card */}
+        {/* Static visual — no fake data */}
         <div className={styles.heroVisual}>
-          <div className={styles.battleCard}>
-            <div className={styles.battleCardTop}>
-              <span className={styles.battleLive}>🔴 LIVE</span>
-              <span className={styles.battleVotes}>247 watching</span>
+          <div className={styles.visualCard}>
+            <div className={styles.visualTop}>
+              <span className={styles.visualTag}>⚔️ Battle Mode</span>
+              <span className={styles.visualTag}>⚾ Game Lobby</span>
+              <span className={styles.visualTag}>🏆 Leaderboard</span>
             </div>
-            <div className={styles.battleTopic}>"Mahomes has already surpassed Brady"</div>
-            <div className={styles.battlePlayers}>
-              <div className={styles.battlePlayer}>
-                <div className={styles.playerAvatar} style={{background:'#3B82F6'}}>MJ</div>
-                <div className={styles.playerInfo}>
-                  <div className={styles.playerName}>@mikeelesin</div>
-                  <div className={styles.playerStance}>FOR</div>
-                </div>
-                <div className={styles.playerVotes} style={{color:'#10B981'}}>61%</div>
-              </div>
-              <div className={styles.battleVs}>VS</div>
-              <div className={styles.battlePlayer}>
-                <div className={styles.playerAvatar} style={{background:'#8B5CF6'}}>JS</div>
-                <div className={styles.playerInfo}>
-                  <div className={styles.playerName}>@johnsmith</div>
-                  <div className={styles.playerStance}>AGAINST</div>
-                </div>
-                <div className={styles.playerVotes} style={{color:'#EF4444'}}>39%</div>
-              </div>
+            <div className={styles.visualCenter}>
+              <div className={styles.visualIcon}>🔥</div>
+              <div className={styles.visualHeadline}>Prove your takes live on camera</div>
+              <div className={styles.visualSub}>Real debates. Real stakes. Real fans decide.</div>
             </div>
-            <div className={styles.voteBar}>
-              <div className={styles.voteBarFill} style={{width:'61%'}}></div>
+            <div className={styles.visualBottom}>
+              <div className={styles.visualStep}>
+                <div className={styles.visualStepDot} style={{background:'#3B82F6'}}></div>
+                <span>Pick a topic</span>
+              </div>
+              <div className={styles.visualStepLine}></div>
+              <div className={styles.visualStep}>
+                <div className={styles.visualStepDot} style={{background:'#8B5CF6'}}></div>
+                <span>Go live</span>
+              </div>
+              <div className={styles.visualStepLine}></div>
+              <div className={styles.visualStep}>
+                <div className={styles.visualStepDot} style={{background:'#10B981'}}></div>
+                <span>Win the crowd</span>
+              </div>
             </div>
           </div>
         </div>
@@ -127,26 +138,18 @@ export default function Home() {
           <div className={styles.sectionEyebrow} style={{color:'#60A5FA'}}>Built for sports fans</div>
           <h2 className={styles.sectionTitle} style={{color:'#EEF2FF'}}>More than just debate</h2>
           <div className={styles.features}>
-            <div className={styles.feature}>
-              <div className={styles.featureIcon}>⚾</div>
-              <h3 className={styles.featureTitle}>Live game lobby</h3>
-              <p className={styles.featureBody}>Follow along with live play-by-play, box scores, and team stats for every MLB, NBA, NFL, and NHL game.</p>
-            </div>
-            <div className={styles.feature}>
-              <div className={styles.featureIcon}>📹</div>
-              <h3 className={styles.featureTitle}>Watch parties</h3>
-              <p className={styles.featureBody}>React on camera with other fans watching the same game live. Like a sports bar, but you're actually there.</p>
-            </div>
-            <div className={styles.feature}>
-              <div className={styles.featureIcon}>📊</div>
-              <h3 className={styles.featureTitle}>Rankings & rep</h3>
-              <p className={styles.featureBody}>Every win builds your record. Climb the global leaderboard. Prove you're not just a fan — you're right.</p>
-            </div>
-            <div className={styles.feature}>
-              <div className={styles.featureIcon}>🔥</div>
-              <h3 className={styles.featureTitle}>Hot takes, settled</h3>
-              <p className={styles.featureBody}>The debates that dominate your timeline — who's the GOAT, who choked, who's overrated — finally have a verdict.</p>
-            </div>
+            {[
+              { icon: '⚾', title: 'Live game lobby', body: 'Follow live play-by-play, box scores, and team stats for every MLB, NBA, NFL, and NHL game.' },
+              { icon: '📹', title: 'Watch parties', body: 'React on camera with other fans watching the same game live. Like a sports bar, without leaving your couch.' },
+              { icon: '📊', title: 'Rankings & rep', body: 'Every win builds your record. Climb the global leaderboard. Prove you\'re not just a fan — you\'re right.' },
+              { icon: '🔥', title: 'Hot takes, settled', body: 'The debates that dominate your timeline — GOAT arguments, choke jobs, overrated takes — finally have a verdict.' },
+            ].map((f, i) => (
+              <div key={i} className={styles.feature}>
+                <div className={styles.featureIcon}>{f.icon}</div>
+                <h3 className={styles.featureTitle}>{f.title}</h3>
+                <p className={styles.featureBody}>{f.body}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -154,26 +157,23 @@ export default function Home() {
       {/* TOPICS */}
       <section className={styles.section}>
         <div className={styles.sectionInner}>
-          <div className={styles.sectionEyebrow}>Trending debates</div>
-          <h2 className={styles.sectionTitle}>What are people arguing about?</h2>
+          <div className={styles.sectionEyebrow}>What people debate</div>
+          <h2 className={styles.sectionTitle}>The takes that start wars</h2>
           <div className={styles.topics}>
             {[
-              { topic: 'Mahomes has already surpassed Brady', sport: 'NFL', hot: true },
-              { topic: 'LeBron is the greatest of all time', sport: 'NBA', hot: true },
-              { topic: 'The Yankees will win the World Series', sport: 'MLB', hot: false },
-              { topic: 'Gretzky is untouchable as the GOAT', sport: 'NHL', hot: false },
-              { topic: 'Steph Curry changed basketball forever', sport: 'NBA', hot: true },
-              { topic: 'Analytics have made baseball boring', sport: 'MLB', hot: false },
+              { topic: 'Mahomes has already surpassed Brady', sport: 'NFL' },
+              { topic: 'LeBron is the greatest of all time', sport: 'NBA' },
+              { topic: 'The Yankees will win the World Series', sport: 'MLB' },
+              { topic: 'Gretzky is untouchable as the GOAT', sport: 'NHL' },
+              { topic: 'Steph Curry changed basketball forever', sport: 'NBA' },
+              { topic: 'Analytics have made baseball boring', sport: 'MLB' },
             ].map((t, i) => (
               <Link key={i} href="/signup" className={styles.topic}>
                 <div className={styles.topicLeft}>
                   <span className={styles.topicSport}>{t.sport}</span>
                   <span className={styles.topicText}>"{t.topic}"</span>
                 </div>
-                <div className={styles.topicRight}>
-                  {t.hot && <span className={styles.topicHot}>🔥 Hot</span>}
-                  <span className={styles.topicDebate}>Debate this →</span>
-                </div>
+                <span className={styles.topicDebate}>Debate this →</span>
               </Link>
             ))}
           </div>
