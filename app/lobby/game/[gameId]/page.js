@@ -627,6 +627,7 @@ export default function GameRoom() {
     const rawHome = game?.home?.color || game?.home?.alternateColor || sportColors[game?.home?.abbr];
     const awayColor = getVisibleTeamColor(toHex(rawAway) || '#3B82F6');
     const homeColor = getVisibleTeamColor(toHex(rawHome) || '#10B981');
+    if (typeof window !== 'undefined') console.log('COLORS:', {rawAway, rawHome, awayColor, homeColor, awayAbbr: game?.away?.abbr, homeAbbr: game?.home?.abbr});
     const awayBorder = toHex(rawAway) || '#3B82F6';
     const homeBorder = toHex(rawHome) || '#10B981';
 
@@ -676,9 +677,9 @@ export default function GameRoom() {
           </div>
           {play.scoringPlay && game && (
             <div className={styles.playScore}>
-              <span className={styles.scoreTeamPill} style={{ background: `${awayBorder}20`, border: `2px solid ${awayBorder}`, color: awayBorder, fontWeight: 800 }}>{game.away?.abbr} {play.awayScore}</span>
+              <span className={styles.scoreTeamPill} style={{ background: `${awayColor}18`, border: `2px solid ${awayColor}`, color: awayColor, fontWeight: 800 }}>{game.away?.abbr} {play.awayScore}</span>
               <span style={{color:'#3D4A66',margin:'0 4px'}}>–</span>
-              <span className={styles.scoreTeamPill} style={{ background: `${homeBorder}20`, border: `2px solid ${homeBorder}`, color: homeBorder, fontWeight: 800 }}>{game.home?.abbr} {play.homeScore}</span>
+              <span className={styles.scoreTeamPill} style={{ background: `${homeColor}18`, border: `2px solid ${homeColor}`, color: homeColor, fontWeight: 800 }}>{game.home?.abbr} {play.homeScore}</span>
             </div>
           )}
         </div>
@@ -747,9 +748,9 @@ export default function GameRoom() {
           )}
           {isScoring && game && (
             <div className={styles.playScore}>
-              <span className={styles.scoreTeamPill} style={{ background: `${awayBorder}20`, border: `2px solid ${awayBorder}`, color: awayBorder, fontWeight: 800 }}>{game.away?.abbr} {displayPlay.awayScore}</span>
+              <span className={styles.scoreTeamPill} style={{ background: `${awayColor}18`, border: `2px solid ${awayColor}`, color: awayColor, fontWeight: 800 }}>{game.away?.abbr} {displayPlay.awayScore}</span>
               <span style={{color:'#3D4A66',margin:'0 4px'}}>–</span>
-              <span className={styles.scoreTeamPill} style={{ background: `${homeBorder}20`, border: `2px solid ${homeBorder}`, color: homeBorder, fontWeight: 800 }}>{game.home?.abbr} {displayPlay.homeScore}</span>
+              <span className={styles.scoreTeamPill} style={{ background: `${homeColor}18`, border: `2px solid ${homeColor}`, color: homeColor, fontWeight: 800 }}>{game.home?.abbr} {displayPlay.homeScore}</span>
             </div>
           )}
         </div>
