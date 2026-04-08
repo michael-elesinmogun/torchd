@@ -623,11 +623,12 @@ export default function GameRoom() {
     const wrapClass = scrollable ? styles.mobileScrollPane : styles.gamecastWrap;
     const toHex = (c) => !c ? null : c.startsWith('#') ? c : `#${c}`;
     const sportColors = TEAM_COLORS[sport] || TEAM_COLORS.mlb;
-    const rawAway = game?.away?.color || game?.away?.alternateColor || sportColors[game?.away?.abbr];
-    const rawHome = game?.home?.color || game?.home?.alternateColor || sportColors[game?.home?.abbr];
+    const validColor = (c) => c && c !== '000000' && c !== 'ffffff' && c.length === 6;
+    const rawAway = (validColor(game?.away?.color) ? game.away.color : null) || sportColors[game?.away?.abbr] || game?.away?.alternateColor;
+    const rawHome = (validColor(game?.home?.color) ? game.home.color : null) || sportColors[game?.home?.abbr] || game?.home?.alternateColor;
     const awayColor = getVisibleTeamColor(toHex(rawAway) || '#3B82F6');
     const homeColor = getVisibleTeamColor(toHex(rawHome) || '#10B981');
-    if (typeof window !== 'undefined') console.log('COLORS:', {rawAway, rawHome, awayColor, homeColor, awayAbbr: game?.away?.abbr, homeAbbr: game?.home?.abbr});
+    if (typeof window !== 'undefined') console.log('COLORS:', {rawAway, rawHome, awayColor, homeColor, homeKeys: game?.home ? Object.keys(game.home) : null, homeObj: game?.home});
     const awayBorder = toHex(rawAway) || '#3B82F6';
     const homeBorder = toHex(rawHome) || '#10B981';
 
