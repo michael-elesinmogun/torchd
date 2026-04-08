@@ -601,33 +601,11 @@ export default function GameRoom() {
     const awayColor = getVisibleTeamColor(game?.away?.color ? `#${game.away.color}` : '#3B82F6');
     const homeColor = getVisibleTeamColor(game?.home?.color ? `#${game.home.color}` : '#10B981');
 
-    // Pre-build a period -> inning half map from the full filtered play list.
-    // Key: period number (e.g. 8), value: 'top' | 'bottom'
-    // This is built once and used for all plays.
-    const inningHalfMap = React.useMemo(() => {
-      const map = {};
-      for (const p of filtered) {
-        const tx = (p.text || '').toLowerCase();
-        if (tx.includes('top of') || tx.includes('top of the')) {
-          const m = tx.match(/top of (?:the )?(\w+)/);
-          // Use period number from the play itself
-          if (p.period) map[p.period] = map[p.period] || 'unknown';
-        }
-        if (tx.includes('bottom of') || tx.includes('bottom of the')) {
-          if (p.period) map[p.period] = 'bottom_seen';
-        }
-        if (tx.includes('top of')) {
-          if (p.period) map[`${p.period}_top`] = true;
-        }
-        if (tx.includes('bottom of')) {
-          if (p.period) map[`${p.period}_bottom`] = true;
-        }
-      }
-      return map;
-    }, [filtered]);
-
     // Helper: get team color/logo from a play using inning half inference
     // In baseball: TOP = away team bats, BOTTOM = home team bats
+    // Plays are NEWEST-FIRST. To find which half a play is in, scan FORWARD
+    // (higher index = older plays) to find the nearest "Top of" or "Bottom of" separator
+    // that came just before this play chronologically.
     function getPlayTeam(play) {
       if (play.team) {
         if (game?.away?.abbr === play.team) return { logo: game.away.logo, color: awayColor };
@@ -636,32 +614,27 @@ export default function GameRoom() {
       if (sport === 'mlb') {
         const tx = (play.text || '').toLowerCase();
         // Pure pitching/fielding position events — no batting team
-        const isFieldingOnly = /^(pitches to|relieved|to the mound|warming up)/.test(tx) ||
-          /in (center|left|right) field[.]?$/.test(tx);
+        const isFieldingOnly = tx.startsWith('pitches to') || tx.startsWith('relieved') ||
+          tx.startsWith('to the mound') || tx.startsWith('warming up') ||
+          tx.endsWith('in center field.') || tx.endsWith('in left field.') || tx.endsWith('in right field.');
         if (isFieldingOnly) return { logo: null, color: null };
 
+        // If the play itself says top/bottom, use that directly
         const pt = (play.periodText || '').toLowerCase();
         if (pt.includes('top') || tx.includes('top of')) return { logo: game?.away?.logo, color: awayColor };
         if (pt.includes('bottom') || tx.includes('bottom of')) return { logo: game?.home?.logo, color: homeColor };
 
-        // Use period-based half map
-        if (play.period) {
-          if (inningHalfMap[`${play.period}_top`]) return { logo: game?.away?.logo, color: awayColor };
-          if (inningHalfMap[`${play.period}_bottom`]) return { logo: game?.home?.logo, color: homeColor };
-        }
-
-        // Final fallback: scan nearby plays in filtered (newest-first)
+        // Plays are newest-first. The inning half separator for this play is OLDER
+        // than the play itself, meaning it has a HIGHER index in filtered[].
+        // Scan forward (higher index = older) to find nearest "Top of" / "Bottom of".
         const playIdx = filtered.findIndex(p => p.id === play.id);
         const start = playIdx >= 0 ? playIdx : 0;
-        for (let j = start - 1; j >= Math.max(0, start - 80); j--) {
+        for (let j = start + 1; j < Math.min(start + 120, filtered.length); j++) {
           const tx2 = (filtered[j].text || '').toLowerCase();
           if (tx2.includes('top of')) return { logo: game?.away?.logo, color: awayColor };
           if (tx2.includes('bottom of')) return { logo: game?.home?.logo, color: homeColor };
-        }
-        for (let j = start + 1; j < Math.min(start + 80, filtered.length); j++) {
-          const tx2 = (filtered[j].text || '').toLowerCase();
-          if (tx2.includes('top of')) return { logo: game?.away?.logo, color: awayColor };
-          if (tx2.includes('bottom of')) return { logo: game?.home?.logo, color: homeColor };
+          // Stop if we hit a different period — don't bleed into prior innings
+          if (filtered[j].period && play.period && filtered[j].period < play.period - 1) break;
         }
       }
       return { logo: null, color: null };
