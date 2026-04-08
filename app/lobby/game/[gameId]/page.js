@@ -68,7 +68,6 @@ export default function GameRoom() {
   const [reactions, setReactions] = useState({});
   const REACTION_EMOJIS = ['🔥','💀','😤','👑','🐐'];
 
-  // LiveKit watch party
   const [cameraOn, setCameraOn] = useState(false);
   const [cameraError, setCameraError] = useState('');
   const [creatingRoom, setCreatingRoom] = useState(false);
@@ -373,7 +372,6 @@ export default function GameRoom() {
 
   const live = game && isLive(game.status);
 
-  // The chat panel — shared between desktop sidebar and mobile tab
   const chatPanel = (
     <div className={styles.chatWrap} style={{width: `${100 - splitPct}%`}}>
       <div className={styles.chatHeader}>
@@ -454,6 +452,139 @@ export default function GameRoom() {
       </div>
     </div>
   );
+
+  // Reusable team stats block — shows ALL stats ESPN returns, no filtering
+  function TeamStatsBlock({ team }) {
+    return (
+      <div className={styles.teamStatsBlock}>
+        <div className={styles.teamStatsHeader}>
+          {team.logo && <img src={team.logo} alt={team.team} className={styles.teamStatsLogo} />}
+          <span className={styles.teamStatsName}>{team.name}</span>
+        </div>
+        <div className={styles.teamStatsGrid}>
+          {team.statistics?.map(stat => (
+            <div key={stat.name} className={styles.teamStatItem}>
+              <div className={styles.teamStatValue}>{stat.displayValue}</div>
+              <div className={styles.teamStatLabel}>{stat.abbreviation || stat.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Reusable box score block
+  function BoxScoreBlock({ teamPlayers }) {
+    const statGroup = teamPlayers.statistics?.[0];
+    if (!statGroup) return null;
+    const labels = statGroup.labels || [];
+    const keyStats = sport === 'mlb'
+      ? ['AB','R','H','RBI','BB','SO','AVG']
+      : sport === 'nhl'
+      ? ['G','A','PTS','+/-','PIM','SOG']
+      : sport === 'nfl' || sport === 'ncaafb'
+      ? ['C/ATT','YDS','TD','INT','SACKS']
+      : ['MIN','PTS','REB','AST','STL','BLK','FG','3PT','TO'];
+    const keyIndices = keyStats.map(k => labels.indexOf(k)).filter(i => i >= 0);
+    const finalIndices = keyIndices.length > 0 ? keyIndices : labels.map((_, i) => i).slice(0, 8);
+    const displayLabels = finalIndices.map(i => labels[i]);
+    return (
+      <div className={styles.boxScoreBlock}>
+        <div className={styles.teamStatsHeader}>
+          {teamPlayers.teamLogo && <img src={teamPlayers.teamLogo} alt={teamPlayers.team} className={styles.teamStatsLogo} />}
+          <span className={styles.teamStatsName}>{teamPlayers.teamName}</span>
+        </div>
+        <div className={styles.boxScoreTable}>
+          <div className={styles.boxScoreRow + ' ' + styles.boxScoreHeader}>
+            <div className={styles.boxScorePlayer}>PLAYER</div>
+            {displayLabels.map(l => <div key={l} className={styles.boxScoreStat}>{l}</div>)}
+          </div>
+          {statGroup.athletes?.map(athlete => (
+            <div key={athlete.id} className={`${styles.boxScoreRow} ${athlete.starter ? styles.boxScoreStarter : ''} ${athlete.didNotPlay ? styles.boxScoreDNP : ''}`}>
+              <div className={styles.boxScorePlayer}>
+                <span className={styles.boxScoreJersey}>{athlete.jersey}</span>
+                <span className={styles.boxScoreName}>{athlete.shortName}</span>
+                <span className={styles.boxScorePos}>{athlete.position}</span>
+              </div>
+              {athlete.didNotPlay ? (
+                <div className={styles.boxScoreDNPLabel} style={{flex:4,textAlign:'left',paddingLeft:'4px'}}>{athlete.reason || 'DNP'}</div>
+              ) : finalIndices.map((ki, idx) => (
+                <div key={idx} className={styles.boxScoreStat}>{athlete.stats?.[ki] || '—'}</div>
+              ))}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Reusable plays list
+  function PlaysList({ scrollable = false }) {
+    const filtered = plays.filter(p => activePeriod === 'all' || Number(p.period) === Number(activePeriod));
+    const wrapClass = scrollable ? styles.mobileScrollPane : styles.gamecastWrap;
+    return (
+      <>
+        {plays.length > 0 && (() => {
+          const periods = ['all', ...new Set(plays.map(p => p.period).filter(Boolean).sort((a,b) => a-b))];
+          return (
+            <div className={styles.periodTabs}>
+              {periods.map(p => (
+                <button key={p} className={`${styles.periodTab} ${activePeriod === 'all' ? p === 'all' : Number(activePeriod) === Number(p) ? styles.periodTabActive : ''}`} onClick={() => setActivePeriod(p)}>
+                  {getPeriodLabel(sport, p)}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
+        <div className={wrapClass}>
+          {gamcastLoading ? (
+            <div className={styles.chatLoading}>Loading...</div>
+          ) : plays.length === 0 ? (
+            <div className={styles.chatEmpty}>
+              <div className={styles.chatEmptyIcon}>📊</div>
+              <div className={styles.chatEmptyTitle}>No plays yet</div>
+              <p className={styles.chatEmptySub}>Play-by-play appears here during the game.</p>
+            </div>
+          ) : filtered.map((play, i) => {
+            let scoringClass = '';
+            if (play.scoringPlay) {
+              const prevPlayCheck = plays[i + 1];
+              const awayDiff = prevPlayCheck ? (play.awayScore - prevPlayCheck.awayScore) : 0;
+              const homeDiff = prevPlayCheck ? (play.homeScore - prevPlayCheck.homeScore) : 0;
+              if (awayDiff > 0) scoringClass = styles.playScoringAway;
+              else if (homeDiff > 0) scoringClass = styles.playScoringHome;
+              else scoringClass = styles.playScoring;
+            }
+            const awayColor = game?.away?.color ? `#${game.away.color}` : '#3B82F6';
+            const homeColor = game?.home?.color ? `#${game.home.color}` : '#10B981';
+            const prevPlay = plays[i + 1];
+            let scoringLogo = null;
+            if (play.scoringPlay && prevPlay) {
+              if (play.awayScore > prevPlay.awayScore) scoringLogo = game?.away?.logo;
+              else if (play.homeScore > prevPlay.homeScore) scoringLogo = game?.home?.logo;
+            }
+            return (
+              <div key={play.id || i} className={`${styles.play} ${scoringClass}`}
+                style={{ animationDelay: `${Math.min(i, 10) * 80}ms`, '--away-color': awayColor, '--home-color': homeColor }}>
+                <div className={styles.playHeader}>
+                  {scoringLogo && <img src={scoringLogo} alt="" className={styles.playTeamLogo} />}
+                  <div className={styles.playClock}>{play.clock} {play.periodText}</div>
+                </div>
+                <div className={styles.playText}>{play.text}</div>
+                {play.scoringPlay && game && (
+                  <div className={styles.playScore}>
+                    <span className={styles.scoreTeamPill} style={{ background: `${awayColor}22`, border: `1px solid ${awayColor}55`, color: '#EEF2FF' }}>{game.away?.abbr} {play.awayScore}</span>
+                    <span style={{color:'#3D4A66',margin:'0 4px'}}>–</span>
+                    <span className={styles.scoreTeamPill} style={{ background: `${homeColor}22`, border: `1px solid ${homeColor}55`, color: '#EEF2FF' }}>{game.home?.abbr} {play.homeScore}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </>
+    );
+  }
 
   return (
     <main className={styles.main}>
@@ -553,142 +684,26 @@ export default function GameRoom() {
           <button className={`${styles.mainStatsTab} ${activeStatsTab === 'team' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('team')}>📊 Team</button>
         </div>
 
-        {activeStatsTab === 'plays' && <>
-          {plays.length > 0 && (() => {
-            const periods = ['all', ...new Set(plays.map(p => p.period).filter(Boolean).sort((a,b) => a-b))];
-            return (
-              <div className={styles.periodTabs}>
-                {periods.map(p => (
-                  <button key={p} className={`${styles.periodTab} ${activePeriod === 'all' ? p === 'all' : Number(activePeriod) === Number(p) ? styles.periodTabActive : ''}`} onClick={() => setActivePeriod(p)}>
-                    {getPeriodLabel(sport, p)}
-                  </button>
-                ))}
-              </div>
-            );
-          })()}
-          <div className={styles.mobileScrollPane}>
-            {gamcastLoading ? (
-              <div className={styles.chatLoading}>Loading...</div>
-            ) : plays.length === 0 ? (
-              <div className={styles.chatEmpty}>
-                <div className={styles.chatEmptyIcon}>📊</div>
-                <div className={styles.chatEmptyTitle}>No plays yet</div>
-                <p className={styles.chatEmptySub}>Play-by-play appears here during the game.</p>
-              </div>
-            ) : plays.filter(p => activePeriod === 'all' || Number(p.period) === Number(activePeriod)).map((play, i) => {
-              let scoringClass = '';
-              if (play.scoringPlay) {
-                const prevPlayCheck = plays[i + 1];
-                const awayDiff = prevPlayCheck ? (play.awayScore - prevPlayCheck.awayScore) : 0;
-                const homeDiff = prevPlayCheck ? (play.homeScore - prevPlayCheck.homeScore) : 0;
-                if (awayDiff > 0) scoringClass = styles.playScoringAway;
-                else if (homeDiff > 0) scoringClass = styles.playScoringHome;
-                else scoringClass = styles.playScoring;
-              }
-              const awayColor = game?.away?.color ? `#${game.away.color}` : '#3B82F6';
-              const homeColor = game?.home?.color ? `#${game.home.color}` : '#10B981';
-              const prevPlay = plays[i + 1];
-              let scoringLogo = null;
-              if (play.scoringPlay && prevPlay) {
-                if (play.awayScore > prevPlay.awayScore) scoringLogo = game?.away?.logo;
-                else if (play.homeScore > prevPlay.homeScore) scoringLogo = game?.home?.logo;
-              }
-              return (
-                <div key={play.id || i} className={`${styles.play} ${scoringClass}`}
-                  style={{ animationDelay: `${Math.min(i, 10) * 80}ms`, '--away-color': awayColor, '--home-color': homeColor }}>
-                  <div className={styles.playHeader}>
-                    {scoringLogo && <img src={scoringLogo} alt="" className={styles.playTeamLogo} />}
-                    <div className={styles.playClock}>{play.clock} {play.periodText}</div>
-                  </div>
-                  <div className={styles.playText}>{play.text}</div>
-                  {play.scoringPlay && game && (
-                    <div className={styles.playScore}>
-                      <span className={styles.scoreTeamPill} style={{ background: `${awayColor}22`, border: `1px solid ${awayColor}55`, color: '#EEF2FF' }}>{game.away?.abbr} {play.awayScore}</span>
-                      <span style={{color:'#3D4A66',margin:'0 4px'}}>–</span>
-                      <span className={styles.scoreTeamPill} style={{ background: `${homeColor}22`, border: `1px solid ${homeColor}55`, color: '#EEF2FF' }}>{game.home?.abbr} {play.homeScore}</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </>}
+        {activeStatsTab === 'plays' && <PlaysList scrollable={true} />}
 
         {activeStatsTab === 'team' && (
           <div className={styles.mobileScrollPane}>
-            {teamStats.length === 0 ? <div className={styles.chatLoading}>Loading team stats...</div>
-            : teamStats.map(team => (
-              <div key={team.team} className={styles.teamStatsBlock}>
-                <div className={styles.teamStatsHeader}>
-                  {team.logo && <img src={team.logo} alt={team.team} className={styles.teamStatsLogo} />}
-                  <span className={styles.teamStatsName}>{team.name}</span>
-                </div>
-                <div className={styles.teamStatsGrid}>
-                  {team.statistics?.filter(s => ['FG','3PT','FT','REB','AST','TO','STL','BLK','PTS','R','H','E','LOB','HR','BB','SO'].includes(s.abbreviation)).map(stat => (
-                    <div key={stat.name} className={styles.teamStatItem}>
-                      <div className={styles.teamStatValue}>{stat.displayValue}</div>
-                      <div className={styles.teamStatLabel}>{stat.abbreviation || stat.label}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
+            {teamStats.length === 0
+              ? <div className={styles.chatLoading}>Loading team stats...</div>
+              : teamStats.map(team => <TeamStatsBlock key={team.team} team={team} />)}
           </div>
         )}
 
         {activeStatsTab === 'box' && (
           <div className={styles.mobileScrollPane}>
-            {players.length === 0 ? <div className={styles.chatLoading}>Loading box score...</div>
-            : players.map(teamPlayers => {
-              const statGroup = teamPlayers.statistics?.[0];
-              if (!statGroup) return null;
-              const labels = statGroup.labels || [];
-              const keyStats = sport === 'mlb'
-                ? ['AB','R','H','RBI','BB','SO','AVG']
-                : sport === 'nhl'
-                ? ['G','A','PTS','+/-','PIM','SOG']
-                : sport === 'nfl' || sport === 'ncaafb'
-                ? ['C/ATT','YDS','TD','INT','SACKS']
-                : ['MIN','PTS','REB','AST','STL','BLK','FG','3PT','TO'];
-              const keyIndices = keyStats.map(k => labels.indexOf(k)).filter(i => i >= 0);
-              const finalIndices = keyIndices.length > 0 ? keyIndices : labels.map((_, i) => i).slice(0, 8);
-              const displayLabels = finalIndices.map(i => labels[i]);
-              return (
-                <div key={teamPlayers.team} className={styles.boxScoreBlock}>
-                  <div className={styles.teamStatsHeader}>
-                    {teamPlayers.teamLogo && <img src={teamPlayers.teamLogo} alt={teamPlayers.team} className={styles.teamStatsLogo} />}
-                    <span className={styles.teamStatsName}>{teamPlayers.teamName}</span>
-                  </div>
-                  <div className={styles.boxScoreTable}>
-                    <div className={styles.boxScoreRow + ' ' + styles.boxScoreHeader}>
-                      <div className={styles.boxScorePlayer}>PLAYER</div>
-                      {displayLabels.map(l => <div key={l} className={styles.boxScoreStat}>{l}</div>)}
-                    </div>
-                    {statGroup.athletes?.map(athlete => (
-                      <div key={athlete.id} className={`${styles.boxScoreRow} ${athlete.starter ? styles.boxScoreStarter : ''} ${athlete.didNotPlay ? styles.boxScoreDNP : ''}`}>
-                        <div className={styles.boxScorePlayer}>
-                          <span className={styles.boxScoreJersey}>{athlete.jersey}</span>
-                          <span className={styles.boxScoreName}>{athlete.shortName}</span>
-                          <span className={styles.boxScorePos}>{athlete.position}</span>
-                        </div>
-                        {athlete.didNotPlay ? (
-                          <div className={styles.boxScoreDNPLabel} style={{flex:4,textAlign:'left',paddingLeft:'4px'}}>{athlete.reason || 'DNP'}</div>
-                        ) : finalIndices.map((ki, idx) => (
-                          <div key={idx} className={styles.boxScoreStat}>{athlete.stats?.[ki] || '—'}</div>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              );
-            })}
+            {players.length === 0
+              ? <div className={styles.chatLoading}>Loading box score...</div>
+              : players.map(tp => <BoxScoreBlock key={tp.team} teamPlayers={tp} />)}
           </div>
         )}
 
         {activeStatsTab === 'chat' && (
-          <div className={styles.mobileChatPane}>
-            {chatPanel}
-          </div>
+          <div className={styles.mobileChatPane}>{chatPanel}</div>
         )}
       </div>
 
@@ -701,136 +716,21 @@ export default function GameRoom() {
             <button className={`${styles.mainStatsTab} ${activeStatsTab === 'box' ? styles.mainStatsTabActive : ''}`} onClick={() => setActiveStatsTab('box')}>{getSportEmoji(sport)} Box</button>
           </div>
 
-          {activeStatsTab === 'plays' && <>
-            {plays.length > 0 && (() => {
-              const periods = ['all', ...new Set(plays.map(p => p.period).filter(Boolean).sort((a,b) => a-b))];
-              return (
-                <div className={styles.periodTabs}>
-                  {periods.map(p => (
-                    <button key={p} className={`${styles.periodTab} ${activePeriod === 'all' ? p === 'all' : Number(activePeriod) === Number(p) ? styles.periodTabActive : ''}`} onClick={() => setActivePeriod(p)}>
-                      {getPeriodLabel(sport, p)}
-                    </button>
-                  ))}
-                </div>
-              );
-            })()}
-          </>}
-
-          {activeStatsTab === 'plays' && <div className={styles.gamecastWrap}>
-            {gamcastLoading ? (
-              <div className={styles.chatLoading}>Loading...</div>
-            ) : plays.length === 0 ? (
-              <div className={styles.chatEmpty}>
-                <div className={styles.chatEmptyIcon}>📊</div>
-                <div className={styles.chatEmptyTitle}>No plays yet</div>
-                <p className={styles.chatEmptySub}>Play-by-play appears here during the game.</p>
-              </div>
-            ) : plays.filter(p => activePeriod === 'all' || Number(p.period) === Number(activePeriod)).map((play, i) => {
-              let scoringClass = '';
-              if (play.scoringPlay) {
-                const prevPlayCheck = plays[i + 1];
-                const awayDiff = prevPlayCheck ? (play.awayScore - prevPlayCheck.awayScore) : 0;
-                const homeDiff = prevPlayCheck ? (play.homeScore - prevPlayCheck.homeScore) : 0;
-                if (awayDiff > 0) scoringClass = styles.playScoringAway;
-                else if (homeDiff > 0) scoringClass = styles.playScoringHome;
-                else scoringClass = styles.playScoring;
-              }
-              const awayColor = game?.away?.color ? `#${game.away.color}` : '#3B82F6';
-              const homeColor = game?.home?.color ? `#${game.home.color}` : '#10B981';
-              const prevPlay = plays[i + 1];
-              let scoringLogo = null;
-              if (play.scoringPlay && prevPlay) {
-                if (play.awayScore > prevPlay.awayScore) scoringLogo = game?.away?.logo;
-                else if (play.homeScore > prevPlay.homeScore) scoringLogo = game?.home?.logo;
-              }
-              return (
-                <div key={play.id || i} className={`${styles.play} ${scoringClass}`}
-                  style={{ animationDelay: `${Math.min(i, 10) * 80}ms`, '--away-color': awayColor, '--home-color': homeColor }}>
-                  <div className={styles.playHeader}>
-                    {scoringLogo && <img src={scoringLogo} alt="" className={styles.playTeamLogo} />}
-                    <div className={styles.playClock}>{play.clock} {play.periodText}</div>
-                  </div>
-                  <div className={styles.playText}>{play.text}</div>
-                  {play.scoringPlay && game && (
-                    <div className={styles.playScore}>
-                      <span className={styles.scoreTeamPill} style={{ background: `${awayColor}22`, border: `1px solid ${awayColor}55`, color: '#EEF2FF' }}>{game.away?.abbr} {play.awayScore}</span>
-                      <span style={{color:'#3D4A66',margin:'0 4px'}}>–</span>
-                      <span className={styles.scoreTeamPill} style={{ background: `${homeColor}22`, border: `1px solid ${homeColor}55`, color: '#EEF2FF' }}>{game.home?.abbr} {play.homeScore}</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>}
+          {activeStatsTab === 'plays' && <PlaysList scrollable={false} />}
 
           {activeStatsTab === 'team' && (
             <div className={styles.gamecastWrap}>
-              {teamStats.length === 0 ? <div className={styles.chatLoading}>Loading team stats...</div>
-              : teamStats.map(team => (
-                <div key={team.team} className={styles.teamStatsBlock}>
-                  <div className={styles.teamStatsHeader}>
-                    {team.logo && <img src={team.logo} alt={team.team} className={styles.teamStatsLogo} />}
-                    <span className={styles.teamStatsName}>{team.name}</span>
-                  </div>
-                  <div className={styles.teamStatsGrid}>
-                    {team.statistics?.filter(s => ['FG','3PT','FT','REB','AST','TO','STL','BLK','PTS','R','H','E','LOB','HR','BB','SO'].includes(s.abbreviation)).map(stat => (
-                      <div key={stat.name} className={styles.teamStatItem}>
-                        <div className={styles.teamStatValue}>{stat.displayValue}</div>
-                        <div className={styles.teamStatLabel}>{stat.abbreviation || stat.label}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
+              {teamStats.length === 0
+                ? <div className={styles.chatLoading}>Loading team stats...</div>
+                : teamStats.map(team => <TeamStatsBlock key={team.team} team={team} />)}
             </div>
           )}
 
           {activeStatsTab === 'box' && (
             <div className={styles.gamecastWrap}>
-              {players.length === 0 ? <div className={styles.chatLoading}>Loading box score...</div>
-              : players.map(teamPlayers => {
-                const statGroup = teamPlayers.statistics?.[0];
-                if (!statGroup) return null;
-                const labels = statGroup.labels || [];
-                const keyStats = sport === 'mlb'
-                  ? ['AB','R','H','RBI','BB','SO','AVG']
-                  : sport === 'nhl'
-                  ? ['G','A','PTS','+/-','PIM','SOG']
-                  : sport === 'nfl' || sport === 'ncaafb'
-                  ? ['C/ATT','YDS','TD','INT','SACKS']
-                  : ['MIN','PTS','REB','AST','STL','BLK','FG','3PT','TO'];
-                const keyIndices = keyStats.map(k => labels.indexOf(k)).filter(i => i >= 0);
-                const finalIndices = keyIndices.length > 0 ? keyIndices : labels.map((_, i) => i).slice(0, 8);
-                const displayLabels = finalIndices.map(i => labels[i]);
-                return (
-                  <div key={teamPlayers.team} className={styles.boxScoreBlock}>
-                    <div className={styles.teamStatsHeader}>
-                      {teamPlayers.teamLogo && <img src={teamPlayers.teamLogo} alt={teamPlayers.team} className={styles.teamStatsLogo} />}
-                      <span className={styles.teamStatsName}>{teamPlayers.teamName}</span>
-                    </div>
-                    <div className={styles.boxScoreTable}>
-                      <div className={styles.boxScoreRow + ' ' + styles.boxScoreHeader}>
-                        <div className={styles.boxScorePlayer}>PLAYER</div>
-                        {displayLabels.map(l => <div key={l} className={styles.boxScoreStat}>{l}</div>)}
-                      </div>
-                      {statGroup.athletes?.map(athlete => (
-                        <div key={athlete.id} className={`${styles.boxScoreRow} ${athlete.starter ? styles.boxScoreStarter : ''} ${athlete.didNotPlay ? styles.boxScoreDNP : ''}`}>
-                          <div className={styles.boxScorePlayer}>
-                            <span className={styles.boxScoreJersey}>{athlete.jersey}</span>
-                            <span className={styles.boxScoreName}>{athlete.shortName}</span>
-                            <span className={styles.boxScorePos}>{athlete.position}</span>
-                          </div>
-                          {athlete.didNotPlay ? (
-                            <div className={styles.boxScoreDNPLabel} style={{flex:4,textAlign:'left',paddingLeft:'4px'}}>{athlete.reason || 'DNP'}</div>
-                          ) : finalIndices.map((ki, idx) => (
-                            <div key={idx} className={styles.boxScoreStat}>{athlete.stats?.[ki] || '—'}</div>
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
+              {players.length === 0
+                ? <div className={styles.chatLoading}>Loading box score...</div>
+                : players.map(tp => <BoxScoreBlock key={tp.team} teamPlayers={tp} />)}
             </div>
           )}
         </div>
