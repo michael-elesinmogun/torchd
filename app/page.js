@@ -17,21 +17,6 @@ export default function Home() {
   return (
     <main className={styles.main}>
 
-      {/* NAV */}
-      <nav className={styles.nav}>
-        <div className={styles.navInner}>
-          <Link href="/" className={styles.navLogo}>
-            <span className={styles.flame}>🔥</span>
-            <span className={styles.logoText}>Torchd</span>
-          </Link>
-          <div className={styles.navLinks}>
-            <Link href="/lobby" className={styles.navLink}>Game Lobby</Link>
-            <Link href="/leaderboard" className={styles.navLink}>Leaderboard</Link>
-            <Link href="/signup" className={styles.navCta}>Join now →</Link>
-          </div>
-        </div>
-      </nav>
-
       {/* HERO */}
       <section className={styles.hero}>
         <div className={styles.heroInner}>

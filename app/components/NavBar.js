@@ -311,7 +311,7 @@ export default function NavBar() {
                 fontSize: '14px', fontWeight: 700, fontFamily: 'Syne, sans-serif',
                 color: '#EEF2FF', background: '#3B82F6', borderRadius: '8px',
                 padding: '8px 18px', textDecoration: 'none', transition: 'all 0.2s',
-              }}>Join →</Link>
+              }}>Join Now →</Link>
             </>
           )}
 
