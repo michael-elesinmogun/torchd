@@ -1,10 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const gameId = searchParams.get('gameId');
@@ -26,20 +21,16 @@ export async function GET(request) {
 
   try {
     const res = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-
     if (!res.ok) {
       return Response.json({ error: 'Failed to fetch gamecast' }, { status: 500 });
     }
 
     const data = await res.json();
-
     const headerPeriod = data.header?.competitions?.[0]?.status?.period || null;
 
     const espnPlays = (data.plays || []).map(play => {
       let periodNumber = null;
-      if (play.period?.number && play.period.number > 0) {
-        periodNumber = play.period.number;
-      }
+      if (play.period?.number && play.period.number > 0) periodNumber = play.period.number;
       if (!periodNumber && play.period?.displayValue) {
         const m = play.period.displayValue.match(/(\d+)/);
         if (m) periodNumber = parseInt(m[1], 10);
@@ -48,9 +39,7 @@ export async function GET(request) {
         const m = play.text.match(/(\d+)(?:st|nd|rd|th)\s+inning/i);
         if (m) periodNumber = parseInt(m[1], 10);
       }
-      if (!periodNumber && headerPeriod) {
-        periodNumber = headerPeriod;
-      }
+      if (!periodNumber && headerPeriod) periodNumber = headerPeriod;
       return {
         id: String(play.id),
         game_id: gameId,
@@ -70,43 +59,46 @@ export async function GET(request) {
       };
     });
 
-    // Upsert plays to Supabase for persistence
-    if (espnPlays.length > 0) {
-      await supabaseAdmin
-        .from('game_plays')
-        .upsert(espnPlays, { onConflict: 'id,game_id', ignoreDuplicates: false });
-    }
-
-    // Fetch full play history from Supabase
-    const { data: allPlays } = await supabaseAdmin
-      .from('game_plays')
-      .select('*')
-      .eq('game_id', gameId)
-      .order('id', { ascending: false })
-      .limit(500);
-
-    const plays = (allPlays || []).map(p => ({
-      id: p.id,
-      text: p.text,
-      clock: p.clock,
-      period: p.period,
-      periodText: p.period_text,
-      team: p.team,
-      teamLogo: p.team_logo,
-      teamColor: p.team_color,
-      scoreValue: p.score_value,
-      scoringPlay: p.scoring_play,
-      awayScore: p.away_score,
-      homeScore: p.home_score,
-      type: p.type,
+    // Try Supabase persistence — wrapped so it never crashes the route
+    let plays = espnPlays.map(p => ({
+      id: p.id, text: p.text, clock: p.clock, period: p.period,
+      periodText: p.period_text, team: p.team, teamLogo: p.team_logo,
+      teamColor: p.team_color, scoreValue: p.score_value,
+      scoringPlay: p.scoring_play, awayScore: p.away_score,
+      homeScore: p.home_score, type: p.type,
     }));
+
+    try {
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (supabaseUrl && serviceKey) {
+        const supabaseAdmin = createClient(supabaseUrl, serviceKey);
+        if (espnPlays.length > 0) {
+          await supabaseAdmin.from('game_plays').upsert(espnPlays, { onConflict: 'id,game_id', ignoreDuplicates: false });
+        }
+        const { data: allPlays } = await supabaseAdmin
+          .from('game_plays').select('*').eq('game_id', gameId)
+          .order('id', { ascending: false }).limit(500);
+        if (allPlays?.length > 0) {
+          plays = allPlays.map(p => ({
+            id: p.id, text: p.text, clock: p.clock, period: p.period,
+            periodText: p.period_text, team: p.team, teamLogo: p.team_logo,
+            teamColor: p.team_color, scoreValue: p.score_value,
+            scoringPlay: p.scoring_play, awayScore: p.away_score,
+            homeScore: p.home_score, type: p.type,
+          }));
+        }
+      }
+    } catch (sbErr) {
+      // Supabase failed — continue with ESPN plays only
+      console.error('Supabase error (non-fatal):', sbErr.message);
+    }
 
     const boxscore = data.boxscore || {};
     const teams = boxscore.teams || [];
     const boxscorePlayers = boxscore.players || [];
 
-    // Build team stats — ESPN sends real displayValues for NBA/NFL/NHL
-    // but for MLB the statistics array has no values, so we build from players
+    // Build team stats
     let teamStats = teams.map(team => ({
       team: team.team?.abbreviation,
       name: team.team?.displayName,
@@ -123,52 +115,34 @@ export async function GET(request) {
         })),
     }));
 
-    // For MLB: build team batting totals from players boxscore
+    // MLB: ESPN sends empty statistics — build from players boxscore instead
     if (sport === 'mlb' && teamStats.every(t => t.statistics.length === 0)) {
       teamStats = boxscorePlayers.map(teamPlayers => {
         const battingGroup = teamPlayers.statistics?.find(s => s.name === 'batting');
         const pitchingGroup = teamPlayers.statistics?.find(s => s.name === 'pitching');
-
         const battingLabels = battingGroup?.labels || [];
-        const battingStats = [];
+        const stats = [];
 
-        // Sum up key batting stats across all athletes
-        const keyBattingStats = ['AB','R','H','RBI','BB','SO','HR'];
-        keyBattingStats.forEach(stat => {
+        ['AB','R','H','RBI','BB','SO','HR'].forEach(stat => {
           const idx = battingLabels.indexOf(stat);
           if (idx === -1) return;
-          const total = (battingGroup?.athletes || []).reduce((sum, athlete) => {
-            const val = parseFloat(athlete.stats?.[idx]);
-            return sum + (isNaN(val) ? 0 : val);
+          const total = (battingGroup?.athletes || []).reduce((sum, a) => {
+            const v = parseFloat(a.stats?.[idx]);
+            return sum + (isNaN(v) ? 0 : v);
           }, 0);
-          battingStats.push({
-            name: stat,
-            displayValue: String(Math.round(total)),
-            label: stat,
-            abbreviation: stat,
-          });
+          stats.push({ name: stat, displayValue: String(Math.round(total)), label: stat, abbreviation: stat });
         });
 
-        // Get ERA and IP from pitching
         const pitchingLabels = pitchingGroup?.labels || [];
-        const eraIdx = pitchingLabels.indexOf('ERA');
-        const ipIdx = pitchingLabels.indexOf('IP');
-        const kIdx = pitchingLabels.indexOf('K');
-
-        if (ipIdx !== -1) {
-          const ipTotal = (pitchingGroup?.athletes || []).reduce((sum, a) => {
-            const val = parseFloat(a.stats?.[ipIdx]);
-            return sum + (isNaN(val) ? 0 : val);
+        [['IP', false], ['K', true], ['ER', true]].forEach(([stat, round]) => {
+          const idx = pitchingLabels.indexOf(stat);
+          if (idx === -1) return;
+          const total = (pitchingGroup?.athletes || []).reduce((sum, a) => {
+            const v = parseFloat(a.stats?.[idx]);
+            return sum + (isNaN(v) ? 0 : v);
           }, 0);
-          battingStats.push({ name: 'IP', displayValue: ipTotal.toFixed(1), label: 'IP', abbreviation: 'IP' });
-        }
-        if (kIdx !== -1) {
-          const kTotal = (pitchingGroup?.athletes || []).reduce((sum, a) => {
-            const val = parseFloat(a.stats?.[kIdx]);
-            return sum + (isNaN(val) ? 0 : val);
-          }, 0);
-          battingStats.push({ name: 'K', displayValue: String(Math.round(kTotal)), label: 'K', abbreviation: 'K' });
-        }
+          stats.push({ name: stat, displayValue: round ? String(Math.round(total)) : total.toFixed(1), label: stat, abbreviation: stat });
+        });
 
         return {
           team: teamPlayers.team?.abbreviation,
@@ -176,7 +150,7 @@ export async function GET(request) {
           logo: teamPlayers.team?.logo,
           color: teamPlayers.team?.color,
           homeAway: teamPlayers.homeAway,
-          statistics: battingStats,
+          statistics: stats,
         };
       });
     }
