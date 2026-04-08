@@ -91,6 +91,34 @@ const TEAM_COLORS = {
   },
 };
 
+function darkenForBorder(hexColor) {
+  // Returns a darker, richer version of the color suitable for borders/accents
+  if (!hexColor) return '#EEF2FF';
+  const hex = hexColor.replace('#', '');
+  if (hex.length !== 6) return hexColor;
+  const r = parseInt(hex.slice(0, 2), 16);
+  const g = parseInt(hex.slice(2, 4), 16);
+  const b = parseInt(hex.slice(4, 6), 16);
+  // Convert to HSL
+  const rr = r/255, gg = g/255, bb = b/255;
+  const mx = Math.max(rr,gg,bb), mn = Math.min(rr,gg,bb);
+  let h = 0, s = 0, l = (mx+mn)/2;
+  if (mx !== mn) {
+    const d = mx-mn;
+    s = l > 0.5 ? d/(2-mx-mn) : d/(mx+mn);
+    if (mx===rr) h=((gg-bb)/d+(gg<bb?6:0))/6;
+    else if (mx===gg) h=((bb-rr)/d+2)/6;
+    else h=((rr-gg)/d+4)/6;
+  }
+  if (s < 0.08) return '#6B7A9E';
+  // Fix lightness to 45% - rich and readable, not washed out or too dark
+  l = 0.45; s = Math.min(1, s * 1.2);
+  const hue = (p,q,t) => { const tt=((t%1)+1)%1; if(tt<1/6)return p+(q-p)*6*tt; if(tt<1/2)return q; if(tt<2/3)return p+(q-p)*(2/3-tt)*6; return p; };
+  const q = l*(1+s); const p = 2*l-q;
+  const nr=Math.round(hue(p,q,h+1/3)*255), ng=Math.round(hue(p,q,h)*255), nb=Math.round(hue(p,q,h-1/3)*255);
+  return `#${nr.toString(16).padStart(2,'0')}${ng.toString(16).padStart(2,'0')}${nb.toString(16).padStart(2,'0')}`;
+}
+
 function getVisibleTeamColor(hexColor) {
   if (!hexColor) return '#EEF2FF';
   const hex = hexColor.replace('#', '');
@@ -646,9 +674,9 @@ export default function GameRoom() {
           </div>
           {play.scoringPlay && game && (
             <div className={styles.playScore}>
-              <span className={styles.scoreTeamPill} style={{ background: `${awayColor}20`, border: `2px solid ${awayColor}`, color: awayColor, fontWeight: 800 }}>{game.away?.abbr} {play.awayScore}</span>
+              <span className={styles.scoreTeamPill} style={{ background: `${awayBorder}20`, border: `2px solid ${awayBorder}`, color: awayBorder, fontWeight: 800 }}>{game.away?.abbr} {play.awayScore}</span>
               <span style={{color:'#3D4A66',margin:'0 4px'}}>–</span>
-              <span className={styles.scoreTeamPill} style={{ background: `${homeColor}22`, border: `1px solid ${homeColor}55`, color: homeColor, fontWeight: 800 }}>{game.home?.abbr} {play.homeScore}</span>
+              <span className={styles.scoreTeamPill} style={{ background: `${homeColor}22`, border: `1px solid ${homeColor}55`, color: homeBorder, fontWeight: 800 }}>{game.home?.abbr} {play.homeScore}</span>
             </div>
           )}
         </div>
@@ -670,6 +698,7 @@ export default function GameRoom() {
       const dt = (displayPlay.text || '').trim();
       if (!result && (!dt || /pitches to|steps in|batting/i.test(dt))) return null;
       const { logo, color: tc } = getTeam(displayPlay);
+      const tcBorder = tc === awayColor ? awayBorder : tc === homeColor ? homeBorder : tc;
       const tx = dt.toLowerCase();
       const isScoring = scoringPlay || displayPlay.scoringPlay;
       const isHit = /singled|doubled|tripled|homered|hit by pitch|safe at/.test(tx);
@@ -716,9 +745,9 @@ export default function GameRoom() {
           )}
           {isScoring && game && (
             <div className={styles.playScore}>
-              <span className={styles.scoreTeamPill} style={{ background: `${awayColor}20`, border: `2px solid ${awayColor}`, color: awayColor, fontWeight: 800 }}>{game.away?.abbr} {displayPlay.awayScore}</span>
+              <span className={styles.scoreTeamPill} style={{ background: `${awayBorder}20`, border: `2px solid ${awayBorder}`, color: awayBorder, fontWeight: 800 }}>{game.away?.abbr} {displayPlay.awayScore}</span>
               <span style={{color:'#3D4A66',margin:'0 4px'}}>–</span>
-              <span className={styles.scoreTeamPill} style={{ background: `${homeColor}20`, border: `2px solid ${homeColor}`, color: homeColor, fontWeight: 800 }}>{game.home?.abbr} {displayPlay.homeScore}</span>
+              <span className={styles.scoreTeamPill} style={{ background: `${homeBorder}20`, border: `2px solid ${homeBorder}`, color: homeBorder, fontWeight: 800 }}>{game.home?.abbr} {displayPlay.homeScore}</span>
             </div>
           )}
         </div>
