@@ -1,0 +1,209 @@
+.main {
+  background: #060912;
+  color: #EEF2FF;
+  font-family: 'DM Sans', sans-serif;
+  overflow-x: hidden;
+}
+
+/* NAV */
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  background: rgba(6,9,18,0.85);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255,255,255,0.065);
+}
+.navInner {
+  max-width: 1100px; margin: 0 auto;
+  padding: 0 clamp(1rem, 4vw, 2rem);
+  height: 60px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.navLogo { display: flex; align-items: center; gap: 8px; text-decoration: none; }
+.flame { font-size: 20px; }
+.logoText { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; color: #EEF2FF; }
+.navLinks { display: flex; align-items: center; gap: 1.5rem; }
+.navLink { font-size: 14px; color: #6B7A9E; text-decoration: none; transition: color 0.2s; }
+.navLink:hover { color: #EEF2FF; }
+.navCta {
+  font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
+  color: #EEF2FF; background: #3B82F6; border-radius: 8px;
+  padding: 8px 16px; text-decoration: none; transition: background 0.2s;
+}
+.navCta:hover { background: #60A5FA; }
+
+/* HERO */
+.hero {
+  min-height: 100vh;
+  padding: 120px clamp(1rem, 4vw, 2rem) 80px;
+  max-width: 1100px; margin: 0 auto;
+  display: grid; grid-template-columns: 1fr 1fr;
+  align-items: center; gap: 4rem;
+}
+.heroInner { display: flex; flex-direction: column; gap: 1.5rem; }
+.eyebrow {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: #60A5FA;
+}
+.liveDot {
+  width: 7px; height: 7px; border-radius: 50%; background: #EF4444;
+  animation: pulse 1.4s ease infinite; flex-shrink: 0;
+}
+@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+.heroTitle {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-weight: 800; line-height: 1.05;
+  letter-spacing: -0.02em; color: #EEF2FF;
+  margin: 0;
+}
+.heroAccent { color: #3B82F6; }
+.heroSub { font-size: 18px; color: #6B7A9E; line-height: 1.6; margin: 0; max-width: 480px; }
+.heroCtas { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.ctaPrimary {
+  font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 700;
+  color: #EEF2FF; background: #3B82F6; border-radius: 12px;
+  padding: 14px 28px; text-decoration: none; transition: all 0.2s;
+  white-space: nowrap;
+}
+.ctaPrimary:hover { background: #60A5FA; transform: translateY(-1px); }
+.ctaSecondary {
+  font-size: 15px; color: #6B7A9E; text-decoration: none;
+  transition: color 0.2s; white-space: nowrap;
+}
+.ctaSecondary:hover { color: #EEF2FF; }
+.heroStats { display: flex; align-items: center; gap: 1.5rem; padding-top: 0.5rem; }
+.heroStat { display: flex; flex-direction: column; gap: 2px; }
+.heroStatNum { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; color: #EEF2FF; }
+.heroStatLabel { font-size: 12px; color: #3D4A66; }
+.heroStatDivider { width: 1px; height: 32px; background: rgba(255,255,255,0.1); }
+
+/* BATTLE CARD MOCK */
+.heroVisual { display: flex; justify-content: center; align-items: center; }
+.battleCard {
+  background: #0f1623; border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 20px; padding: 1.5rem; width: 100%; max-width: 420px;
+  display: flex; flex-direction: column; gap: 1rem;
+}
+.battleCardTop { display: flex; align-items: center; justify-content: space-between; }
+.battleLive { font-size: 12px; font-weight: 700; color: #EF4444; }
+.battleVotes { font-size: 12px; color: #6B7A9E; }
+.battleTopic {
+  font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800;
+  color: #EEF2FF; line-height: 1.3;
+}
+.battlePlayers { display: flex; align-items: center; gap: 1rem; }
+.battlePlayer { display: flex; align-items: center; gap: 10px; flex: 1; }
+.playerAvatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 800;
+  color: white; flex-shrink: 0;
+}
+.playerInfo { flex: 1; min-width: 0; }
+.playerName { font-size: 13px; font-weight: 600; color: #EEF2FF; }
+.playerStance { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: #6B7A9E; }
+.playerVotes { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; }
+.battleVs { font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 800; color: #3D4A66; }
+.voteBar { height: 4px; background: rgba(239,68,68,0.3); border-radius: 2px; overflow: hidden; }
+.voteBarFill { height: 100%; background: #10B981; border-radius: 2px; transition: width 0.5s; }
+
+/* SECTIONS */
+.section { padding: 6rem clamp(1rem, 4vw, 2rem); }
+.sectionDark { background: #0a0f1e; padding: 6rem clamp(1rem, 4vw, 2rem); }
+.sectionInner { max-width: 1100px; margin: 0 auto; }
+.sectionEyebrow {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: #3B82F6; margin-bottom: 0.75rem;
+}
+.sectionTitle {
+  font-family: 'Syne', sans-serif; font-size: clamp(1.75rem, 3vw, 2.5rem);
+  font-weight: 800; letter-spacing: -0.02em; color: #EEF2FF;
+  margin: 0 0 3rem;
+}
+
+/* STEPS */
+.steps {
+  display: flex; align-items: flex-start; gap: 1rem;
+}
+.step {
+  flex: 1; background: #0f1623;
+  border: 1px solid rgba(255,255,255,0.065);
+  border-radius: 16px; padding: 2rem;
+  display: flex; flex-direction: column; gap: 0.75rem;
+}
+.stepNum { font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700; color: #3D4A66; letter-spacing: 0.1em; }
+.stepIcon { font-size: 28px; }
+.stepTitle { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; color: #EEF2FF; margin: 0; }
+.stepBody { font-size: 14px; color: #6B7A9E; line-height: 1.6; margin: 0; }
+.stepArrow { font-size: 24px; color: #3D4A66; flex-shrink: 0; margin-top: 3.5rem; }
+
+/* FEATURES */
+.features {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.5rem;
+}
+.feature {
+  background: #0f1623; border: 1px solid rgba(255,255,255,0.065);
+  border-radius: 16px; padding: 1.75rem;
+  display: flex; flex-direction: column; gap: 0.75rem;
+}
+.featureIcon { font-size: 28px; }
+.featureTitle { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 800; color: #EEF2FF; margin: 0; }
+.featureBody { font-size: 14px; color: #6B7A9E; line-height: 1.6; margin: 0; }
+
+/* TOPICS */
+.topics { display: flex; flex-direction: column; gap: 0; border: 1px solid rgba(255,255,255,0.065); border-radius: 16px; overflow: hidden; }
+.topic {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(255,255,255,0.065);
+  text-decoration: none; transition: background 0.15s;
+}
+.topic:last-child { border-bottom: none; }
+.topic:hover { background: rgba(59,130,246,0.05); }
+.topicLeft { display: flex; align-items: center; gap: 0.75rem; flex: 1; min-width: 0; }
+.topicSport {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+  color: #3B82F6; background: rgba(59,130,246,0.1);
+  border: 1px solid rgba(59,130,246,0.2);
+  border-radius: 6px; padding: 2px 8px; white-space: nowrap;
+}
+.topicText { font-size: 14px; color: #C4CCDF; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.topicRight { display: flex; align-items: center; gap: 1rem; flex-shrink: 0; }
+.topicHot { font-size: 12px; color: #F59E0B; }
+.topicDebate { font-size: 13px; font-weight: 600; color: #3B82F6; white-space: nowrap; }
+
+/* CTA SECTION */
+.ctaSection {
+  padding: 7rem clamp(1rem, 4vw, 2rem);
+  text-align: center;
+  background: linear-gradient(180deg, transparent, rgba(59,130,246,0.05));
+}
+.ctaTitle {
+  font-family: 'Syne', sans-serif; font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 800; letter-spacing: -0.02em; color: #EEF2FF; margin: 0 0 1rem;
+}
+.ctaSub { font-size: 18px; color: #6B7A9E; margin: 0 0 2.5rem; }
+.ctaFine { font-size: 13px; color: #3D4A66; margin-top: 1.25rem; }
+
+/* FOOTER */
+.footer { border-top: 1px solid rgba(255,255,255,0.065); padding: 2.5rem clamp(1rem, 4vw, 2rem); }
+.footerInner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+.footerLogo { display: flex; align-items: center; gap: 6px; }
+.footerLinks { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+.footerLink { font-size: 13px; color: #3D4A66; text-decoration: none; transition: color 0.2s; }
+.footerLink:hover { color: #6B7A9E; }
+.footerCopy { font-size: 12px; color: #3D4A66; }
+
+/* MOBILE */
+@media (max-width: 768px) {
+  .hero { grid-template-columns: 1fr; padding-top: 100px; gap: 2.5rem; }
+  .heroVisual { order: -1; }
+  .battleCard { max-width: 100%; }
+  .steps { flex-direction: column; }
+  .stepArrow { display: none; }
+  .heroStats { flex-wrap: wrap; gap: 1rem; }
+  .navLinks .navLink { display: none; }
+  .footerInner { flex-direction: column; text-align: center; }
+  .footerLinks { justify-content: center; }
+}

@@ -1,269 +1,211 @@
-'use client';
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { supabase } from './supabase';
-import styles from './page.module.css';
+import styles from './landing.module.css';
 
 export default function Home() {
-  const router = useRouter();
-
-  useEffect(() => {
-    async function checkSession() {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        router.replace('/lobby');
-      }
-    }
-    checkSession();
-  }, []);
-
   return (
     <main className={styles.main}>
 
+      {/* NAV */}
+      <nav className={styles.nav}>
+        <div className={styles.navInner}>
+          <Link href="/" className={styles.navLogo}>
+            <span className={styles.flame}>🔥</span>
+            <span className={styles.logoText}>Torchd</span>
+          </Link>
+          <div className={styles.navLinks}>
+            <Link href="/lobby" className={styles.navLink}>Game Lobby</Link>
+            <Link href="/leaderboard" className={styles.navLink}>Leaderboard</Link>
+            <Link href="/login" className={styles.navCta}>Sign up free</Link>
+          </div>
+        </div>
+      </nav>
+
       {/* HERO */}
       <section className={styles.hero}>
-        <div className={styles.heroGrid}></div>
-        <div className={styles.heroBgGlow}></div>
-
-        <div className={styles.heroEyebrow}>
-          <span className={styles.eyebrowDot}></span>
-          Now open for early access
-        </div>
-
-        <h1 className={styles.heroH1}>
-          Stop tweeting.<br />
-          Start <span className={styles.blue}>debating</span>.<br />
-          <span className={styles.stroke}>On camera.</span>
-        </h1>
-
-        <p className={styles.heroSub}>
-          <strong>Torchd</strong> is the live video debate platform for sports fans. Go head-to-head with real people, in real time — with a crowd deciding who wins.
-        </p>
-
-        <div className={styles.heroActions}>
-          <Link href="/signup" className={styles.heroBtnPrimary}>Create Free Account →</Link>
-          <Link href="/battle" className={styles.heroBtnSecondary}>▶ Watch a live battle</Link>
-        </div>
-
-        <div className={styles.socialProof}>
-          <div className={styles.proofAvatars}>
-            <div className={styles.proofAv} style={{background:'#3B82F6'}}>JK</div>
-            <div className={styles.proofAv} style={{background:'#10B981'}}>SR</div>
-            <div className={styles.proofAv} style={{background:'#F59E0B'}}>TW</div>
-            <div className={styles.proofAv} style={{background:'#EF4444'}}>DM</div>
-            <div className={styles.proofAv} style={{background:'#8B5CF6'}}>AL</div>
+        <div className={styles.heroInner}>
+          <div className={styles.eyebrow}>
+            <span className={styles.liveDot}></span>
+            Live debates. Real sports fans.
           </div>
-          <span className={styles.proofText}><strong>2,400+ fans</strong> already on Torchd</span>
-        </div>
-      </section>
-
-      {/* TICKER */}
-      <div className={styles.tickerWrap}>
-        <div className={styles.tickerLabel}>Hot debates right now</div>
-        <div className={styles.tickerTrack}>
-          {[
-            {tag:'NBA', text:'Is LeBron the GOAT?'},
-            {tag:'NFL', text:'Mahomes already passed Brady'},
-            {tag:'🔥 HOT', text:'Celtics dynasty or one-year wonder?'},
-            {tag:'NBA', text:'Wembanyama > Embiid right now'},
-            {tag:'NFL', text:'Ravens should have gone to the Super Bowl'},
-            {tag:'🔥 HOT', text:'NFL officiating is broken'},
-            {tag:'NBA', text:'Steph Curry is the most underrated GOAT'},
-            {tag:'NFL', text:'Lamar Jackson is the best QB in football today'},
-            {tag:'NBA', text:'Is LeBron the GOAT?'},
-            {tag:'NFL', text:'Mahomes already passed Brady'},
-            {tag:'🔥 HOT', text:'Celtics dynasty or one-year wonder?'},
-            {tag:'NBA', text:'Wembanyama > Embiid right now'},
-            {tag:'NFL', text:'Ravens should have gone to the Super Bowl'},
-            {tag:'🔥 HOT', text:'NFL officiating is broken'},
-            {tag:'NBA', text:'Steph Curry is the most underrated GOAT'},
-            {tag:'NFL', text:'Lamar Jackson is the best QB in football today'},
-          ].map((item, i) => (
-            <div key={i} className={styles.tickerItem}>
-              <span className={`${styles.tickerTag} ${item.tag==='NFL' ? styles.tagRed : item.tag.includes('HOT') ? styles.tagAmber : styles.tagBlue}`}>{item.tag}</span>
-              {item.text}
+          <h1 className={styles.heroTitle}>
+            Your take is<br />
+            <span className={styles.heroAccent}>worth fighting for.</span>
+          </h1>
+          <p className={styles.heroSub}>
+            Get on camera. Pick a stance. Debate live against someone who disagrees.
+            The crowd votes. Your rank rises. This is Torchd.
+          </p>
+          <div className={styles.heroCtas}>
+            <Link href="/signup" className={styles.ctaPrimary}>Start debating free →</Link>
+            <Link href="/lobby" className={styles.ctaSecondary}>Watch live games</Link>
+          </div>
+          <div className={styles.heroStats}>
+            <div className={styles.heroStat}>
+              <span className={styles.heroStatNum}>Live</span>
+              <span className={styles.heroStatLabel}>game watch parties</span>
             </div>
-          ))}
+            <div className={styles.heroStatDivider}></div>
+            <div className={styles.heroStat}>
+              <span className={styles.heroStatNum}>Real</span>
+              <span className={styles.heroStatLabel}>camera debates</span>
+            </div>
+            <div className={styles.heroStatDivider}></div>
+            <div className={styles.heroStat}>
+              <span className={styles.heroStatNum}>You</span>
+              <span className={styles.heroStatLabel}>decide who wins</span>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {/* MODES */}
-      <section className={styles.modesSection}>
-        <div className={styles.container}>
-          <div className={styles.eyebrow}><span className={styles.eyebrowDot}></span> Two ways to play</div>
-          <h2 className={styles.h2}>Pick your battle format</h2>
-          <div className={styles.modesGrid}>
-            <Link href="/battle" className={`${styles.modeCard} ${styles.modeBattle}`}>
-              <span className={styles.modeIcon}>⚔️</span>
-              <div className={styles.modeTitle}>Battle Mode</div>
-              <p className={styles.modeBody}>1-on-1 live video. Pick a topic, get matched with someone who disagrees, argue your case on camera. Live crowd votes on the winner. No script. No edits. Pure debate.</p>
-              <div className={styles.modeLink} style={{color:'var(--blue)'}}>Go to Battle Mode →</div>
-            </Link>
-            <Link href="/lobby" className={`${styles.modeCard} ${styles.modeLobby}`}>
-              <span className={styles.modeIcon}>🏟️</span>
-              <div className={styles.modeTitle}>Game Lobby</div>
-              <p className={styles.modeBody}>Jump into a live room tied to tonight's game. Get on camera, drop hot takes, upvote the best moments. It's a sports bar — but global, and on your screen.</p>
-              <div className={styles.modeLink} style={{color:'var(--green)'}}>Go to Game Lobby →</div>
-            </Link>
+        {/* Mock battle card */}
+        <div className={styles.heroVisual}>
+          <div className={styles.battleCard}>
+            <div className={styles.battleCardTop}>
+              <span className={styles.battleLive}>🔴 LIVE</span>
+              <span className={styles.battleVotes}>247 watching</span>
+            </div>
+            <div className={styles.battleTopic}>"Mahomes has already surpassed Brady"</div>
+            <div className={styles.battlePlayers}>
+              <div className={styles.battlePlayer}>
+                <div className={styles.playerAvatar} style={{background:'#3B82F6'}}>MJ</div>
+                <div className={styles.playerInfo}>
+                  <div className={styles.playerName}>@mikeelesin</div>
+                  <div className={styles.playerStance}>FOR</div>
+                </div>
+                <div className={styles.playerVotes} style={{color:'#10B981'}}>61%</div>
+              </div>
+              <div className={styles.battleVs}>VS</div>
+              <div className={styles.battlePlayer}>
+                <div className={styles.playerAvatar} style={{background:'#8B5CF6'}}>JS</div>
+                <div className={styles.playerInfo}>
+                  <div className={styles.playerName}>@johnsmith</div>
+                  <div className={styles.playerStance}>AGAINST</div>
+                </div>
+                <div className={styles.playerVotes} style={{color:'#EF4444'}}>39%</div>
+              </div>
+            </div>
+            <div className={styles.voteBar}>
+              <div className={styles.voteBarFill} style={{width:'61%'}}></div>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* STATS */}
-      <div className={styles.statsBand}>
-        <div className={styles.statsGrid}>
-          <div className={styles.statBlock}><span className={styles.statNum}>80M+</span><div className={styles.statLabel}>Sports fans actively debating online in the US</div></div>
-          <div className={styles.statBlock}><span className={styles.statNum}>$73B</span><div className={styles.statLabel}>Sports media market shifting to interactive formats</div></div>
-          <div className={styles.statBlock}><span className={styles.statNum}>2,400+</span><div className={styles.statLabel}>Fans already on Torchd in early access</div></div>
-          <div className={styles.statBlock}><span className={styles.statNum}>0</span><div className={styles.statLabel}>Other platforms doing what we do. Until now.</div></div>
+      {/* HOW IT WORKS */}
+      <section className={styles.section}>
+        <div className={styles.sectionInner}>
+          <div className={styles.sectionEyebrow}>How it works</div>
+          <h2 className={styles.sectionTitle}>Three steps to prove your take</h2>
+          <div className={styles.steps}>
+            <div className={styles.step}>
+              <div className={styles.stepNum}>01</div>
+              <div className={styles.stepIcon}>🎯</div>
+              <h3 className={styles.stepTitle}>Pick your stance</h3>
+              <p className={styles.stepBody}>Choose a hot sports topic and pick a side. Agree or disagree — just be ready to defend it.</p>
+            </div>
+            <div className={styles.stepArrow}>→</div>
+            <div className={styles.step}>
+              <div className={styles.stepNum}>02</div>
+              <div className={styles.stepIcon}>🎥</div>
+              <h3 className={styles.stepTitle}>Debate on camera</h3>
+              <p className={styles.stepBody}>Get matched with someone who disagrees. Go live. Make your case. No scripts, no edits.</p>
+            </div>
+            <div className={styles.stepArrow}>→</div>
+            <div className={styles.step}>
+              <div className={styles.stepNum}>03</div>
+              <div className={styles.stepIcon}>🏆</div>
+              <h3 className={styles.stepTitle}>The crowd decides</h3>
+              <p className={styles.stepBody}>Live viewers vote in real time. Win the crowd, win the debate. Climb the leaderboard.</p>
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
       {/* FEATURES */}
-      <section className={styles.featuresSection}>
-        <div className={styles.container}>
-          <div className={styles.eyebrow}><span className={styles.eyebrowDot}></span> Features</div>
-          <h2 className={styles.h2}>Built for fans with real opinions</h2>
-          <div className={styles.featuresGrid}>
-            {[
-              {icon:'🎯', title:'Stance-based matchmaking', body:'We find you someone who genuinely disagrees. No echo chambers. Real stakes, real debate.'},
-              {icon:'📊', title:'Live audience voting', body:'The crowd decides — in real time. Hundreds of fans watch and vote as you argue your case.'},
-              {icon:'🏆', title:'Rankings & leaderboards', body:'Win debates. Earn points. Climb the global leaderboard and build your rep.'},
-              {icon:'✂️', title:'Shareable highlight clips', body:'Your best moments auto-clipped and ready to post. Go viral for being right, not just loud.'},
-              {icon:'🔥', title:'AI topic engine', body:'Topics generated from live game moments. Bad call just happened? There\'s a debate room for that.'},
-              {icon:'🌍', title:'Global fan base', body:'Debate fans from Boston to Lagos to London. Every sport, every team, every take — covered.'},
-            ].map((f, i) => (
-              <div key={i} className={styles.featCard}>
-                <span className={styles.featIcon}>{f.icon}</span>
-                <div className={styles.featTitle}>{f.title}</div>
-                <p className={styles.featBody}>{f.body}</p>
-              </div>
-            ))}
+      <section className={styles.sectionDark}>
+        <div className={styles.sectionInner}>
+          <div className={styles.sectionEyebrow} style={{color:'#60A5FA'}}>Built for sports fans</div>
+          <h2 className={styles.sectionTitle} style={{color:'#EEF2FF'}}>More than just debate</h2>
+          <div className={styles.features}>
+            <div className={styles.feature}>
+              <div className={styles.featureIcon}>⚾</div>
+              <h3 className={styles.featureTitle}>Live game lobby</h3>
+              <p className={styles.featureBody}>Follow along with live play-by-play, box scores, and team stats for every MLB, NBA, NFL, and NHL game.</p>
+            </div>
+            <div className={styles.feature}>
+              <div className={styles.featureIcon}>📹</div>
+              <h3 className={styles.featureTitle}>Watch parties</h3>
+              <p className={styles.featureBody}>React on camera with other fans watching the same game live. Like a sports bar, but you're actually there.</p>
+            </div>
+            <div className={styles.feature}>
+              <div className={styles.featureIcon}>📊</div>
+              <h3 className={styles.featureTitle}>Rankings & rep</h3>
+              <p className={styles.featureBody}>Every win builds your record. Climb the global leaderboard. Prove you're not just a fan — you're right.</p>
+            </div>
+            <div className={styles.feature}>
+              <div className={styles.featureIcon}>🔥</div>
+              <h3 className={styles.featureTitle}>Hot takes, settled</h3>
+              <p className={styles.featureBody}>The debates that dominate your timeline — who's the GOAT, who choked, who's overrated — finally have a verdict.</p>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* LIVE BATTLES */}
-      <section className={styles.liveSection}>
-        <div className={styles.container}>
-          <div className={styles.eyebrow}><span className={styles.liveDot}></span> Live now</div>
-          <h2 className={styles.h2}>Battles happening right now</h2>
-          <div className={styles.battlesList}>
+      {/* TOPICS */}
+      <section className={styles.section}>
+        <div className={styles.sectionInner}>
+          <div className={styles.sectionEyebrow}>Trending debates</div>
+          <h2 className={styles.sectionTitle}>What are people arguing about?</h2>
+          <div className={styles.topics}>
             {[
-              {tag:'NBA', title:'"LeBron James is the greatest basketball player of all time"', p1:'Jordan K.', p2:'Darius W.', pct:62},
-              {tag:'NFL', title:'"Patrick Mahomes has already surpassed Tom Brady as the GOAT QB"', p1:'Marcus T.', p2:'Lisa R.', pct:55},
-              {tag:'NBA', title:'"The Boston Celtics are building a legitimate dynasty"', p1:'Keisha B.', p2:'Ryan O.', pct:71},
-            ].map((b, i) => (
-              <Link href="/battle" key={i} className={styles.battleRow}>
-                <div className={`${styles.tag} ${b.tag==='NFL' ? styles.tagRed : styles.tagBlue}`}>{b.tag}</div>
-                <div className={styles.battleTopic}>
-                  <div className={styles.battleTitle}>{b.title}</div>
-                  <div className={styles.battleMeta}>
-                    <span>{b.p1} vs {b.p2}</span>
-                    <span className={styles.liveBadge}>● LIVE</span>
-                  </div>
+              { topic: 'Mahomes has already surpassed Brady', sport: 'NFL', hot: true },
+              { topic: 'LeBron is the greatest of all time', sport: 'NBA', hot: true },
+              { topic: 'The Yankees will win the World Series', sport: 'MLB', hot: false },
+              { topic: 'Gretzky is untouchable as the GOAT', sport: 'NHL', hot: false },
+              { topic: 'Steph Curry changed basketball forever', sport: 'NBA', hot: true },
+              { topic: 'Analytics have made baseball boring', sport: 'MLB', hot: false },
+            ].map((t, i) => (
+              <Link key={i} href="/signup" className={styles.topic}>
+                <div className={styles.topicLeft}>
+                  <span className={styles.topicSport}>{t.sport}</span>
+                  <span className={styles.topicText}>"{t.topic}"</span>
                 </div>
-                <div className={styles.battleVotes}>
-                  <div className={styles.voteBar}>
-                    <div className={styles.voteBlue} style={{width:`${b.pct}%`}}></div>
-                    <div className={styles.voteRed} style={{width:`${100-b.pct}%`}}></div>
-                  </div>
-                  <div className={styles.votePcts}>
-                    <span style={{color:'#60A5FA'}}>{b.pct}%</span>
-                    <span style={{color:'#F87171'}}>{100-b.pct}%</span>
-                  </div>
+                <div className={styles.topicRight}>
+                  {t.hot && <span className={styles.topicHot}>🔥 Hot</span>}
+                  <span className={styles.topicDebate}>Debate this →</span>
                 </div>
-                <div className={styles.watchBtn}>Watch →</div>
               </Link>
             ))}
           </div>
         </div>
       </section>
 
-      {/* LEADERBOARD PREVIEW */}
-      <section className={styles.lbPreviewSection}>
-        <div className={styles.container}>
-          <div className={styles.eyebrow}><span className={styles.eyebrowDot}></span> Rankings</div>
-          <div className={styles.lbPreviewHeader}>
-            <h2 className={styles.h2}>Top debaters this week</h2>
-            <Link href="/leaderboard" className={styles.lbPreviewLink}>See full leaderboard →</Link>
-          </div>
-          <div className={styles.lbPreviewList}>
-            {[
-              { rank: 1, init: 'MJ', name: 'Mike J.', sport: 'NBA · NFL', pts: 4820, winRate: 84, bg: '#3B82F6' },
-              { rank: 2, init: 'SR', name: 'Simone R.', sport: 'NBA', pts: 4210, winRate: 71, bg: '#10B981' },
-              { rank: 3, init: 'TW', name: 'Tyler W.', sport: 'NFL', pts: 3980, winRate: 67, bg: '#F59E0B' },
-              { rank: 4, init: 'KR', name: 'King Rick', sport: 'NBA · NFL', pts: 3720, winRate: 79, bg: '#8B5CF6' },
-              { rank: 5, init: 'AL', name: 'Ashley L.', sport: 'NBA', pts: 3510, winRate: 74, bg: '#EF4444' },
-            ].map((p) => (
-              <div key={p.rank} className={styles.lbPreviewRow}>
-                <div className={styles.lbPreviewRank} style={{ color: p.rank <= 3 ? '#F59E0B' : '#3D4A66' }}>{p.rank}</div>
-                <div className={styles.lbPreviewAv} style={{ background: p.bg }}>{p.init}</div>
-                <div className={styles.lbPreviewInfo}>
-                  <div className={styles.lbPreviewName}>{p.name}</div>
-                  <div className={styles.lbPreviewSport}>{p.sport}</div>
-                </div>
-                <div className={styles.lbPreviewPts}>{p.pts.toLocaleString()} <span>pts</span></div>
-                <div className={styles.lbPreviewWin} style={{ color: p.winRate >= 70 ? '#10B981' : '#F59E0B' }}>{p.winRate}%</div>
-              </div>
-            ))}
-          </div>
-          <div className={styles.lbPreviewFooter}>
-            <Link href="/leaderboard" className={styles.heroBtnPrimary}>View Full Leaderboard →</Link>
-          </div>
-        </div>
-      </section>
-
       {/* CTA */}
       <section className={styles.ctaSection}>
-        <div className={styles.ctaGlow}></div>
-        <div className={styles.ctaInner}>
-          <div className={styles.eyebrow} style={{justifyContent:'center'}}><span className={styles.eyebrowDot}></span> Join Torchd</div>
-          <h2 className={styles.h2}>Your takes deserve a real stage</h2>
-          <p className={styles.ctaBody}>Create your free account and start debating in minutes. No credit card. No download required.</p>
-          <Link href="/signup" className={styles.heroBtnPrimary} style={{display:'inline-flex',marginTop:'2rem'}}>Create Free Account →</Link>
-          <p className={styles.ctaNote}>Free forever · No spam · Cancel anytime</p>
+        <div className={styles.sectionInner}>
+          <h2 className={styles.ctaTitle}>Your takes deserve a verdict.</h2>
+          <p className={styles.ctaSub}>Sign up free. No credit card. Start debating in 60 seconds.</p>
+          <Link href="/signup" className={styles.ctaPrimary} style={{fontSize:'18px', padding:'16px 40px'}}>
+            Create your account →
+          </Link>
+          <p className={styles.ctaFine}>Already have an account? <Link href="/login" style={{color:'#60A5FA', textDecoration:'none'}}>Sign in</Link></p>
         </div>
       </section>
 
       {/* FOOTER */}
       <footer className={styles.footer}>
         <div className={styles.footerInner}>
-          <div>
-            <div style={{fontFamily:'Syne,sans-serif',fontSize:'20px',fontWeight:800,color:'#3B82F6'}}>🔥 Torchd</div>
-            <p className={styles.footerDesc}>Sports debate, reimagined. Go head-to-head with fans worldwide on live video.</p>
+          <div className={styles.footerLogo}>
+            <span className={styles.flame}>🔥</span>
+            <span className={styles.logoText}>Torchd</span>
           </div>
-          <div className={styles.footerCol}>
-            <h4>Product</h4>
-            <ul>
-              <li><Link href="/battle">Battle Mode</Link></li>
-              <li><Link href="/lobby">Game Lobby</Link></li>
-              <li><Link href="/leaderboard">Leaderboard</Link></li>
-              <li><Link href="/signup">Create Account</Link></li>
-            </ul>
+          <div className={styles.footerLinks}>
+            <Link href="/lobby" className={styles.footerLink}>Game Lobby</Link>
+            <Link href="/battle" className={styles.footerLink}>Battle Mode</Link>
+            <Link href="/leaderboard" className={styles.footerLink}>Leaderboard</Link>
+            <Link href="/login" className={styles.footerLink}>Sign in</Link>
           </div>
-          <div className={styles.footerCol}>
-            <h4>Company</h4>
-            <ul>
-              <li><Link href="#">About</Link></li>
-              <li><Link href="#">Blog</Link></li>
-              <li><Link href="#">Careers</Link></li>
-              <li><Link href="#">Press</Link></li>
-            </ul>
-          </div>
-          <div className={styles.footerCol}>
-            <h4>Legal</h4>
-            <ul>
-              <li><Link href="#">Privacy Policy</Link></li>
-              <li><Link href="#">Terms of Service</Link></li>
-              <li><a href="mailto:hello@torchd.app">Contact Us</a></li>
-            </ul>
-          </div>
-        </div>
-        <div className={styles.footerBottom}>
-          <div>© 2025 Torchd, Inc. All rights reserved.</div>
-          <div>hello@torchd.app · torchd.app</div>
+          <p className={styles.footerCopy}>© 2026 Torchd. All rights reserved.</p>
         </div>
       </footer>
 
