@@ -114,6 +114,38 @@ function getPlayType(play, sport) {
   return 'normal';
 }
 
+function groupMLBAtBats(plays) {
+  const groups = [];
+  let current = null;
+  const chronological = [...plays].reverse();
+  for (const play of chronological) {
+    const text = (play.text || '').toLowerCase();
+    if (text.includes('end of') || text.includes('top of') || text.includes('bottom of') || text.includes('start of') || text.includes('middle of')) {
+      if (current) { groups.unshift(current); current = null; }
+      groups.unshift({ type: 'inning', play });
+      continue;
+    }
+    const isABStart = /pitches to|batting|steps in/i.test(text);
+    if (isABStart) {
+      if (current) groups.unshift(current);
+      current = { type: 'ab', pitches: [], result: null, play };
+      continue;
+    }
+    const isPitch = /^pitch \d+|^ball \d+|^strike \d+|ball in play|foul ball|foul tip|swinging strike/i.test(text);
+    if (isPitch && current) { current.pitches.unshift(play); continue; }
+    const isResult = /struck out|strikeout|grounded|flied|lined|popped|singled|doubled|tripled|homered|walked|hit by pitch|sacrifice|fielder.s choice|error|reaches|safe at/i.test(text);
+    if (isResult) {
+      if (current) { current.result = play; if (play.scoringPlay) current.scoringPlay = true; groups.unshift(current); current = null; }
+      else { groups.unshift({ type: 'ab', pitches: [], result: play, play, scoringPlay: play.scoringPlay }); }
+      continue;
+    }
+    if (current) { groups.unshift(current); current = null; }
+    groups.unshift({ type: 'event', play });
+  }
+  if (current) groups.unshift(current);
+  return groups;
+}
+
 export default function GameRoom() {
   const params = useParams();
   const gameId = params?.gameId;
@@ -732,7 +764,6 @@ export default function GameRoom() {
             // Non-MLB: render plays individually
             filtered.map((play, i) => renderPlay(play, i, filtered))
           ) : (
-            // MLB: group by at-bat
             groupMLBAtBats(filtered).map((group, gi) => {
               if (group.type === 'inning') {
                 const p = group.play;
@@ -824,7 +855,7 @@ export default function GameRoom() {
                   )}
                 </div>
               );
-            })
+            ))
           )}
         </div>
       </>
