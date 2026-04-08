@@ -115,7 +115,10 @@ function getVisibleTeamColor(hexColor) {
 
   // Boost saturation and ensure minimum lightness for dark bg visibility
   s = Math.min(1, s * 1.3);
-  l = Math.max(0.55, Math.min(0.75, l * 1.25));
+  // Only boost lightness for dark colors — bright colors get washed out if pushed higher
+  if (l < 0.45) l = Math.max(0.55, l * 1.4);
+  // Cap at 0.65 to prevent pale/washed look on already-bright colors
+  l = Math.min(0.65, l);
 
   // Convert back to RGB
   const hue = (p, q, t) => {
