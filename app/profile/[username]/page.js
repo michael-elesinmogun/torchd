@@ -1,4 +1,4 @@
-// TORCHD_PROFILE_V6
+// TORCHD_PROFILE_V7
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
@@ -30,18 +30,20 @@ function UserCard({ u, index, styles }) {
   const initials = u.full_name
     ? u.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
     : u.username.slice(0, 2).toUpperCase();
-
   return (
     <Link href={`/profile/${u.username}`} className={styles.followListItem}>
-      <div className={styles.followListAv} style={{ background: bg }}>
-        {initials}
-      </div>
+      <div className={styles.followListAv} style={{ background: bg }}>{initials}</div>
       <div>
         <div className={styles.followListName}>{u.full_name || u.username}</div>
         <div style={{ fontSize: '12px', color: '#6B7A9E' }}>@{u.username}</div>
       </div>
     </Link>
   );
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 export default function Profile({ params }) {
@@ -75,7 +77,7 @@ export default function Profile({ params }) {
   const [editingSports, setEditingSports] = useState(false);
   const [savingSports, setSavingSports] = useState(false);
 
-  const [activeTab, setActiveTab] = useState('followers');
+  const [activeTab, setActiveTab] = useState('battles');
 
   const [isFollowing, setIsFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
@@ -85,28 +87,28 @@ export default function Profile({ params }) {
   const [listsLoading, setListsLoading] = useState(true);
   const [followLoading, setFollowLoading] = useState(false);
 
+  const [battleHistory, setBattleHistory] = useState([]);
+  const [battlesLoading, setBattlesLoading] = useState(true);
+
   const [photoUrl, setPhotoUrl] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [checklist, setChecklist] = useState({ addBio: false, pickTeams: false, firstBattle: false });
 
-  // Real stats
   const [stats, setStats] = useState({ wins: 0, losses: 0, battles_count: 0, rank: null });
 
   useEffect(() => {
     async function fetchData() {
       setLoading(true);
       setListsLoading(true);
+      setBattlesLoading(true);
 
       const { data: { session } } = await supabase.auth.getSession();
       const currentUser = session?.user;
       setUser(currentUser);
 
       const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('username', username)
-        .maybeSingle();
+        .from('profiles').select('*').eq('username', username).maybeSingle();
 
       if (profileData) {
         setProfile(profileData);
@@ -133,39 +135,38 @@ export default function Profile({ params }) {
           firstBattle: (profileData.battles_count || 0) > 0,
         });
 
-        // Set stats from profile
         const wins = profileData.wins || 0;
         const losses = profileData.losses || 0;
         const battles = profileData.battles_count || 0;
 
-        // Fetch rank — count profiles with more wins
         const { count } = await supabase
-          .from('profiles')
-          .select('id', { count: 'exact', head: true })
-          .eq('show_on_leaderboard', true)
-          .eq('is_public', true)
-          .gt('wins', wins);
+          .from('profiles').select('id', { count: 'exact', head: true })
+          .eq('show_on_leaderboard', true).eq('is_public', true).gt('wins', wins);
 
-        const rank = (count ?? 0) + 1;
-        setStats({ wins, losses, battles_count: battles, rank });
+        setStats({ wins, losses, battles_count: battles, rank: (count ?? 0) + 1 });
       } else {
         setDisplayName(username.split(/[-_]/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
         setInitials(username.slice(0, 2).toUpperCase());
       }
 
-      const { data: followersRaw } = await supabase
-        .from('follows')
-        .select('follower_id')
-        .eq('following_username', username);
+      // Fetch battle history
+      const { data: p1Battles } = await supabase
+        .from('battles').select('*').eq('player1_username', username).eq('status', 'ended').order('ended_at', { ascending: false }).limit(50);
+      const { data: p2Battles } = await supabase
+        .from('battles').select('*').eq('player2_username', username).eq('status', 'ended').order('ended_at', { ascending: false }).limit(50);
 
+      const allBattles = [...(p1Battles || []), ...(p2Battles || [])]
+        .sort((a, b) => new Date(b.ended_at || b.created_at) - new Date(a.ended_at || a.created_at));
+      setBattleHistory(allBattles);
+      setBattlesLoading(false);
+
+      const { data: followersRaw } = await supabase
+        .from('follows').select('follower_id').eq('following_username', username);
       const followerIds = followersRaw?.map(f => f.follower_id) || [];
       setFollowerCount(followerIds.length);
-
       if (followerIds.length > 0) {
         const { data: followerProfiles } = await supabase
-          .from('profiles')
-          .select('username, full_name')
-          .in('id', followerIds);
+          .from('profiles').select('username, full_name').in('id', followerIds);
         setFollowerList(followerProfiles || []);
       } else {
         setFollowerList([]);
@@ -173,18 +174,12 @@ export default function Profile({ params }) {
 
       if (profileData?.id) {
         const { data: followingRaw } = await supabase
-          .from('follows')
-          .select('following_username')
-          .eq('follower_id', profileData.id);
-
+          .from('follows').select('following_username').eq('follower_id', profileData.id);
         const followingUsernames = followingRaw?.map(f => f.following_username) || [];
         setFollowingCount(followingUsernames.length);
-
         if (followingUsernames.length > 0) {
           const { data: followingProfiles } = await supabase
-            .from('profiles')
-            .select('username, full_name')
-            .in('username', followingUsernames);
+            .from('profiles').select('username, full_name').in('username', followingUsernames);
           setFollowingList(followingProfiles || []);
         } else {
           setFollowingList([]);
@@ -193,11 +188,7 @@ export default function Profile({ params }) {
 
       if (currentUser) {
         const { data: existingFollow } = await supabase
-          .from('follows')
-          .select('id')
-          .eq('follower_id', currentUser.id)
-          .eq('following_username', username)
-          .maybeSingle();
+          .from('follows').select('id').eq('follower_id', currentUser.id).eq('following_username', username).maybeSingle();
         setIsFollowing(!!existingFollow);
       }
 
@@ -216,9 +207,7 @@ export default function Profile({ params }) {
     if (isFollowing) {
       setIsFollowing(false);
       setFollowerCount(c => c - 1);
-      await supabase.from('follows').delete()
-        .eq('follower_id', user.id)
-        .eq('following_username', username);
+      await supabase.from('follows').delete().eq('follower_id', user.id).eq('following_username', username);
     } else {
       setIsFollowing(true);
       setFollowerCount(c => c + 1);
@@ -422,42 +411,28 @@ export default function Profile({ params }) {
               )}
             </div>
 
-            {/* Stats card with real data */}
             <div className={styles.sideCard}>
               <div className={styles.sideCardTitle}>Stats</div>
               <div className={styles.statsGrid}>
                 <div className={styles.statItem}>
-                  <div className={styles.statNum} style={{ color: stats.battles_count > 0 ? '#EEF2FF' : '#3D4A66' }}>
-                    {stats.battles_count}
-                  </div>
+                  <div className={styles.statNum} style={{ color: stats.battles_count > 0 ? '#EEF2FF' : '#3D4A66' }}>{stats.battles_count}</div>
                   <div className={styles.statLabel}>Battles</div>
                 </div>
                 <div className={styles.statItem}>
-                  <div className={styles.statNum} style={{ color: stats.wins > 0 ? '#10B981' : '#3D4A66' }}>
-                    {stats.wins > 0 ? `${stats.wins}W` : '—'}
-                  </div>
+                  <div className={styles.statNum} style={{ color: stats.wins > 0 ? '#10B981' : '#3D4A66' }}>{stats.wins > 0 ? `${stats.wins}W` : '—'}</div>
                   <div className={styles.statLabel}>Wins</div>
                 </div>
                 <div className={styles.statItem}>
-                  <div className={styles.statNum} style={{ color: stats.battles_count > 0 ? '#EEF2FF' : '#3D4A66' }}>
-                    {winRate}
-                  </div>
+                  <div className={styles.statNum} style={{ color: stats.battles_count > 0 ? '#EEF2FF' : '#3D4A66' }}>{winRate}</div>
                   <div className={styles.statLabel}>Win Rate</div>
                 </div>
                 <div className={styles.statItem}>
-                  <div className={styles.statNum} style={{ color: stats.rank ? '#F59E0B' : '#3D4A66' }}>
-                    {stats.rank && stats.battles_count > 0 ? `#${stats.rank}` : '—'}
-                  </div>
+                  <div className={styles.statNum} style={{ color: stats.rank ? '#F59E0B' : '#3D4A66' }}>{stats.rank && stats.battles_count > 0 ? `#${stats.rank}` : '—'}</div>
                   <div className={styles.statLabel}>Rank</div>
                 </div>
               </div>
               {stats.battles_count > 0 && (
-                <div style={{
-                  marginTop: '0.75rem', paddingTop: '0.75rem',
-                  borderTop: '1px solid rgba(255,255,255,0.06)',
-                  display: 'flex', justifyContent: 'space-between',
-                  fontSize: '12px', color: '#6B7A9E',
-                }}>
+                <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#6B7A9E' }}>
                   <span>{stats.wins}W — {stats.losses}L</span>
                   <Link href="/leaderboard" style={{ color: '#3B82F6', textDecoration: 'none' }}>View leaderboard →</Link>
                 </div>
@@ -468,6 +443,9 @@ export default function Profile({ params }) {
           <div className={styles.mainContent}>
 
             <div className={styles.tabs}>
+              <button className={`${styles.tab} ${activeTab === 'battles' ? styles.tabActive : ''}`} onClick={() => setActiveTab('battles')}>
+                Battles ({battleHistory.length})
+              </button>
               <button className={`${styles.tab} ${activeTab === 'followers' ? styles.tabActive : ''}`} onClick={() => setActiveTab('followers')}>
                 Followers ({followerCount})
               </button>
@@ -476,6 +454,84 @@ export default function Profile({ params }) {
               </button>
             </div>
 
+            {/* BATTLES TAB */}
+            {activeTab === 'battles' && (
+              battlesLoading ? (
+                <div className={styles.emptyState}><div style={{ color: '#6B7A9E', fontSize: '14px' }}>Loading...</div></div>
+              ) : battleHistory.length === 0 ? (
+                <div className={styles.emptyState}>
+                  <div className={styles.emptyIcon}>⚔️</div>
+                  <div className={styles.emptyTitle}>No battles yet</div>
+                  <p className={styles.emptyBody}>Get on camera and start debating. Your battle history will show up here.</p>
+                  <Link href="/battle" className={styles.emptyBtn}>Start a battle →</Link>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {battleHistory.map(battle => {
+                    const isP1 = battle.player1_username === username;
+                    const opponent = isP1 ? battle.player2_username : battle.player1_username;
+                    const myStance = isP1 ? battle.player1_stance : battle.player2_stance;
+                    let result = 'pending';
+                    let resultLabel = '—';
+                    let resultColor = '#6B7A9E';
+                    if (battle.winner) {
+                      if (battle.winner === 'tie') {
+                        result = 'tie';
+                        resultLabel = 'Tie';
+                        resultColor = '#F59E0B';
+                      } else if (battle.winner === username) {
+                        result = 'win';
+                        resultLabel = 'Win';
+                        resultColor = '#10B981';
+                      } else {
+                        result = 'loss';
+                        resultLabel = 'Loss';
+                        resultColor = '#EF4444';
+                      }
+                    }
+                    return (
+                      <Link key={battle.id} href={`/battle/room/${battle.id}`} style={{ textDecoration: 'none' }}>
+                        <div style={{
+                          background: '#0f1623',
+                          border: `1px solid ${result === 'win' ? 'rgba(16,185,129,0.2)' : result === 'loss' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.065)'}`,
+                          borderRadius: '14px', padding: '1rem 1.25rem',
+                          transition: 'border-color 0.2s',
+                          display: 'flex', flexDirection: 'column', gap: '8px',
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', color: '#EEF2FF', lineHeight: 1.4, marginBottom: '4px' }}>
+                                "{battle.topic}"
+                              </div>
+                              {myStance && (
+                                <div style={{ fontSize: '12px', color: '#6B7A9E' }}>
+                                  Your stance: <span style={{ color: '#C4CCDF' }}>{myStance}</span>
+                                </div>
+                              )}
+                            </div>
+                            <div style={{
+                              fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: '13px',
+                              color: resultColor,
+                              background: result === 'win' ? 'rgba(16,185,129,0.1)' : result === 'loss' ? 'rgba(239,68,68,0.1)' : result === 'tie' ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.05)',
+                              border: `1px solid ${result === 'win' ? 'rgba(16,185,129,0.25)' : result === 'loss' ? 'rgba(239,68,68,0.2)' : result === 'tie' ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.08)'}`,
+                              borderRadius: '100px', padding: '3px 12px', flexShrink: 0,
+                            }}>
+                              {result === 'win' ? '🏆 ' : result === 'loss' ? '' : result === 'tie' ? '🤝 ' : ''}{resultLabel}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', color: '#6B7A9E' }}>
+                            <span>vs <Link href={`/profile/${opponent}`} onClick={e => e.stopPropagation()} style={{ color: '#60A5FA', textDecoration: 'none', fontWeight: 600 }}>@{opponent}</Link></span>
+                            <span>{formatDate(battle.ended_at || battle.created_at)}</span>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )
+            )}
+
+            {/* FOLLOWERS TAB */}
             {activeTab === 'followers' && (
               listsLoading ? (
                 <div className={styles.emptyState}><div style={{ color: '#6B7A9E', fontSize: '14px' }}>Loading...</div></div>
@@ -488,13 +544,12 @@ export default function Profile({ params }) {
                 </div>
               ) : (
                 <div className={styles.followList}>
-                  {followerList.map((u, i) => (
-                    <UserCard key={u.username} u={u} index={i} styles={styles} />
-                  ))}
+                  {followerList.map((u, i) => <UserCard key={u.username} u={u} index={i} styles={styles} />)}
                 </div>
               )
             )}
 
+            {/* FOLLOWING TAB */}
             {activeTab === 'following' && (
               listsLoading ? (
                 <div className={styles.emptyState}><div style={{ color: '#6B7A9E', fontSize: '14px' }}>Loading...</div></div>
@@ -507,9 +562,7 @@ export default function Profile({ params }) {
                 </div>
               ) : (
                 <div className={styles.followList}>
-                  {followingList.map((u, i) => (
-                    <UserCard key={u.username} u={u} index={i} styles={styles} />
-                  ))}
+                  {followingList.map((u, i) => <UserCard key={u.username} u={u} index={i} styles={styles} />)}
                 </div>
               )
             )}
@@ -541,17 +594,13 @@ export default function Profile({ params }) {
 
                 <div className={styles.firstBattleCard}>
                   <div className={styles.firstBattleIcon}>⚔️</div>
-                  <div className={styles.firstBattleTitle}>
-                    {stats.battles_count > 0 ? 'Keep battling!' : 'Start your first battle'}
-                  </div>
+                  <div className={styles.firstBattleTitle}>{stats.battles_count > 0 ? 'Keep battling!' : 'Start your first battle'}</div>
                   <p className={styles.firstBattleBody}>
                     {stats.battles_count > 0
                       ? `You've fought ${stats.battles_count} battle${stats.battles_count > 1 ? 's' : ''} with a ${winRate} win rate. Keep going to climb the ranks.`
                       : "You haven't debated yet. Pick a topic, get matched with someone who disagrees, and let the crowd decide who wins."}
                   </p>
-                  <Link href="/battle" className={styles.firstBattleBtn}>
-                    {stats.battles_count > 0 ? 'Battle again →' : 'Find me an opponent →'}
-                  </Link>
+                  <Link href="/battle" className={styles.firstBattleBtn}>{stats.battles_count > 0 ? 'Battle again →' : 'Find me an opponent →'}</Link>
                 </div>
 
                 <div className={styles.suggestedCard}>
