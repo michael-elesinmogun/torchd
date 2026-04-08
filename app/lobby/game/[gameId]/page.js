@@ -601,13 +601,11 @@ export default function GameRoom() {
     const awayColor = getVisibleTeamColor(game?.away?.color ? `#${game.away.color}` : '#3B82F6');
     const homeColor = getVisibleTeamColor(game?.home?.color ? `#${game.home.color}` : '#10B981');
 
-    // Build a play->half map in ONE pass through filtered (newest-first).
-    // Reverse to process chronologically, track current half as we go.
-    // Top = away bats, Bottom = home bats. Dead simple.
-    const playHalfMap = React.useMemo(() => {
-      const map = {}; // play.id -> 'top' | 'bottom'
+    // Build a play->half map in ONE pass through filtered (oldest-first).
+    // Top = away bats, Bottom = home bats.
+    const playHalfMap = (() => {
+      const map = {};
       let currentHalf = null;
-      // Process oldest-first (reverse of newest-first filtered)
       for (let i = filtered.length - 1; i >= 0; i--) {
         const p = filtered[i];
         const tx = (p.text || '').toLowerCase();
@@ -616,7 +614,7 @@ export default function GameRoom() {
         if (p.id && currentHalf) map[p.id] = currentHalf;
       }
       return map;
-    }, [filtered]);
+    })();
 
     // Helper: get team color/logo for a play
     function getPlayTeam(play) {
