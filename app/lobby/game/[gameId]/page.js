@@ -627,6 +627,8 @@ export default function GameRoom() {
     const rawHome = game?.home?.color || game?.home?.alternateColor || sportColors[game?.home?.abbr];
     const awayColor = getVisibleTeamColor(toHex(rawAway) || '#3B82F6');
     const homeColor = getVisibleTeamColor(toHex(rawHome) || '#10B981');
+    const awayBorder = darkenForBorder(toHex(rawAway) || '#3B82F6');
+    const homeBorder = darkenForBorder(toHex(rawHome) || '#10B981');
 
     // Single pass: build play->half map oldest-first
     const playHalfMap = {};
@@ -676,7 +678,7 @@ export default function GameRoom() {
             <div className={styles.playScore}>
               <span className={styles.scoreTeamPill} style={{ background: `${awayBorder}20`, border: `2px solid ${awayBorder}`, color: awayBorder, fontWeight: 800 }}>{game.away?.abbr} {play.awayScore}</span>
               <span style={{color:'#3D4A66',margin:'0 4px'}}>–</span>
-              <span className={styles.scoreTeamPill} style={{ background: `${homeColor}22`, border: `1px solid ${homeColor}55`, color: homeBorder, fontWeight: 800 }}>{game.home?.abbr} {play.homeScore}</span>
+              <span className={styles.scoreTeamPill} style={{ background: `${homeBorder}20`, border: `2px solid ${homeBorder}`, color: homeBorder, fontWeight: 800 }}>{game.home?.abbr} {play.homeScore}</span>
             </div>
           )}
         </div>
