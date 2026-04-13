@@ -1,3 +1,7 @@
+* {
+  box-sizing: border-box;
+}
+
 .main {
   background: #060912;
   color: #EEF2FF;
@@ -7,6 +11,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  max-width: 100vw;
 }
 
 /* SCORE HEADER */
@@ -428,7 +433,6 @@
   font-weight: 800;
   line-height: 1;
   margin-bottom: 5px;
-  /* color set inline via team color */
 }
 .teamStatLabel {
   font-size: 9px;
@@ -470,19 +474,21 @@
   .main {
     height: auto; min-height: 100vh;
     overflow-x: hidden; overflow-y: auto;
+    max-width: 100vw;
   }
 
   .scoreHeader {
     padding: 0.625rem 1rem; gap: 0.5rem;
-    flex-wrap: nowrap; align-items: center;
+    flex-wrap: wrap; align-items: center;
+    overflow: hidden;
   }
 
   .backBtn { font-size: 12px; }
-  .scoreBoard { gap: 0.75rem; flex: 1; }
+  .scoreBoard { gap: 0.75rem; flex: 1; min-width: 0; }
   .teamLogo { width: 26px; height: 26px; }
   .teamAbbr { font-size: 12px; }
   .score { font-size: 20px; }
-  .gameInfo { flex: 1; }
+  .gameInfo { flex: 1; min-width: 0; }
   .gameStatus { font-size: 11px; }
   .gameName { font-size: 11px; }
   .gameBroadcast { display: none; }
@@ -497,12 +503,13 @@
 
   .mobileLayout {
     display: flex; flex-direction: column; flex: 1; min-height: 0;
+    width: 100%; max-width: 100vw; overflow-x: hidden;
   }
 
   .mainContent { display: none !important; }
 
   .mobileScrollPane {
-    flex: 1; overflow-y: auto;
+    flex: 1; overflow-y: auto; overflow-x: hidden;
     height: calc(100vh - 280px);
     scrollbar-width: thin; scrollbar-color: #1c2840 transparent;
   }
@@ -513,7 +520,7 @@
   }
 
   .mobileChatPane .chatWrap {
-    width: 100% !important; flex: 1;
+    width: 100% !important; max-width: 100vw !important; flex: 1;
     padding: 0 1rem;
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
@@ -531,8 +538,9 @@
   .teamStatItem:nth-last-child(-n+3) { border-bottom: none; }
   .teamStatValue { font-size: 17px; }
 
-  .boxScoreTable { overflow-x: auto; display: block; }
-  .boxScoreRow { padding: 5px 1rem; min-width: 360px; }
+  /* Box score — scrollable horizontally within its container, no page overflow */
+  .boxScoreTable { overflow-x: auto; display: block; max-width: 100%; }
+  .boxScoreRow { padding: 5px 1rem; min-width: 0; }
 
   .reactionBtn { padding: 4px 7px; font-size: 15px; }
   .divider { display: none !important; }

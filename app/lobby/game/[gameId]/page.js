@@ -92,14 +92,12 @@ const TEAM_COLORS = {
 };
 
 function darkenForBorder(hexColor) {
-  // Returns a darker, richer version of the color suitable for borders/accents
   if (!hexColor) return '#EEF2FF';
   const hex = hexColor.replace('#', '');
   if (hex.length !== 6) return hexColor;
   const r = parseInt(hex.slice(0, 2), 16);
   const g = parseInt(hex.slice(2, 4), 16);
   const b = parseInt(hex.slice(4, 6), 16);
-  // Convert to HSL
   const rr = r/255, gg = g/255, bb = b/255;
   const mx = Math.max(rr,gg,bb), mn = Math.min(rr,gg,bb);
   let h = 0, s = 0, l = (mx+mn)/2;
@@ -111,7 +109,6 @@ function darkenForBorder(hexColor) {
     else h=((rr-gg)/d+4)/6;
   }
   if (s < 0.08) return '#6B7A9E';
-  // Fix lightness to 45% - rich and readable, not washed out or too dark
   l = 0.45; s = Math.min(1, s * 1.2);
   const hue = (p,q,t) => { const tt=((t%1)+1)%1; if(tt<1/6)return p+(q-p)*6*tt; if(tt<1/2)return q; if(tt<2/3)return p+(q-p)*(2/3-tt)*6; return p; };
   const q = l*(1+s); const p = 2*l-q;
@@ -127,7 +124,6 @@ function getVisibleTeamColor(hexColor) {
   const g = parseInt(hex.slice(2, 4), 16) / 255;
   const b = parseInt(hex.slice(4, 6), 16) / 255;
 
-  // Convert to HSL
   const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
   let h = 0, s = 0, l = (mx + mn) / 2;
   if (mx !== mn) {
@@ -138,18 +134,13 @@ function getVisibleTeamColor(hexColor) {
     else h = ((r - g) / d + 4) / 6;
   }
 
-  // Near-gray or black — return neutral
   if (s < 0.08) return '#C4CCDF';
 
-  // Boost saturation and ensure minimum lightness for dark bg visibility
   s = Math.min(1, s * 1.3);
-  // Only boost lightness for dark colors — bright colors get washed out if pushed higher
   if (l < 0.45) l = Math.max(0.55, l * 1.4);
-  // For bright vivid colors (like PIT gold), pull lightness DOWN slightly so they read as color not white
   else if (l > 0.55) l = 0.52;
   l = Math.max(0.45, Math.min(0.60, l));
 
-  // Convert back to RGB
   const hue = (p, q, t) => {
     const tt = ((t % 1) + 1) % 1;
     if (tt < 1/6) return p + (q - p) * 6 * tt;
@@ -253,6 +244,7 @@ export default function GameRoom() {
   const [players, setPlayers] = useState([]);
   const [splitPct, setSplitPct] = useState(50);
   const [reactions, setReactions] = useState({});
+  const [isMobile, setIsMobile] = useState(false);
   const REACTION_EMOJIS = ['🔥','💀','😤','👑','🐐'];
 
   const [cameraOn, setCameraOn] = useState(false);
@@ -267,6 +259,14 @@ export default function GameRoom() {
   const audioElementsRef = useRef({});
   const liveKitRoomObjectRef = useRef(null);
   const isCamEnabledRef = useRef(true);
+
+  // Track mobile state for responsive inline styles
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth <= 768);
+    check();
+    window.addEventListener('resize', check);
+    return () => window.removeEventListener('resize', check);
+  }, []);
 
   function attachLocalVideo(track) {
     if (!track?.mediaStreamTrack || !localVideoRef.current) return;
@@ -482,8 +482,9 @@ export default function GameRoom() {
 
   const live = game && isLive(game.status);
 
+  // FIX: chatPanel width is only split-based on desktop; full width on mobile
   const chatPanel = (
-    <div className={styles.chatWrap} style={{width: `${100 - splitPct}%`}}>
+    <div className={styles.chatWrap} style={isMobile ? { width: '100%' } : { width: `${100 - splitPct}%` }}>
       <div className={styles.chatHeader}>
         <div className={styles.colHeader}>
           {game ? (
@@ -606,12 +607,10 @@ export default function GameRoom() {
       const seenIds = new Set();
       const seenText = new Set();
       return plays.filter(p => {
-        // Dedup by ID
         if (p.id) {
           if (seenIds.has(p.id)) return false;
           seenIds.add(p.id);
         }
-        // Dedup by text+period (ESPN sometimes sends same play with different IDs)
         const textKey = `${p.period}|${(p.text||'').trim()}`;
         if (textKey.length > 2) {
           if (seenText.has(textKey)) return false;
@@ -628,11 +627,9 @@ export default function GameRoom() {
     const rawHome = (validColor(game?.home?.color) ? game.home.color : null) || sportColors[game?.home?.abbr] || game?.home?.alternateColor;
     const awayColor = getVisibleTeamColor(toHex(rawAway) || '#3B82F6');
     const homeColor = getVisibleTeamColor(toHex(rawHome) || '#10B981');
-    if (typeof window !== 'undefined') console.log('COLORS:', {rawAway, rawHome, awayColor, homeColor, homeKeys: game?.home ? Object.keys(game.home) : null, homeObj: game?.home});
     const awayBorder = toHex(rawAway) || '#3B82F6';
     const homeBorder = toHex(rawHome) || '#10B981';
 
-    // Single pass: build play->half map oldest-first
     const playHalfMap = {};
     let half = null;
     for (let i = filtered.length - 1; i >= 0; i--) {
@@ -690,7 +687,6 @@ export default function GameRoom() {
     const renderAB = (group, key) => {
       const { pitches, play: abPlay, scoringPlay } = group;
       let { result } = group;
-      // If no result but the AB starter itself is an outcome, promote it
       if (!result && abPlay) {
         const at = (abPlay.text || '').toLowerCase();
         if (/struck out|grounded|flied|lined|popped|fouled out|singled|doubled|tripled|homered|walked|hit by pitch|sacrifice|fielder.s choice|error|reaches|safe at/.test(at)) {
@@ -702,7 +698,6 @@ export default function GameRoom() {
       const dt = (displayPlay.text || '').trim();
       if (!result && (!dt || /pitches to|steps in|batting/i.test(dt))) return null;
       const { logo, color: tc } = getTeam(displayPlay);
-      const tcBorder = tc === awayColor ? awayBorder : tc === homeColor ? homeBorder : tc;
       const tx = dt.toLowerCase();
       const isScoring = scoringPlay || displayPlay.scoringPlay;
       const isHit = /singled|doubled|tripled|homered|hit by pitch|safe at/.test(tx);
@@ -789,7 +784,6 @@ export default function GameRoom() {
               if (group.type === 'event') {
                 if (!group.play?.text?.trim()) return null;
                 const et = (group.play.text || '').toLowerCase();
-                // Skip raw pitch events — they show as dots in at-bat groups
                 if (/^pitch \d|^ball \d|^strike \d|ball in play|foul ball|foul tip|swinging strike/i.test(et)) return null;
                 return renderPlay(group.play, group.play.id || gi);
               }
