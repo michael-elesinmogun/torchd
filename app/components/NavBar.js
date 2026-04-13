@@ -80,7 +80,7 @@ export default function NavBar() {
         profileLoadedRef.current = true;
         supabase.auth.getSession().then(({ data: { session } }) => setupUser(session?.user ?? null));
       }
-    }, 1000);
+    }, 0);
 
     return () => {
       subscription.unsubscribe();
