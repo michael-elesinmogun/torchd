@@ -2,10 +2,12 @@
   background: #060912;
   color: #EEF2FF;
   font-family: 'DM Sans', sans-serif;
-  min-height: 100vh;
+  height: 100vh;
   padding-top: 62px;
+  overflow: hidden;
 }
 
+/* Two-column: video stage left, chat right */
 .layout {
   display: grid;
   grid-template-columns: 1fr 300px;
@@ -13,146 +15,76 @@
   overflow: hidden;
 }
 
-/* STAGE */
+/* LEFT COLUMN */
 .stage {
   display: flex;
   flex-direction: column;
-  gap: 0.625rem;
-  padding: 1rem;
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #1c2840 transparent;
+  height: 100%;
+  overflow: hidden;
+  padding: 0.75rem;
+  gap: 0.5rem;
 }
 
-/* Topic bar */
+/* Topic bar — always top */
 .topicBar {
   display: flex; align-items: center; gap: 0.75rem;
   background: #0f1623; border: 1px solid rgba(255,255,255,0.065);
-  border-radius: 12px; padding: 0.75rem 1rem; flex-wrap: wrap;
-  flex-shrink: 0;
+  border-radius: 10px; padding: 0.625rem 1rem;
+  flex-shrink: 0; flex-wrap: nowrap; min-width: 0;
 }
 
 .livePill {
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; gap: 5px;
   font-size: 11px; font-weight: 700; color: #EF4444;
   background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.22);
-  border-radius: 100px; padding: 3px 9px; flex-shrink: 0;
+  border-radius: 100px; padding: 3px 8px; flex-shrink: 0;
 }
 
 .liveDot {
   width: 6px; height: 6px; border-radius: 50%; background: #EF4444;
   animation: livepulse 1.4s ease infinite;
 }
-
 @keyframes livepulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
 
 .topicText {
-  font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700;
+  font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
   color: #EEF2FF; flex: 1; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 
 .shareBtn {
-  font-size: 12px; color: #6B7A9E; background: none;
+  font-size: 11px; color: #6B7A9E; background: none;
   border: 1px solid rgba(255,255,255,0.065); border-radius: 8px;
-  padding: 5px 10px; cursor: pointer; transition: all 0.2s;
+  padding: 4px 10px; cursor: pointer; transition: all 0.2s;
   font-family: 'DM Sans', sans-serif; white-space: nowrap; flex-shrink: 0;
 }
 .shareBtn:hover { color: #EEF2FF; border-color: rgba(59,130,246,0.22); }
 
-/* Round bar */
+/* Round bar + timer — below topic, above video */
 .roundBar {
   display: flex; align-items: center; justify-content: space-between;
   background: #0f1623; border: 1px solid rgba(255,255,255,0.065);
-  border-radius: 12px; padding: 0.75rem 1rem;
+  border-radius: 10px; padding: 0.5rem 1rem;
   flex-shrink: 0;
 }
 
 .roundLabel {
-  font-family: 'Syne', sans-serif; font-weight: 800; font-size: 14px; color: #EEF2FF;
+  font-family: 'Syne', sans-serif; font-weight: 800; font-size: 13px; color: #EEF2FF;
 }
-
-.roundDesc { font-size: 12px; color: #6B7A9E; margin-top: 2px; }
-
+.roundDesc { font-size: 11px; color: #6B7A9E; margin-top: 1px; }
 .roundTimer {
-  font-family: 'Syne', sans-serif; font-weight: 800; font-size: 26px;
-  transition: color 0.3s;
+  font-family: 'Syne', sans-serif; font-weight: 800; font-size: 28px;
+  line-height: 1; transition: color 0.3s;
 }
 
-/* Vote section — always visible */
-.voteSection {
-  background: #0f1623; border: 1px solid rgba(255,255,255,0.065);
-  border-radius: 12px; padding: 0.875rem 1rem;
-  display: flex; flex-direction: column; gap: 0.5rem;
-  flex-shrink: 0;
+/* VIDEO — flex: 1 so it takes all remaining vertical space */
+.videoWrap {
+  flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0;
 }
-
-.voteNames {
-  display: flex; justify-content: space-between; align-items: center;
-  font-size: 12px; font-weight: 700;
-}
-
-.voteNameBlue { color: #60A5FA; }
-.voteNameRed { color: #F87171; }
-.voteTally { font-size: 11px; color: #6B7A9E; font-weight: 400; }
-
-.voteTrack {
-  height: 8px; background: rgba(239,68,68,0.25); border-radius: 4px; overflow: hidden;
-}
-
-.voteFill {
-  height: 100%; background: #3B82F6; border-radius: 4px;
-  transition: width 0.5s ease;
-}
-
-.votePcts {
-  display: flex; justify-content: space-between;
-  font-size: 12px; font-weight: 700;
-}
-
-.voteButtons { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin-top: 2px; }
-
-.voteBtn {
-  border: none; border-radius: 10px; padding: 10px;
-  font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700;
-  cursor: pointer; transition: all 0.2s; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-
-.voteBtnBlue { background: rgba(59,130,246,0.12); border: 1.5px solid rgba(59,130,246,0.3); color: #60A5FA; }
-.voteBtnBlue:hover { background: rgba(59,130,246,0.2); }
-.voteBtnRed { background: rgba(239,68,68,0.12); border: 1.5px solid rgba(239,68,68,0.3); color: #F87171; }
-.voteBtnRed:hover { background: rgba(239,68,68,0.2); }
-
-.voteCast { text-align: center; font-size: 12px; color: #10B981; font-weight: 600; }
-.playerNotice { text-align: center; font-size: 11px; color: #6B7A9E; }
-.loginPrompt { text-align: center; font-size: 12px; color: #6B7A9E; }
-.loginLink { color: #60A5FA; text-decoration: none; font-weight: 600; }
-
-/* Winner banner */
-.winnerBanner {
-  background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25);
-  border-radius: 14px; padding: 1.25rem; text-align: center;
-  display: flex; flex-direction: column; align-items: center; gap: 0.5rem;
-  flex-shrink: 0;
-}
-
-.winnerIcon { font-size: 32px; }
-.winnerText { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 18px; color: #EEF2FF; }
-.winnerSub { font-size: 12px; color: #6B7A9E; }
-
-.backToBattlesBtn {
-  margin-top: 0.25rem;
-  background: #3B82F6; border: none; border-radius: 100px;
-  padding: 8px 20px; color: white; font-family: 'Syne', sans-serif;
-  font-weight: 700; font-size: 13px; cursor: pointer; transition: background 0.2s;
-}
-.backToBattlesBtn:hover { background: #60A5FA; }
-
-/* Video */
-.videoWrap { display: flex; flex-direction: column; gap: 8px; }
 
 .videoMain {
-  width: 100%; aspect-ratio: 16/9; background: #000;
-  border-radius: 14px; overflow: hidden; position: relative;
+  flex: 1; min-height: 0;
+  background: #000; border-radius: 14px; overflow: hidden; position: relative;
 }
 
 .videoWaiting {
@@ -161,127 +93,178 @@
 }
 
 .pip {
-  position: absolute; right: 12px; width: 28%; max-width: 180px;
+  position: absolute; right: 12px;
+  width: 28%; max-width: 160px;
   aspect-ratio: 16/9; border-radius: 10px; overflow: hidden;
   border: 2px solid rgba(255,255,255,0.15);
 }
 
 .localVideo {
-  position: absolute; right: 12px; width: 28%; max-width: 180px;
-  aspect-ratio: 16/9; object-fit: cover; border-radius: 10px;
-  border: 2px solid rgba(59,130,246,0.4); transform: scaleX(-1);
+  position: absolute; right: 12px;
+  width: 28%; max-width: 160px;
+  aspect-ratio: 16/9; object-fit: cover;
+  border-radius: 10px; border: 2px solid rgba(59,130,246,0.4);
+  transform: scaleX(-1);
 }
 
 .controls {
-  position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%);
-  display: flex; gap: 10px; align-items: center;
-  background: rgba(0,0,0,0.7); border-radius: 100px;
-  padding: 8px 16px; backdrop-filter: blur(10px);
+  position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%);
+  display: flex; gap: 8px; align-items: center;
+  background: rgba(0,0,0,0.75); border-radius: 100px;
+  padding: 7px 14px; backdrop-filter: blur(10px);
 }
 
 .controlBtn {
-  width: 40px; height: 40px; border-radius: 50%; border: none;
-  font-size: 18px; cursor: pointer; transition: all 0.2s;
+  width: 38px; height: 38px; border-radius: 50%; border: none;
+  font-size: 17px; cursor: pointer; transition: background 0.2s;
   display: flex; align-items: center; justify-content: center;
 }
 
 .leaveBtn {
   background: #EF4444; border: none; border-radius: 100px;
-  padding: 8px 18px; color: white; font-family: 'Syne', sans-serif;
-  font-weight: 700; font-size: 13px; cursor: pointer; transition: background 0.2s;
+  padding: 7px 16px; color: white; font-family: 'Syne', sans-serif;
+  font-weight: 700; font-size: 13px; cursor: pointer;
 }
 .leaveBtn:hover { background: #DC2626; }
 
 .leaveBtnViewer {
-  position: absolute; bottom: 16px; right: 16px;
+  position: absolute; bottom: 14px; right: 14px;
   background: rgba(239,68,68,0.8); border: none; border-radius: 100px;
-  padding: 8px 16px; color: white; font-family: 'Syne', sans-serif;
-  font-weight: 700; font-size: 13px; cursor: pointer;
+  padding: 7px 14px; color: white; font-family: 'Syne', sans-serif;
+  font-weight: 700; font-size: 12px; cursor: pointer;
 }
 
 .startBattleBtn {
   background: #10B981; border: none; border-radius: 100px;
-  padding: 10px 24px; color: white; font-family: 'Syne', sans-serif;
-  font-weight: 700; font-size: 14px; cursor: pointer; transition: all 0.2s;
-  align-self: center;
+  padding: 9px 22px; color: white; font-family: 'Syne', sans-serif;
+  font-weight: 700; font-size: 13px; cursor: pointer; align-self: center;
 }
 .startBattleBtn:hover { background: #059669; }
 
 .waitingForP1 {
   background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2);
-  border-radius: 100px; padding: 10px 20px; font-size: 13px; color: #60A5FA;
-  font-weight: 600; text-align: center;
+  border-radius: 100px; padding: 8px 18px; font-size: 12px; color: #60A5FA;
+  font-weight: 600; text-align: center; align-self: center;
 }
 
-/* Join prompt */
+/* VOTE BAR — below video, always visible */
+.voteSection {
+  background: #0f1623; border: 1px solid rgba(255,255,255,0.065);
+  border-radius: 10px; padding: 0.625rem 0.875rem;
+  display: flex; flex-direction: column; gap: 0.375rem;
+  flex-shrink: 0;
+}
+
+.voteNames {
+  display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700;
+}
+.voteNameBlue { color: #60A5FA; }
+.voteNameRed { color: #F87171; }
+.voteTally { font-size: 11px; color: #6B7A9E; font-weight: 400; }
+
+.voteTrack {
+  height: 7px; background: rgba(239,68,68,0.25); border-radius: 4px; overflow: hidden;
+}
+.voteFill {
+  height: 100%; background: #3B82F6; border-radius: 4px; transition: width 0.5s ease;
+}
+
+.votePcts {
+  display: flex; justify-content: space-between; font-size: 11px; font-weight: 700;
+}
+
+.voteButtons { display: grid; grid-template-columns: 1fr 1fr; gap: 0.4rem; }
+
+.voteBtn {
+  border: none; border-radius: 8px; padding: 8px;
+  font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700;
+  cursor: pointer; transition: all 0.2s; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.voteBtnBlue { background: rgba(59,130,246,0.12); border: 1.5px solid rgba(59,130,246,0.3); color: #60A5FA; }
+.voteBtnBlue:hover { background: rgba(59,130,246,0.2); }
+.voteBtnRed { background: rgba(239,68,68,0.12); border: 1.5px solid rgba(239,68,68,0.3); color: #F87171; }
+.voteBtnRed:hover { background: rgba(239,68,68,0.2); }
+
+.voteCast { text-align: center; font-size: 12px; color: #10B981; font-weight: 600; }
+.playerNotice { text-align: center; font-size: 11px; color: #6B7A9E; }
+.loginPrompt { text-align: center; font-size: 11px; color: #6B7A9E; }
+.loginLink { color: #60A5FA; text-decoration: none; font-weight: 600; }
+
+/* Winner banner */
+.winnerBanner {
+  background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.25);
+  border-radius: 12px; padding: 1rem; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 0.375rem;
+  flex-shrink: 0;
+}
+.winnerIcon { font-size: 28px; }
+.winnerText { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 17px; color: #EEF2FF; }
+.winnerSub { font-size: 11px; color: #6B7A9E; }
+.backToBattlesBtn {
+  background: #3B82F6; border: none; border-radius: 100px;
+  padding: 7px 18px; color: white; font-family: 'Syne', sans-serif;
+  font-weight: 700; font-size: 13px; cursor: pointer; margin-top: 2px;
+}
+.backToBattlesBtn:hover { background: #60A5FA; }
+
+/* Join prompt (before joining video) */
 .joinWrap {
-  display: flex; flex-direction: column; align-items: center;
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
   background: #0f1623; border: 1px solid rgba(255,255,255,0.065);
   border-radius: 14px; padding: 2rem 1.5rem; text-align: center; gap: 0.75rem;
 }
-
 .joinIcon { font-size: 40px; }
 .joinTitle { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; color: #EEF2FF; }
 .joinSub { font-size: 13px; color: #6B7A9E; line-height: 1.6; max-width: 280px; }
-
 .videoError {
-  font-size: 13px; color: #F87171;
+  font-size: 12px; color: #F87171;
   background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.2);
-  border-radius: 8px; padding: 8px 14px;
+  border-radius: 8px; padding: 7px 12px;
 }
-
 .joinBtn {
   font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 700;
   color: #EEF2FF; background: #3B82F6; border: none; border-radius: 12px;
-  padding: 12px 28px; cursor: pointer; transition: all 0.2s;
+  padding: 11px 26px; cursor: pointer; transition: all 0.2s;
 }
-.joinBtn:hover { background: #60A5FA; transform: translateY(-2px); }
+.joinBtn:hover { background: #60A5FA; }
 
-/* Waiting card */
+/* Waiting for opponent card */
 .waitingCard {
   background: rgba(59,130,246,0.05); border: 1px solid rgba(59,130,246,0.2);
-  border-radius: 12px; padding: 1rem; flex-shrink: 0;
+  border-radius: 10px; padding: 0.875rem; flex-shrink: 0;
 }
+.waitingTitle { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 800; color: #EEF2FF; margin-bottom: 3px; }
+.waitingSub { font-size: 11px; color: #6B7A9E; margin-bottom: 0.5rem; }
+.linkBox { display: flex; align-items: center; gap: 6px; }
+.linkUrl { font-size: 11px; color: #60A5FA; flex: 1; word-break: break-all; font-family: monospace; background: #0a0f1e; border-radius: 6px; padding: 5px 8px; min-width: 0; }
+.copyBtn { background: #3B82F6; border: none; border-radius: 6px; padding: 6px 10px; color: white; cursor: pointer; font-size: 13px; flex-shrink: 0; }
 
-.waitingTitle { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 800; color: #EEF2FF; margin-bottom: 4px; }
-.waitingSub { font-size: 12px; color: #6B7A9E; margin-bottom: 0.625rem; }
-
-.linkBox { display: flex; align-items: center; gap: 8px; }
-.linkUrl { font-size: 11px; color: #60A5FA; flex: 1; word-break: break-all; font-family: monospace; background: #0a0f1e; border-radius: 6px; padding: 6px 8px; min-width: 0; }
-.copyBtn { background: #3B82F6; border: none; border-radius: 6px; padding: 7px 10px; color: white; cursor: pointer; font-size: 13px; flex-shrink: 0; }
-.copyBtn:hover { background: #60A5FA; }
-
-/* SIDEBAR */
+/* RIGHT COLUMN: SIDEBAR */
 .sidebar {
   background: #0f1623; border-left: 1px solid rgba(255,255,255,0.065);
   display: flex; flex-direction: column;
-  height: calc(100vh - 62px); position: sticky; top: 62px; overflow: hidden;
+  height: 100%; overflow: hidden;
 }
-
 .sidebarTitle {
   padding: 0.875rem 1.25rem; border-bottom: 1px solid rgba(255,255,255,0.065);
   font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
   text-transform: uppercase; color: #6B7A9E; flex-shrink: 0;
 }
-
 .chatMessages {
   flex: 1; overflow-y: auto; padding: 0.75rem;
-  display: flex; flex-direction: column; gap: 10px;
+  display: flex; flex-direction: column; gap: 8px;
   scrollbar-width: thin; scrollbar-color: #1c2840 transparent;
 }
-
 .chatEmpty { font-size: 13px; color: #3D4A66; text-align: center; margin-top: 2rem; }
-.chatMsg { }
+.chatMsg {}
 .chatName { font-size: 11px; color: #6B7A9E; margin-bottom: 2px; }
 .chatTime { font-size: 10px; color: #3D4A66; margin-left: 4px; }
 .chatText { font-size: 13px; color: #EEF2FF; background: #151e2e; border-radius: 4px 10px 10px 10px; padding: 6px 10px; display: inline-block; line-height: 1.4; word-break: break-word; max-width: 100%; }
 .chatTextMe { background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.22); }
-
 .chatInputRow {
   border-top: 1px solid rgba(255,255,255,0.065);
   padding: 0.75rem; display: flex; gap: 8px; flex-shrink: 0;
 }
-
 .chatInput {
   flex: 1; background: #151e2e; border: 1px solid rgba(255,255,255,0.065);
   border-radius: 8px; padding: 7px 10px; font-size: 13px; color: #EEF2FF;
@@ -290,7 +273,6 @@
 .chatInput::placeholder { color: #3D4A66; }
 .chatInput:focus { border-color: rgba(59,130,246,0.22); }
 .chatInput:disabled { opacity: 0.4; }
-
 .chatSend {
   background: #3B82F6; border: none; border-radius: 8px;
   width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
@@ -303,35 +285,29 @@
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   height: 80vh; gap: 1rem;
 }
-
 .spinner {
   width: 40px; height: 40px;
-  border: 3px solid rgba(59,130,246,0.2);
-  border-top-color: #3B82F6; border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  border: 3px solid rgba(59,130,246,0.2); border-top-color: #3B82F6;
+  border-radius: 50%; animation: spin 0.8s linear infinite;
 }
-
 @keyframes spin { to { transform: rotate(360deg); } }
 .loadingText { font-size: 14px; color: #6B7A9E; }
 
 /* MOBILE */
 @media (max-width: 900px) {
-  .layout { grid-template-columns: 1fr; height: auto; overflow: visible; }
+  .main { height: auto; overflow: visible; }
+  .layout { grid-template-columns: 1fr; height: auto; }
   .sidebar { display: none; }
-  .stage { overflow: visible; }
+  .stage { height: auto; overflow: visible; padding: 0.625rem; }
+  .videoWrap { min-height: 240px; }
+  .videoMain { min-height: 240px; flex: none; aspect-ratio: 16/9; }
 }
 
 @media (max-width: 600px) {
   .main { padding-top: 56px; }
-  .stage { padding: 0.75rem; gap: 0.5rem; }
-  .topicBar { flex-wrap: wrap; padding: 0.625rem 0.875rem; gap: 0.5rem; }
-  .topicText { font-size: 13px; }
   .roundTimer { font-size: 22px; }
   .voteButtons { grid-template-columns: 1fr; }
-  .voteBtn { padding: 8px; font-size: 11px; }
-  .waitingCard { padding: 0.875rem; }
+  .waitingCard { padding: 0.75rem; }
   .linkBox { flex-direction: column; }
-  .copyBtn { width: 100%; }
-  .joinWrap { padding: 1.5rem 1rem; }
-  .joinTitle { font-size: 16px; }
+  .copyBtn { width: 100%; text-align: center; }
 }

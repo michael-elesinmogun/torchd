@@ -87,24 +87,19 @@ export default function BattleRoom({ params }) {
     async function init() {
       const { data: { session } } = await supabase.auth.getSession();
       const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      setAuthReady(true);
+      setUser(currentUser); setAuthReady(true);
 
       if (currentUser) {
         const { data: profileData } = await supabase.from('profiles').select('username, full_name').eq('id', currentUser.id).maybeSingle();
-        setProfile(profileData);
-        profileRef.current = profileData;
+        setProfile(profileData); profileRef.current = profileData;
       }
 
       const { data: battleData } = await supabase.from('battles').select('*').eq('id', id).single();
       if (!battleData) { router.push('/battle'); return; }
-      setBattle(battleData);
-      battleRef.current = battleData;
+      setBattle(battleData); battleRef.current = battleData;
 
       if (battleData.status === 'ended' && battleData.winner) {
-        setBattleEnded(true);
-        setWinner(battleData.winner);
-        setCurrentRound(TOTAL_ROUNDS);
+        setBattleEnded(true); setWinner(battleData.winner); setCurrentRound(TOTAL_ROUNDS);
       }
 
       const { data: voteData } = await supabase.from('votes').select('side').eq('battle_id', id);
@@ -124,21 +119,18 @@ export default function BattleRoom({ params }) {
         .on('postgres_changes', { event: '*', schema: 'public', table: 'votes', filter: `battle_id=eq.${id}` }, () => loadVotes())
         .subscribe();
 
-      // Both players listen — winner declared by DB update, not by timer race
+      // Both players react to DB update — only Player 1 writes it
       supabase.channel(`battle-status-${id}`)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'battles', filter: `id=eq.${id}` }, (payload) => {
           const updated = payload.new;
-          setBattle(updated);
-          battleRef.current = updated;
+          setBattle(updated); battleRef.current = updated;
           if (updated.status === 'ended' && updated.winner) {
-            setBattleEnded(true);
-            setWinner(updated.winner);
-            clearInterval(roundTimerRef.current);
+            setBattleEnded(true); setWinner(updated.winner); clearInterval(roundTimerRef.current);
           }
         })
         .subscribe();
 
-      // Round sync — self:true so sender also receives and starts their own timer
+      // self:true — sender also receives and starts their own timer
       supabase.channel(`round-sync-${id}`, { config: { broadcast: { self: true } } })
         .on('broadcast', { event: 'start-round' }, ({ payload }) => startRound(payload.round))
         .subscribe();
@@ -173,7 +165,6 @@ export default function BattleRoom({ params }) {
         if (remaining === 0) {
           clearInterval(roundTimerRef.current);
           const next = currentRoundRef.current + 1;
-          // Only Player 1 advances to avoid race condition
           if (battleRef.current?.player1_username === profileRef.current?.username) {
             if (next > TOTAL_ROUNDS) declareWinner();
             else broadcastRound(next);
@@ -202,7 +193,6 @@ export default function BattleRoom({ params }) {
     } catch (e) {}
   }
 
-  // Only Player 1 broadcasts — Player 2 just listens
   function broadcastRound(round) {
     supabase.channel(`round-sync-${id}`).send({ type: 'broadcast', event: 'start-round', payload: { round } });
   }
@@ -211,8 +201,7 @@ export default function BattleRoom({ params }) {
     clearInterval(roundTimerRef.current);
     currentRoundRef.current = round;
     roundStartTimeRef.current = Date.now();
-    setCurrentRound(round);
-    setRoundTimeLeft(ROUND_DURATION);
+    setCurrentRound(round); setRoundTimeLeft(ROUND_DURATION);
     enforceMicForRound(round);
 
     roundTimerRef.current = setInterval(() => {
@@ -222,7 +211,7 @@ export default function BattleRoom({ params }) {
       if (remaining === 0) {
         clearInterval(roundTimerRef.current);
         const next = currentRoundRef.current + 1;
-        // Only Player 1 triggers end/advance
+        // Only Player 1 advances — prevents race condition
         if (battleRef.current?.player1_username === profileRef.current?.username) {
           if (next > TOTAL_ROUNDS) declareWinner();
           else broadcastRound(next);
@@ -236,24 +225,16 @@ export default function BattleRoom({ params }) {
     const isP1 = battleRef.current?.player1_username === profileRef.current?.username;
     const { speaker } = ROUND_CONFIG[round];
     const shouldHaveMic = speaker === 'both' || (speaker === 'player1' && isP1) || (speaker === 'player2' && !isP1);
-    try {
-      await roomRef.current.localParticipant.setMicrophoneEnabled(shouldHaveMic);
-      setIsMicOn(shouldHaveMic);
-    } catch {}
+    try { await roomRef.current.localParticipant.setMicrophoneEnabled(shouldHaveMic); setIsMicOn(shouldHaveMic); } catch {}
   }
 
   async function declareWinner() {
-    const v = votesRef.current;
-    const b = battleRef.current;
-    if (!b || b.status === 'ended') return;
-    if (statsUpdatedRef.current) return;
+    const v = votesRef.current; const b = battleRef.current;
+    if (!b || b.status === 'ended' || statsUpdatedRef.current) return;
     statsUpdatedRef.current = true;
-
     const winnerUsername = v.player1 > v.player2 ? b.player1_username : v.player2 > v.player1 ? b.player2_username : 'tie';
     const loserUsername = winnerUsername === b.player1_username ? b.player2_username : b.player1_username;
-
     await supabase.from('battles').update({ status: 'ended', winner: winnerUsername, ended_at: new Date().toISOString() }).eq('id', id);
-
     await Promise.all([
       sendBattleNotifications(id, winnerUsername, b.player1_username, b.player2_username, false),
       updatePlayerStats(winnerUsername, loserUsername, winnerUsername === 'tie', b.player1_username, b.player2_username),
@@ -262,14 +243,10 @@ export default function BattleRoom({ params }) {
 
   async function declareWinnerByForfeit(leavingUsername) {
     const b = battleRef.current;
-    if (!b || b.status === 'ended') return;
-    if (statsUpdatedRef.current) return;
+    if (!b || b.status === 'ended' || statsUpdatedRef.current) return;
     statsUpdatedRef.current = true;
-
     const winnerUsername = b.player1_username === leavingUsername ? b.player2_username : b.player1_username;
-
     await supabase.from('battles').update({ status: 'ended', winner: winnerUsername, ended_at: new Date().toISOString() }).eq('id', id);
-
     await Promise.all([
       sendBattleNotifications(id, winnerUsername, b.player1_username, b.player2_username, true),
       updatePlayerStats(winnerUsername, leavingUsername, false, b.player1_username, b.player2_username),
@@ -298,19 +275,15 @@ export default function BattleRoom({ params }) {
   }
 
   async function joinVideo() {
-    const battleData = battleRef.current;
-    const profileData = profileRef.current;
+    const battleData = battleRef.current; const profileData = profileRef.current;
     if (!battleData?.room_name) { setVideoError('Room not ready. Please try again.'); return; }
     if (battleData.status === 'ended') { setVideoError('This battle has ended.'); return; }
     setVideoError('');
-
     try {
       const { Room, RoomEvent, Track } = await import('livekit-client');
       const isDebater = profileData && (battleData.player1_username === profileData.username || battleData.player2_username === profileData.username);
-
       const tokenRes = await fetch('/api/livekit-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ roomName: battleData.room_name, participantName: profileData?.username || `viewer-${Date.now()}`, canPublish: isDebater }),
       });
       const { token, error: tokenError } = await tokenRes.json();
@@ -323,39 +296,31 @@ export default function BattleRoom({ params }) {
         if (track.kind === Track.Kind.Video) setRemoteTracks(prev => [...prev, { track, participant }]);
         if (track.kind === Track.Kind.Audio) {
           const audioEl = document.createElement('audio');
-          audioEl.autoplay = true;
-          audioEl.srcObject = new MediaStream([track.mediaStreamTrack]);
+          audioEl.autoplay = true; audioEl.srcObject = new MediaStream([track.mediaStreamTrack]);
           audioEl.play().catch(() => {});
-          audioElementsRef.current[track.sid] = audioEl;
-          document.body.appendChild(audioEl);
+          audioElementsRef.current[track.sid] = audioEl; document.body.appendChild(audioEl);
         }
       });
-
       room.on(RoomEvent.TrackUnsubscribed, (track) => {
         if (track.kind === Track.Kind.Video) setRemoteTracks(prev => prev.filter(t => t.track !== track));
         if (track.kind === Track.Kind.Audio && audioElementsRef.current[track.sid]) {
-          audioElementsRef.current[track.sid].remove();
-          delete audioElementsRef.current[track.sid];
+          audioElementsRef.current[track.sid].remove(); delete audioElementsRef.current[track.sid];
         }
       });
-
       room.on(RoomEvent.Disconnected, () => {
         setVideoJoined(false); setRemoteTracks([]);
         if (localVideoRef.current) localVideoRef.current.srcObject = null;
-        Object.values(audioElementsRef.current).forEach(el => el.remove());
-        audioElementsRef.current = {};
+        Object.values(audioElementsRef.current).forEach(el => el.remove()); audioElementsRef.current = {};
         clearInterval(roundTimerRef.current);
       });
-
       room.on(RoomEvent.LocalTrackPublished, (publication) => {
         if (publication.source === Track.Source.Camera) attachLocalVideo(publication.track);
       });
-
       room.on(RoomEvent.ParticipantDisconnected, (participant) => {
         const b = battleRef.current;
         if (!b || b.status === 'ended') return;
-        const isDebaterLeaving = participant.identity === b.player1_username || participant.identity === b.player2_username;
-        if (isDebaterLeaving && currentRoundRef.current > 0) declareWinnerByForfeit(participant.identity);
+        if ((participant.identity === b.player1_username || participant.identity === b.player2_username) && currentRoundRef.current > 0)
+          declareWinnerByForfeit(participant.identity);
       });
 
       await room.connect('wss://torchd-kub6j4c8.livekit.cloud', token);
@@ -363,22 +328,15 @@ export default function BattleRoom({ params }) {
       if (isDebater) {
         await room.localParticipant.setCameraEnabled(true);
         await room.localParticipant.setMicrophoneEnabled(true);
-        const tryAttach = () => {
-          const camPub = room.localParticipant.getTrackPublication(Track.Source.Camera);
-          if (camPub?.track) attachLocalVideo(camPub.track);
-        };
+        const tryAttach = () => { const camPub = room.localParticipant.getTrackPublication(Track.Source.Camera); if (camPub?.track) attachLocalVideo(camPub.track); };
         tryAttach(); setTimeout(tryAttach, 500); setTimeout(tryAttach, 1500); setTimeout(tryAttach, 3000);
       }
-
       setVideoJoined(true);
-    } catch (err) {
-      setVideoError('Could not join: ' + err.message);
-    }
+    } catch (err) { setVideoError('Could not join: ' + err.message); }
   }
 
   async function leaveVideo() {
-    const profileData = profileRef.current;
-    const battleData = battleRef.current;
+    const profileData = profileRef.current; const battleData = battleRef.current;
     if (profileData && battleData && battleData.status !== 'ended' && currentRoundRef.current > 0) {
       const isDebater = battleData.player1_username === profileData.username || battleData.player2_username === profileData.username;
       if (isDebater) await declareWinnerByForfeit(profileData.username);
@@ -387,19 +345,17 @@ export default function BattleRoom({ params }) {
     if (roomRef.current) { try { await roomRef.current.disconnect(); } catch {} roomRef.current = null; }
     setVideoJoined(false); setRemoteTracks([]);
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
-    Object.values(audioElementsRef.current).forEach(el => el.remove());
-    audioElementsRef.current = {};
+    Object.values(audioElementsRef.current).forEach(el => el.remove()); audioElementsRef.current = {};
     router.push('/battle');
   }
 
   async function toggleMic() {
     if (!roomRef.current) return;
-    // Block mic toggle when locked out for this round
+    // Block when locked out for this round
     if (currentRoundRef.current > 0 && !battleEnded) {
       const isP1 = battleRef.current?.player1_username === profileRef.current?.username;
       const { speaker } = ROUND_CONFIG[currentRoundRef.current];
-      const isLockedOut = (speaker === 'player1' && !isP1) || (speaker === 'player2' && isP1);
-      if (isLockedOut) return;
+      if ((speaker === 'player1' && !isP1) || (speaker === 'player2' && isP1)) return;
     }
     const enabled = !isMicOn;
     await roomRef.current.localParticipant.setMicrophoneEnabled(enabled);
@@ -411,8 +367,8 @@ export default function BattleRoom({ params }) {
     const enabled = !isCamOn;
     await roomRef.current.localParticipant.setCameraEnabled(enabled);
     setIsCamOn(enabled);
-    // FIX: Reattach local preview after re-enabling
     if (enabled) {
+      // Reattach local preview after re-enabling
       const { Track } = await import('livekit-client');
       const tryReattach = () => {
         const camPub = roomRef.current?.localParticipant?.getTrackPublication(Track.Source.Camera);
@@ -434,14 +390,12 @@ export default function BattleRoom({ params }) {
 
   function copyLink() {
     navigator.clipboard.writeText(window.location.href);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setCopied(true); setTimeout(() => setCopied(false), 2000);
   }
 
   async function sendChat() {
     if (!chatInput.trim() || !user) return;
-    const text = chatInput.trim();
-    setChatInput('');
+    const text = chatInput.trim(); setChatInput('');
     await supabase.from('game_chats').insert({ game_id: `battle-${id}`, user_id: user.id, username: profileRef.current?.username || 'Anonymous', message: text });
   }
 
@@ -463,11 +417,11 @@ export default function BattleRoom({ params }) {
   const p2Pct = 100 - p1Pct;
   const isPlayer = authReady && user && (battle.player1_username === profile?.username || battle.player2_username === profile?.username);
   const isPlayer1 = profile?.username === battle.player1_username;
+  const isP1 = profile?.username === battle.player1_username;
   const bothInRoom = !!battle?.player2_username && remoteTracks.length >= 1;
   const shareLink = typeof window !== 'undefined' ? window.location.href : '';
   const roundConfig = currentRound > 0 && currentRound <= TOTAL_ROUNDS ? ROUND_CONFIG[currentRound] : null;
   const formatTime = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-  const isP1 = profile?.username === battle.player1_username;
   const micLocked = currentRound > 0 && !battleEnded && roundConfig &&
     ((roundConfig.speaker === 'player1' && !isP1) || (roundConfig.speaker === 'player2' && isP1));
 
@@ -475,10 +429,10 @@ export default function BattleRoom({ params }) {
     <main className={styles.main}>
       <div className={styles.layout}>
 
-        {/* STAGE */}
+        {/* LEFT: STAGE */}
         <div className={styles.stage}>
 
-          {/* Topic bar */}
+          {/* 1. Topic bar */}
           <div className={styles.topicBar}>
             <div className={styles.livePill}>
               <div className={styles.liveDot}></div>
@@ -488,7 +442,7 @@ export default function BattleRoom({ params }) {
             <button className={styles.shareBtn} onClick={copyLink}>{copied ? '✓ Copied!' : '🔗 Share'}</button>
           </div>
 
-          {/* Round + timer — always visible when live */}
+          {/* 2. Round timer — visible when battle is running */}
           {currentRound > 0 && !battleEnded && roundConfig && (
             <div className={styles.roundBar}>
               <div>
@@ -501,32 +455,7 @@ export default function BattleRoom({ params }) {
             </div>
           )}
 
-          {/* Vote bar — always visible */}
-          <div className={styles.voteSection}>
-            <div className={styles.voteNames}>
-              <span className={styles.voteNameBlue}>@{battle.player1_username}</span>
-              <span className={styles.voteTally}>{total} votes</span>
-              <span className={styles.voteNameRed}>@{battle.player2_username || '?'}</span>
-            </div>
-            <div className={styles.voteTrack}>
-              <div className={styles.voteFill} style={{ width: `${p1Pct}%` }}></div>
-            </div>
-            <div className={styles.votePcts}>
-              <span style={{ color: '#60A5FA' }}>{p1Pct}%</span>
-              <span style={{ color: '#F87171' }}>{p2Pct}%</span>
-            </div>
-            {authReady && !voted && user && !isPlayer && !battleEnded && (
-              <div className={styles.voteButtons}>
-                <button className={`${styles.voteBtn} ${styles.voteBtnBlue}`} onClick={() => castVote('player1')}>Vote {battle.player1_username}</button>
-                <button className={`${styles.voteBtn} ${styles.voteBtnRed}`} onClick={() => castVote('player2')}>Vote {battle.player2_username}</button>
-              </div>
-            )}
-            {voted && <div className={styles.voteCast}>✓ Voted for {voted === 'player1' ? battle.player1_username : battle.player2_username}</div>}
-            {isPlayer && !battleEnded && <div className={styles.playerNotice}>You're in this battle — voting disabled</div>}
-            {authReady && !user && <div className={styles.loginPrompt}><Link href="/login" className={styles.loginLink}>Sign in</Link> to vote</div>}
-          </div>
-
-          {/* Winner banner */}
+          {/* 3. Winner banner */}
           {battleEnded && (
             <div className={styles.winnerBanner}>
               <div className={styles.winnerIcon}>{winner === 'tie' ? '🤝' : '🏆'}</div>
@@ -536,7 +465,7 @@ export default function BattleRoom({ params }) {
             </div>
           )}
 
-          {/* Video */}
+          {/* 4. VIDEO — takes all remaining space */}
           {!battleEnded && videoJoined ? (
             <div className={styles.videoWrap}>
               <div className={styles.videoMain}>
@@ -561,7 +490,7 @@ export default function BattleRoom({ params }) {
                   <div className={styles.controls}>
                     <button onClick={toggleMic} className={styles.controlBtn}
                       style={{ background: micLocked ? 'rgba(107,114,128,0.4)' : isMicOn ? 'rgba(255,255,255,0.15)' : 'rgba(239,68,68,0.5)', cursor: micLocked ? 'not-allowed' : 'pointer' }}
-                      title={micLocked ? 'Mic locked — not your turn' : isMicOn ? 'Mute' : 'Unmute'}>
+                      title={micLocked ? 'Not your turn' : isMicOn ? 'Mute' : 'Unmute'}>
                       {micLocked ? '🔒' : isMicOn ? '🎤' : '🔇'}
                     </button>
                     <button onClick={toggleCam} className={styles.controlBtn}
@@ -573,6 +502,8 @@ export default function BattleRoom({ params }) {
                 )}
                 {!isPlayer && <button onClick={leaveVideo} className={styles.leaveBtnViewer}>Leave</button>}
               </div>
+
+              {/* Start / waiting */}
               {isPlayer1 && bothInRoom && currentRound === 0 && (
                 <button onClick={handleStartBattle} className={styles.startBattleBtn}>▶ Start Battle</button>
               )}
@@ -596,6 +527,32 @@ export default function BattleRoom({ params }) {
             </div>
           ) : null}
 
+          {/* 5. Vote bar — always below video */}
+          <div className={styles.voteSection}>
+            <div className={styles.voteNames}>
+              <span className={styles.voteNameBlue}>@{battle.player1_username}</span>
+              <span className={styles.voteTally}>{total} votes</span>
+              <span className={styles.voteNameRed}>@{battle.player2_username || '?'}</span>
+            </div>
+            <div className={styles.voteTrack}>
+              <div className={styles.voteFill} style={{ width: `${p1Pct}%` }}></div>
+            </div>
+            <div className={styles.votePcts}>
+              <span style={{ color: '#60A5FA' }}>{p1Pct}%</span>
+              <span style={{ color: '#F87171' }}>{p2Pct}%</span>
+            </div>
+            {authReady && !voted && user && !isPlayer && !battleEnded && (
+              <div className={styles.voteButtons}>
+                <button className={`${styles.voteBtn} ${styles.voteBtnBlue}`} onClick={() => castVote('player1')}>Vote {battle.player1_username}</button>
+                <button className={`${styles.voteBtn} ${styles.voteBtnRed}`} onClick={() => castVote('player2')}>Vote {battle.player2_username}</button>
+              </div>
+            )}
+            {voted && <div className={styles.voteCast}>✓ Voted for {voted === 'player1' ? battle.player1_username : battle.player2_username}</div>}
+            {isPlayer && !battleEnded && <div className={styles.playerNotice}>You're in this battle — voting disabled</div>}
+            {authReady && !user && <div className={styles.loginPrompt}><Link href="/login" className={styles.loginLink}>Sign in</Link> to vote</div>}
+          </div>
+
+          {/* 6. Waiting for opponent share link */}
           {(battle.status === 'seeking' || !battle.player2_username) && !battleEnded && (
             <div className={styles.waitingCard}>
               <div className={styles.waitingTitle}>⏳ Waiting for opponent</div>
@@ -609,7 +566,7 @@ export default function BattleRoom({ params }) {
 
         </div>
 
-        {/* SIDEBAR */}
+        {/* RIGHT: CHAT SIDEBAR */}
         <div className={styles.sidebar}>
           <div className={styles.sidebarTitle}>Live Chat</div>
           <div className={styles.chatMessages}>
