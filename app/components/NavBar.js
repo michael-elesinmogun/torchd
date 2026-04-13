@@ -173,6 +173,7 @@ export default function NavBar() {
         background: 'rgba(6,9,18,0.92)', backdropFilter: 'blur(20px)',
         borderBottom: '1px solid rgba(255,255,255,0.065)',
         fontFamily: 'DM Sans, sans-serif',
+        width: '100%', maxWidth: '100vw', overflow: 'hidden',
       }}>
 
         <Link href={logoHref} style={{
@@ -194,7 +195,7 @@ export default function NavBar() {
           ))}
         </ul>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, minWidth: 0 }}>
           {loading ? (
             <div style={{ width: '80px', height: '32px' }}></div>
           ) : user ? (
@@ -223,10 +224,11 @@ export default function NavBar() {
                 </button>
 
                 {notifOpen && (
-                  <div style={{
-                    position: 'absolute', top: 'calc(100% + 10px)', right: 0,
-                    width: '320px', background: '#0f1623',
-                    border: '1px solid rgba(255,255,255,0.065)', borderRadius: '14px',
+                  <div className="notif-dropdown" style={{
+                    position: 'fixed', top: '62px', right: '0',
+                    width: 'min(320px, 100vw)',
+                    background: '#0f1623',
+                    border: '1px solid rgba(255,255,255,0.065)', borderRadius: '0 0 14px 14px',
                     boxShadow: '0 20px 60px rgba(0,0,0,0.5)', zIndex: 300, overflow: 'hidden',
                   }}>
                     <div style={{
@@ -343,7 +345,8 @@ export default function NavBar() {
           background: '#060912',
           display: 'flex', flexDirection: 'column',
           fontFamily: 'DM Sans, sans-serif',
-          overflowY: 'auto',
+          overflowY: 'auto', overflowX: 'hidden',
+          width: '100%', maxWidth: '100vw',
         }}>
           {/* User header */}
           {user && (
@@ -489,6 +492,7 @@ export default function NavBar() {
           .nav-hamburger { display: block !important; }
           .nav-name-label { display: none !important; }
           .nav-search-icon { display: none !important; }
+          .notif-dropdown { right: 0 !important; left: 0 !important; width: 100% !important; border-radius: 0 0 14px 14px !important; }
         }
       `}</style>
     </>
