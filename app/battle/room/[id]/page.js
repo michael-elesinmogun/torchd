@@ -185,6 +185,12 @@ export default function BattleRoom({ params }) {
 
   useEffect(() => { chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
+  // Auto-redirect both players 4s after battle ends — winner banner shows then both get sent back
+  useEffect(() => {
+    if (!battleEnded) return;
+    const t = setTimeout(() => router.push('/battle'), 4000);
+    return () => clearTimeout(t);
+  }, [battleEnded]);
   function attachLocalVideo(track) {
     if (!track?.mediaStreamTrack || !localVideoRef.current) return;
     try {
@@ -346,7 +352,8 @@ export default function BattleRoom({ params }) {
     setVideoJoined(false); setRemoteTracks([]);
     if (localVideoRef.current) localVideoRef.current.srcObject = null;
     Object.values(audioElementsRef.current).forEach(el => el.remove()); audioElementsRef.current = {};
-    router.push('/battle');
+    // Don't redirect here — battleEnded effect handles redirect for both players
+    if (!battleRef.current || battleRef.current.status !== 'ended') router.push('/battle');
   }
 
   async function toggleMic() {

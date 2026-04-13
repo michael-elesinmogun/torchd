@@ -299,8 +299,10 @@
   .layout { grid-template-columns: 1fr; height: auto; }
   .sidebar { display: none; }
   .stage { height: auto; overflow: visible; padding: 0.625rem; }
-  .videoWrap { min-height: 240px; }
-  .videoMain { min-height: 240px; flex: none; aspect-ratio: 16/9; }
+  .videoWrap { min-height: 0; }
+  .videoMain { flex: none; height: 220px; aspect-ratio: unset; }
+  .pip { width: 22%; max-width: 100px; }
+  .localVideo { width: 22%; max-width: 100px; }
 }
 
 @media (max-width: 600px) {
