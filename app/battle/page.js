@@ -76,6 +76,7 @@ export default function Battle() {
         .limit(20),
       supabase.from('battles').select('*')
         .eq('status', 'live')
+        .not('player2_username', 'is', null)
         .gt('expires_at', nowIso)
         .order('created_at', { ascending: false })
         .limit(10),
