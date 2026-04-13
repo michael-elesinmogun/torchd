@@ -17,13 +17,23 @@ const ROUND_CONFIG = {
   3: { label: 'Round 3', desc: 'Open mic — both players speak freely', speaker: 'both' },
 };
 
+async function updatePlayerStats(winnerUsername, loserUsername, isTie, player1Username, player2Username) {
+  try {
+    await fetch('/api/update-stats', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ winnerUsername, loserUsername, isTie, player1Username, player2Username }),
+    });
+  } catch (err) {
+    console.error('Failed to update stats:', err);
+  }
+}
+
 async function sendBattleNotifications(battleId, winnerUsername, player1Username, player2Username, isForfeit = false) {
   const loserUsername = winnerUsername === player1Username ? player2Username : player1Username;
-
   const notifications = [];
 
   if (winnerUsername === 'tie') {
-    // Both get a tie notification
     for (const username of [player1Username, player2Username]) {
       const opponent = username === player1Username ? player2Username : player1Username;
       const { data: profile } = await supabase
@@ -39,7 +49,6 @@ async function sendBattleNotifications(battleId, winnerUsername, player1Username
       }
     }
   } else {
-    // Winner notification
     const { data: winnerProfile } = await supabase
       .from('profiles').select('id').eq('username', winnerUsername).single();
     if (winnerProfile?.id) {
@@ -54,7 +63,6 @@ async function sendBattleNotifications(battleId, winnerUsername, player1Username
       });
     }
 
-    // Loser notification
     const { data: loserProfile } = await supabase
       .from('profiles').select('id').eq('username', loserUsername).single();
     if (loserProfile?.id) {
@@ -110,6 +118,7 @@ export default function BattleRoom({ params }) {
   const profileRef = useRef(null);
   const battleRef = useRef(null);
   const votesRef = useRef({ player1: 0, player2: 0 });
+  const statsUpdatedRef = useRef(false);
 
   useEffect(() => {
     async function init() {
@@ -287,7 +296,11 @@ export default function BattleRoom({ params }) {
     const v = votesRef.current;
     const b = battleRef.current;
     if (!b || b.status === 'ended') return;
+    if (statsUpdatedRef.current) return;
+    statsUpdatedRef.current = true;
+
     const winnerUsername = v.player1 > v.player2 ? b.player1_username : v.player2 > v.player1 ? b.player2_username : 'tie';
+    const loserUsername = winnerUsername === b.player1_username ? b.player2_username : b.player1_username;
 
     await supabase.from('battles').update({
       status: 'ended',
@@ -299,14 +312,20 @@ export default function BattleRoom({ params }) {
     setWinner(winnerUsername);
     clearInterval(roundTimerRef.current);
 
-    // Send notifications to both players
-    await sendBattleNotifications(id, winnerUsername, b.player1_username, b.player2_username, false);
+    await Promise.all([
+      sendBattleNotifications(id, winnerUsername, b.player1_username, b.player2_username, false),
+      updatePlayerStats(winnerUsername, loserUsername, winnerUsername === 'tie', b.player1_username, b.player2_username),
+    ]);
   }
 
   async function declareWinnerByForfeit(leavingUsername) {
     const b = battleRef.current;
     if (!b || b.status === 'ended') return;
+    if (statsUpdatedRef.current) return;
+    statsUpdatedRef.current = true;
+
     const winnerUsername = b.player1_username === leavingUsername ? b.player2_username : b.player1_username;
+    const loserUsername = leavingUsername;
 
     await supabase.from('battles').update({
       status: 'ended',
@@ -318,8 +337,10 @@ export default function BattleRoom({ params }) {
     setWinner(winnerUsername);
     clearInterval(roundTimerRef.current);
 
-    // Send forfeit notifications to both players
-    await sendBattleNotifications(id, winnerUsername, b.player1_username, b.player2_username, true);
+    await Promise.all([
+      sendBattleNotifications(id, winnerUsername, b.player1_username, b.player2_username, true),
+      updatePlayerStats(winnerUsername, loserUsername, false, b.player1_username, b.player2_username),
+    ]);
   }
 
   async function loadVotes() {
