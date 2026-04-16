@@ -91,6 +91,119 @@ const TEAM_COLORS = {
   },
 };
 
+// Alternate/secondary colors to use when two teams clash
+const TEAM_ALT_COLORS = {
+  nba: {
+    'ORL': 'C4CED3', // silver/white
+    'PHI': 'C00118', // red
+    'BKN': 'FFFFFF', // white
+    'GSW': 'FFC72C', // gold
+    'LAL': 'FDB927', // gold
+    'LAC': '1D428A', // blue
+    'MEM': '12173F', // navy
+    'NOP': 'B4975A', // gold
+    'OKC': 'EF3B24', // orange
+    'DAL': 'B8C4CA', // silver
+    'UTA': '00471B', // green
+    'MIN': '236192', // blue
+    'DEN': 'FEC524', // gold
+    'NYK': '006BB6', // blue
+    'IND': 'FDBB30', // gold
+    'MIL': 'EEE1C6', // cream
+    'CHA': '00788C', // teal
+    'WAS': 'E31837', // red
+  },
+  nfl: {
+    'DAL': 'B0B7BC', // silver
+    'LAR': 'FFD100', // gold
+    'SEA': '69BE28', // green
+    'NE': 'C60C30', // red
+    'BUF': 'C60C30', // red
+    'NYG': 'A71930', // red
+    'NYJ': 'FFFFFF', // white
+    'IND': 'FFFFFF', // white
+    'TEN': '4B92DB', // light blue
+    'BAL': 'EFB21E', // gold
+  },
+  nhl: {
+    'NYR': 'CE1126', // red
+    'NYI': 'F47D30', // orange
+    'BUF': 'FCB514', // gold
+    'TOR': 'FFFFFF', // white
+    'MTL': '003DA5', // blue
+    'OTT': '000000', // black
+    'NJD': 'CE1126', // red
+    'PIT': 'FFB612', // gold
+    'STL': '003DA5', // blue
+    'COL': 'A4162B', // burgundy
+  },
+  mlb: {
+    'NYY': 'FFFFFF', // white
+    'LAD': 'EF3E42', // red
+    'CHC': 'CC3433', // red
+    'NYM': 'FF5910', // orange
+    'TOR': 'E8291C', // red
+    'MIN': 'D31145', // red
+    'SEA': '005C5C', // teal
+    'TB': 'F5D130', // gold
+    'COL': 'C4CED3', // silver
+    'MIA': 'FF6600', // orange
+  },
+};
+
+// Measure hue distance between two hex colors (0-180 scale)
+function hueDistance(hex1, hex2) {
+  function getHue(hex) {
+    const h = hex.replace('#', '');
+    const r = parseInt(h.slice(0,2),16)/255, g = parseInt(h.slice(2,4),16)/255, b = parseInt(h.slice(4,6),16)/255;
+    const mx = Math.max(r,g,b), mn = Math.min(r,g,b);
+    if (mx === mn) return 0;
+    const d = mx - mn;
+    let hue = 0;
+    if (mx === r) hue = ((g-b)/d + (g<b?6:0))/6;
+    else if (mx === g) hue = ((b-r)/d + 2)/6;
+    else hue = ((r-g)/d + 4)/6;
+    return hue * 360;
+  }
+  const h1 = getHue(hex1), h2 = getHue(hex2);
+  const diff = Math.abs(h1 - h2);
+  return Math.min(diff, 360 - diff);
+}
+
+// Pick the best color pair — if too similar, swap one to alt color
+function resolveTeamColors(sport, awayAbbr, homeAbbr, rawAway, rawHome) {
+  const sportColors = TEAM_COLORS[sport] || TEAM_COLORS.nba;
+  const sportAlts = TEAM_ALT_COLORS[sport] || {};
+  const toHex = (c) => !c ? null : c.startsWith('#') ? c : `#${c}`;
+  const validColor = (c) => c && c !== '000000' && c !== 'ffffff' && c.length === 6;
+
+  const getBest = (abbr, raw) => {
+    if (validColor(raw)) return toHex(raw);
+    if (sportColors[abbr]) return `#${sportColors[abbr]}`;
+    return null;
+  };
+
+  let awayRaw = getBest(awayAbbr, rawAway) || '#3B82F6';
+  let homeRaw = getBest(homeAbbr, rawHome) || '#10B981';
+
+  // Check if colors are too similar (within 40 hue degrees)
+  const dist = hueDistance(awayRaw, homeRaw);
+  if (dist < 40) {
+    // Try swapping home to its alt color first
+    const homeAlt = sportAlts[homeAbbr];
+    const awayAlt = sportAlts[awayAbbr];
+    if (homeAlt) {
+      const altDist = hueDistance(awayRaw, `#${homeAlt}`);
+      if (altDist >= 40) { homeRaw = `#${homeAlt}`; }
+      else if (awayAlt) { awayRaw = `#${awayAlt}`; }
+    } else if (awayAlt) {
+      awayRaw = `#${awayAlt}`;
+    }
+  }
+
+  return { awayRaw, homeRaw };
+}
+
 function darkenForBorder(hexColor) {
   if (!hexColor) return '#EEF2FF';
   const hex = hexColor.replace('#', '');
@@ -646,14 +759,14 @@ export default function GameRoom() {
 
     const wrapClass = scrollable ? styles.mobileScrollPane : styles.gamecastWrap;
     const toHex = (c) => !c ? null : c.startsWith('#') ? c : `#${c}`;
-    const sportColors = TEAM_COLORS[sport] || TEAM_COLORS.mlb;
     const validColor = (c) => c && c !== '000000' && c !== 'ffffff' && c.length === 6;
-    const rawAway = (validColor(game?.away?.color) ? game.away.color : null) || sportColors[game?.away?.abbr] || game?.away?.alternateColor;
-    const rawHome = (validColor(game?.home?.color) ? game.home.color : null) || sportColors[game?.home?.abbr] || game?.home?.alternateColor;
-    const awayColor = getVisibleTeamColor(toHex(rawAway) || '#3B82F6');
-    const homeColor = getVisibleTeamColor(toHex(rawHome) || '#10B981');
-    const awayBorder = toHex(rawAway) || '#3B82F6';
-    const homeBorder = toHex(rawHome) || '#10B981';
+    const rawAwayEspn = validColor(game?.away?.color) ? game.away.color : null;
+    const rawHomeEspn = validColor(game?.home?.color) ? game.home.color : null;
+    const { awayRaw, homeRaw } = resolveTeamColors(sport, game?.away?.abbr, game?.home?.abbr, rawAwayEspn, rawHomeEspn);
+    const awayColor = getVisibleTeamColor(awayRaw);
+    const homeColor = getVisibleTeamColor(homeRaw);
+    const awayBorder = awayRaw;
+    const homeBorder = homeRaw;
 
     const playHalfMap = {};
     let half = null;
