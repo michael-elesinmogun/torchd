@@ -901,20 +901,21 @@ export default function GameRoom() {
         };
 
         // Try matching any 2-word sequence in the play text against the roster
-        // This catches "blocked by Ben Meyers", "hit Tomas Hertl", etc.
         for (let i = 0; i < words.length - 1; i++) {
           const w1 = words[i].toLowerCase().replace(/[^a-z]/g, '');
           const w2 = words[i + 1].toLowerCase().replace(/[^a-z]/g, '');
+          if (!w1 || !w2) continue;
           const fullKey = `${w1} ${w2}`;
           if (playerTeamMap[fullKey]) return playerTeamMap[fullKey];
-          // Try nickname expansion
+          // Try nickname expansion on first name
           const expandedFirst = nicknames[w1] || w1;
           const expandedKey = `${expandedFirst} ${w2}`;
           if (playerTeamMap[expandedKey]) return playerTeamMap[expandedKey];
         }
 
-        // Try any single last name in the text
-        for (let i = 0; i < words.length; i++) {
+        // Try any single last name — but only check first 2 words to avoid
+        // false matches on action words like "Shot", "Wide", "blocked" etc.
+        for (let i = 0; i < Math.min(2, words.length); i++) {
           const w = words[i].toLowerCase().replace(/[^a-z]/g, '');
           if (w.length > 3 && playerTeamMap[w]) return playerTeamMap[w];
         }
