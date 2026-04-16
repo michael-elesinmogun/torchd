@@ -830,12 +830,23 @@ export default function GameRoom() {
         const color = isAway ? awayColor : homeColor;
         teamPlayers.statistics?.[0]?.athletes?.forEach(athlete => {
           if (athlete.shortName) {
-            // Index by last name and full shortName for flexible matching
+            // ESPN shortName is "F. Lastname" — extract last name
             const parts = athlete.shortName.split(' ');
             const lastName = parts[parts.length - 1].toLowerCase();
-            const fullName = athlete.shortName.toLowerCase();
+            // Also store full shortName lowercased
+            const fullShort = athlete.shortName.toLowerCase();
             playerTeamMap[lastName] = { logo, color };
-            playerTeamMap[fullName] = { logo, color };
+            playerTeamMap[fullShort] = { logo, color };
+            // Store display name variations if available
+            if (athlete.displayName) {
+              const dn = athlete.displayName.toLowerCase();
+              const dnParts = dn.split(' ');
+              playerTeamMap[dn] = { logo, color };
+              // "Firstname Lastname" → also index as "Firstname Last"
+              if (dnParts.length >= 2) {
+                playerTeamMap[`${dnParts[0]} ${dnParts[dnParts.length-1]}`] = { logo, color };
+              }
+            }
           }
         });
       });
@@ -877,31 +888,30 @@ export default function GameRoom() {
       // NHL: infer team from player name in play text using roster lookup
       if (sport === 'nhl' && Object.keys(playerTeamMap).length) {
         const tx = play.text || '';
-        // Play text usually starts with the primary player name
-        // Try to match first word(s) of text as a player last name
-        const words = tx.split(' ');
-        // Try last name (first word usually for NHL)
-        for (let w = 0; w < Math.min(3, words.length); w++) {
-          const key = words[w].toLowerCase().replace(/[^a-z]/g, '');
-          if (playerTeamMap[key]) return playerTeamMap[key];
+        const words = tx.trim().split(/\s+/);
+
+        // NHL play text always starts with "Firstname Lastname action..."
+        // Try full "First Last" match first, then last name only
+        if (words.length >= 2) {
+          const fullName = `${words[0]} ${words[1]}`.toLowerCase();
+          if (playerTeamMap[fullName]) return playerTeamMap[fullName];
         }
-        // Try "saved by [Goalie]" — goalie is home/away, shooter is opposite
-        const savedByMatch = tx.match(/saved by ([A-Z][a-z]+ [A-Z][a-z]+)/);
+        const lastName = words[0]?.toLowerCase().replace(/[^a-z]/g, '');
+        if (lastName && playerTeamMap[lastName]) return playerTeamMap[lastName];
+
+        // "saved by Firstname Lastname" — goalie's team didn't shoot, return opposite
+        const savedByMatch = tx.match(/saved by ([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/);
         if (savedByMatch) {
-          const goalieName = savedByMatch[1].toLowerCase();
-          const goalieLastName = goalieName.split(' ').pop();
-          if (playerTeamMap[goalieLastName]) {
-            // Goalie's team didn't score — return opposite team
-            const gt = playerTeamMap[goalieLastName];
+          const parts = savedByMatch[1].toLowerCase().split(' ');
+          const goalieKey = parts.length >= 2 ? parts.join(' ') : parts[0];
+          const gt = playerTeamMap[goalieKey] || playerTeamMap[parts[parts.length - 1]];
+          if (gt) {
             return gt.logo === game?.away?.logo
               ? { logo: game?.home?.logo, color: homeColor }
               : { logo: game?.away?.logo, color: awayColor };
           }
         }
-        if (play.teamLogo) {
-          if (play.teamLogo === game?.away?.logo) return { logo: game.away.logo, color: awayColor };
-          if (play.teamLogo === game?.home?.logo) return { logo: game.home.logo, color: homeColor };
-        }
+
         return { logo: null, color: null };
       }
       if (sport !== 'mlb') return { logo: null, color: null };
