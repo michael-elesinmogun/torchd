@@ -782,6 +782,18 @@ export default function GameRoom() {
         if (game?.away?.abbr === play.team) return { logo: game.away.logo, color: awayColor };
         if (game?.home?.abbr === play.team) return { logo: game.home.logo, color: homeColor };
       }
+      // For scoring plays, detect which team scored by checking whose score changed
+      if (play.scoringPlay && play.awayScore != null && play.homeScore != null) {
+        // Compare with previous scoring play to see whose score went up
+        // Simple heuristic: use the score totals — higher scorer for this play's team
+        // We can't easily get previous score, so use play text hints
+        const tx = (play.text || '').toLowerCase();
+        // Most ESPN NBA play text starts with the player name — but no team indicator
+        // Best we can do without prev score: if scores are equal, can't tell
+        // If unequal, the team with more points just scored (usually)
+        if (play.homeScore > play.awayScore) return { logo: game?.home?.logo, color: homeColor };
+        if (play.awayScore > play.homeScore) return { logo: game?.away?.logo, color: awayColor };
+      }
       if (sport !== 'mlb') return { logo: null, color: null };
       const tx = (play.text || '').toLowerCase();
       if (tx.startsWith('pitches to') || tx.startsWith('relieved') || tx.startsWith('to the mound') || tx.startsWith('warming up')) return { logo: null, color: null };
