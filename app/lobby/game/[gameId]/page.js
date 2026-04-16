@@ -777,22 +777,29 @@ export default function GameRoom() {
       if (filtered[i].id && half) playHalfMap[filtered[i].id] = half;
     }
 
+    // Build a score-change map: for each play, compare to next play (older) to see who scored
+    const scoringTeamMap = {};
+    for (let i = 0; i < filtered.length; i++) {
+      const play = filtered[i];
+      if (!play.scoringPlay) continue;
+      const prevPlay = filtered[i + 1]; // next in array = older play (newest-first order)
+      if (prevPlay && play.awayScore != null && prevPlay.awayScore != null) {
+        if (play.awayScore > prevPlay.awayScore) scoringTeamMap[play.id] = 'away';
+        else if (play.homeScore > prevPlay.homeScore) scoringTeamMap[play.id] = 'home';
+      } else if (play.awayScore != null && play.homeScore != null) {
+        // First scoring play — can't compare, skip
+      }
+    }
+
     const getTeam = (play) => {
       if (play.team) {
         if (game?.away?.abbr === play.team) return { logo: game.away.logo, color: awayColor };
         if (game?.home?.abbr === play.team) return { logo: game.home.logo, color: homeColor };
       }
-      // For scoring plays, detect which team scored by checking whose score changed
-      if (play.scoringPlay && play.awayScore != null && play.homeScore != null) {
-        // Compare with previous scoring play to see whose score went up
-        // Simple heuristic: use the score totals — higher scorer for this play's team
-        // We can't easily get previous score, so use play text hints
-        const tx = (play.text || '').toLowerCase();
-        // Most ESPN NBA play text starts with the player name — but no team indicator
-        // Best we can do without prev score: if scores are equal, can't tell
-        // If unequal, the team with more points just scored (usually)
-        if (play.homeScore > play.awayScore) return { logo: game?.home?.logo, color: homeColor };
-        if (play.awayScore > play.homeScore) return { logo: game?.away?.logo, color: awayColor };
+      // Use score-change map for scoring plays
+      if (play.scoringPlay && scoringTeamMap[play.id]) {
+        if (scoringTeamMap[play.id] === 'away') return { logo: game?.away?.logo, color: awayColor };
+        if (scoringTeamMap[play.id] === 'home') return { logo: game?.home?.logo, color: homeColor };
       }
       if (sport !== 'mlb') return { logo: null, color: null };
       const tx = (play.text || '').toLowerCase();
