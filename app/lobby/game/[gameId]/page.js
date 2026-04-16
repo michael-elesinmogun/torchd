@@ -887,23 +887,37 @@ export default function GameRoom() {
         const tx = play.text || '';
         const words = tx.trim().split(/\s+/);
 
-        // Handle "Giveaway by Firstname Lastname" / "Takeaway by Firstname Lastname"
-        const byMatch = tx.match(/^(?:Giveaway|Takeaway) by (.+)/i);
-        if (byMatch) {
-          const nameParts = byMatch[1].trim().split(/\s+/);
-          const full = nameParts.slice(0, 2).join(' ').toLowerCase();
-          const last = nameParts[nameParts.length - 1].toLowerCase();
-          if (playerTeamMap[full]) return playerTeamMap[full];
-          if (playerTeamMap[last]) return playerTeamMap[last];
+        // Nickname → full name map for common ESPN inconsistencies
+        const nicknames = {
+          'freddy': 'frederick', 'fred': 'frederick',
+          'alex': 'alexander', 'al': 'alexander',
+          'matt': 'matthew', 'matty': 'matthew',
+          'mike': 'michael', 'mitch': 'mitchell',
+          'nick': 'nicholas', 'nico': 'nicolas',
+          'pat': 'patrick', 'rick': 'patrick',
+          'tj': 't.j.', 'zach': 'zachary', 'jake': 'jacob',
+          'josh': 'joshua', 'andy': 'andrew', 'drew': 'andrew',
+          'tony': 'anthony', 'sam': 'samuel', 'ben': 'benjamin',
+        };
+
+        // Try matching any 2-word sequence in the play text against the roster
+        // This catches "blocked by Ben Meyers", "hit Tomas Hertl", etc.
+        for (let i = 0; i < words.length - 1; i++) {
+          const w1 = words[i].toLowerCase().replace(/[^a-z]/g, '');
+          const w2 = words[i + 1].toLowerCase().replace(/[^a-z]/g, '');
+          const fullKey = `${w1} ${w2}`;
+          if (playerTeamMap[fullKey]) return playerTeamMap[fullKey];
+          // Try nickname expansion
+          const expandedFirst = nicknames[w1] || w1;
+          const expandedKey = `${expandedFirst} ${w2}`;
+          if (playerTeamMap[expandedKey]) return playerTeamMap[expandedKey];
         }
 
-        // NHL play text usually starts with "Firstname Lastname action..."
-        if (words.length >= 2) {
-          const fullName = `${words[0]} ${words[1]}`.toLowerCase();
-          if (playerTeamMap[fullName]) return playerTeamMap[fullName];
+        // Try any single last name in the text
+        for (let i = 0; i < words.length; i++) {
+          const w = words[i].toLowerCase().replace(/[^a-z]/g, '');
+          if (w.length > 3 && playerTeamMap[w]) return playerTeamMap[w];
         }
-        const lastName = words[0]?.toLowerCase().replace(/[^a-z]/g, '');
-        if (lastName && playerTeamMap[lastName]) return playerTeamMap[lastName];
 
         // "saved by Firstname Lastname" — goalie's team didn't shoot, return opposite
         const savedByMatch = tx.match(/saved by ([A-Z][a-z]+(?:\s[A-Z][a-z]+)?)/);
