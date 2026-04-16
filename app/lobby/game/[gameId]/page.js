@@ -310,6 +310,25 @@ function getVisibleTeamColor(hexColor) {
 function getPlayType(play, sport) {
   const text = (play.text || '').toLowerCase();
   if (play.scoringPlay) return 'scoring';
+
+  // Use ESPN's type field for NHL if available
+  if (sport === 'nhl' && play.type) {
+    const t = play.type;
+    if (t === 'Goal') return 'scoring';
+    if (t === 'Shot') return 'hit';
+    if (t === 'Save' || t === 'Goalie Save') return 'save';
+    if (t === 'Penalty') return 'penalty';
+    if (t === 'Hit') return 'physical';
+    if (t === 'Blocked Shot') return 'physical';
+    if (t === 'Giveaway') return 'turnover';
+    if (t === 'Takeaway') return 'turnover';
+    if (t === 'Faceoff') return 'dim';
+    if (t === 'Missed Shot' || t === 'Shot Wide' || t === 'Shot High') return 'shot_miss';
+    if (t === 'Period Start' || t === 'Period End' || t === 'Game Start' || t === 'Game End') return 'period';
+    if (t === 'Stoppage' || t === 'Stop' || t === 'Offside' || t === 'Icing') return 'dim';
+    return 'dim';
+  }
+
   if (sport === 'mlb') {
     if (text.includes('home run') || text.includes('homered')) return 'scoring';
     if (text.match(/singled|doubled|tripled|walked|hit by pitch|stolen|stole/)) return 'hit';
@@ -779,6 +798,14 @@ export default function GameRoom() {
           if (seenText.has(textKey)) return false;
           seenText.add(textKey);
         }
+        // Filter plays before period 1
+        if (p.period === 0 || p.period === null || p.period === undefined) return false;
+        // Filter NHL stoppages and noise
+        if (sport === 'nhl') {
+          const tx = (p.text || '').toLowerCase();
+          if (/puck in (benches|netting|crowd)|goalie stopped|puck frozen|game start|game end|period start|period end|video review/i.test(tx)) return false;
+          if (p.type && /^(Stoppage|Stop|Period Start|Period End|Game Start|Game End)$/.test(p.type)) return false;
+        }
         return true;
       }).filter(p => activePeriod === 'all' || Number(p.period) === Number(activePeriod));
     })();
@@ -826,6 +853,22 @@ export default function GameRoom() {
       if (play.scoringPlay && scoringTeamMap[play.id]) {
         if (scoringTeamMap[play.id] === 'away') return { logo: game?.away?.logo, color: awayColor };
         if (scoringTeamMap[play.id] === 'home') return { logo: game?.home?.logo, color: homeColor };
+      }
+      // NHL: infer team from play text using teamLogo field or text patterns
+      if (sport === 'nhl') {
+        if (play.teamLogo) {
+          if (play.teamLogo === game?.away?.logo) return { logo: game.away.logo, color: awayColor };
+          if (play.teamLogo === game?.home?.logo) return { logo: game.home.logo, color: homeColor };
+        }
+        // "saved by [goalie]" → shot was by the OTHER team
+        // "[player] shot" / "[player] goal" → need player roster which we don't have
+        // Best we can do: use teamColor field if present
+        if (play.teamColor) {
+          const tc = play.teamColor.replace('#','').toLowerCase();
+          if (tc === (game?.away?.color || '').toLowerCase()) return { logo: game.away.logo, color: awayColor };
+          if (tc === (game?.home?.color || '').toLowerCase()) return { logo: game.home.logo, color: homeColor };
+        }
+        return { logo: null, color: null };
       }
       if (sport !== 'mlb') return { logo: null, color: null };
       const tx = (play.text || '').toLowerCase();
