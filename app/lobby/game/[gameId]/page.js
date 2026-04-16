@@ -829,24 +829,20 @@ export default function GameRoom() {
         const logo = isAway ? game?.away?.logo : game?.home?.logo;
         const color = isAway ? awayColor : homeColor;
         teamPlayers.statistics?.[0]?.athletes?.forEach(athlete => {
+          const entry = { logo, color };
+          // athlete.name = "Matty Beniers" (full name — matches play text)
+          if (athlete.name) {
+            const full = athlete.name.toLowerCase();
+            const parts = full.split(' ');
+            const lastName = parts[parts.length - 1];
+            playerTeamMap[full] = entry;        // "matty beniers"
+            playerTeamMap[lastName] = entry;    // "beniers"
+          }
+          // athlete.shortName = "M. Beniers" — also index last name from this
           if (athlete.shortName) {
-            // ESPN shortName is "F. Lastname" — extract last name
             const parts = athlete.shortName.split(' ');
             const lastName = parts[parts.length - 1].toLowerCase();
-            // Also store full shortName lowercased
-            const fullShort = athlete.shortName.toLowerCase();
-            playerTeamMap[lastName] = { logo, color };
-            playerTeamMap[fullShort] = { logo, color };
-            // Store display name variations if available
-            if (athlete.displayName) {
-              const dn = athlete.displayName.toLowerCase();
-              const dnParts = dn.split(' ');
-              playerTeamMap[dn] = { logo, color };
-              // "Firstname Lastname" → also index as "Firstname Last"
-              if (dnParts.length >= 2) {
-                playerTeamMap[`${dnParts[0]} ${dnParts[dnParts.length-1]}`] = { logo, color };
-              }
-            }
+            playerTeamMap[lastName] = entry;
           }
         });
       });
