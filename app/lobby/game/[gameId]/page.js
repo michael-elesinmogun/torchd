@@ -828,22 +828,23 @@ export default function GameRoom() {
         const isAway = teamPlayers.team === game?.away?.abbr;
         const logo = isAway ? game?.away?.logo : game?.home?.logo;
         const color = isAway ? awayColor : homeColor;
-        teamPlayers.statistics?.[0]?.athletes?.forEach(athlete => {
-          const entry = { logo, color };
-          // athlete.name = "Matty Beniers" (full name — matches play text)
-          if (athlete.name) {
-            const full = athlete.name.toLowerCase();
-            const parts = full.split(' ');
-            const lastName = parts[parts.length - 1];
-            playerTeamMap[full] = entry;        // "matty beniers"
-            playerTeamMap[lastName] = entry;    // "beniers"
-          }
-          // athlete.shortName = "M. Beniers" — also index last name from this
-          if (athlete.shortName) {
-            const parts = athlete.shortName.split(' ');
-            const lastName = parts[parts.length - 1].toLowerCase();
-            playerTeamMap[lastName] = entry;
-          }
+        // Read ALL stat groups (forwards, defenses, skaters, goalies)
+        teamPlayers.statistics?.forEach(statGroup => {
+          statGroup?.athletes?.forEach(athlete => {
+            const entry = { logo, color };
+            if (athlete.name) {
+              const full = athlete.name.toLowerCase();
+              const parts = full.split(' ');
+              const lastName = parts[parts.length - 1];
+              playerTeamMap[full] = entry;
+              playerTeamMap[lastName] = entry;
+            }
+            if (athlete.shortName) {
+              const parts = athlete.shortName.split(' ');
+              const lastName = parts[parts.length - 1].toLowerCase();
+              playerTeamMap[lastName] = entry;
+            }
+          });
         });
       });
     }
