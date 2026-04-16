@@ -251,25 +251,26 @@ function getVisibleTeamColor(hexColor) {
   // Near-black, near-white, or near-gray — return neutral readable color
   if (s < 0.08) return '#C4CCDF';
 
-  // Max out saturation for vivid rendering on dark background
-  s = Math.min(1, s * 1.5);
+  // Boost saturation
+  s = Math.min(1, s * 1.4);
 
-  // Force lightness into a range that pops on #060912
-  // Blues/dark colors need to go much lighter — floor at 0.62
-  // Bright colors (gold, orange) get pulled down slightly to avoid washing out
-  if (l < 0.35) {
-    // Very dark colors (navy blue, forest green, etc) — push way up
-    l = 0.65;
-  } else if (l < 0.55) {
-    // Medium dark — boost significantly
-    l = Math.max(0.62, l * 1.5);
-  } else if (l > 0.75) {
-    // Very bright — pull down a touch
-    l = 0.68;
+  // Warm hues (red 0-30°, orange 30-60°, yellow 45-65°) — these are naturally
+  // bright and saturated; don't push lightness too high or they wash to white
+  const hueDeg = h * 360;
+  const isWarm = hueDeg < 65 || hueDeg > 330;
+
+  if (isWarm) {
+    // Warm colors: keep vivid, moderate lightness boost
+    if (l < 0.35) l = 0.58;
+    else if (l < 0.5) l = Math.max(0.55, l * 1.2);
+    l = Math.max(0.52, Math.min(0.65, l));
+  } else {
+    // Cool colors (blues, greens, purples) — push lightness up more aggressively
+    if (l < 0.35) l = 0.65;
+    else if (l < 0.55) l = Math.max(0.62, l * 1.5);
+    else if (l > 0.75) l = 0.68;
+    l = Math.max(0.58, Math.min(0.72, l));
   }
-
-  // Final clamp: always between 0.58 and 0.72 for consistent readability
-  l = Math.max(0.58, Math.min(0.72, l));
 
   const hue = (p, q, t) => {
     const tt = ((t % 1) + 1) % 1;
@@ -858,22 +859,22 @@ export default function GameRoom() {
       const tx = dt.toLowerCase();
       const isScoring = scoringPlay || displayPlay.scoringPlay;
       const isHit = /singled|doubled|tripled|homered|hit by pitch|safe at/.test(tx);
-      const isWalk = /walked|walk/.test(tx);
+      const isWalk = /\bwalked\b|\bwalk\b/.test(tx);
       const isOut = /struck out|grounded|flied|lined|popped|fouled out|fielder.s choice/.test(tx);
       const isPH = /hit for|pinch.hit|pinch hit/.test(tx);
       let bc = tc ? `${tc}55` : 'rgba(255,255,255,0.08)', bg = 'transparent';
       if (isScoring) { bc = tc ? `${tc}99` : awayColor; bg = tc ? `${tc}30` : `${awayColor}30`; }
       else if (isHit) { bc = tc ? `${tc}99` : '#10B981'; bg = tc ? `${tc}18` : 'rgba(16,185,129,0.08)'; }
-      else if (isWalk) { bc = 'rgba(16,185,129,0.6)'; bg = 'rgba(16,185,129,0.06)'; }
+      else if (isWalk) { bc = 'rgba(245,158,11,0.6)'; bg = 'rgba(245,158,11,0.06)'; }
       else if (isOut) { bc = 'rgba(239,68,68,0.4)'; bg = 'rgba(239,68,68,0.04)'; }
-      const bColor = isScoring ? (tc || awayColor) : isPH ? '#A78BFA' : isHit ? (tc || '#10B981') : isWalk ? '#60A5FA' : '#6B7A9E';
+      const bColor = isScoring ? (tc || awayColor) : isPH ? '#A78BFA' : isHit ? (tc || '#10B981') : isWalk ? '#F59E0B' : '#6B7A9E';
       const badgeLabel = isScoring ? '⚾ Scores' : isPH ? 'PH' : isHit ? 'Hit' : isWalk ? 'Walk' : isOut ? 'Out' : '';
       const badgeStyle = isScoring
         ? { bg: `${bColor}22`, border: `${bColor}55`, text: bColor }
         : isOut
         ? { bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.5)', text: '#F87171' }
         : isWalk
-        ? { bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.4)', text: '#10B981' }
+        ? { bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.4)', text: '#F59E0B' }
         : isHit
         ? { bg: `${bColor}18`, border: `${bColor}44`, text: bColor }
         : isPH
