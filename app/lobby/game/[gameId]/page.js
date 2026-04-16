@@ -887,8 +887,17 @@ export default function GameRoom() {
         const tx = play.text || '';
         const words = tx.trim().split(/\s+/);
 
-        // NHL play text always starts with "Firstname Lastname action..."
-        // Try full "First Last" match first, then last name only
+        // Handle "Giveaway by Firstname Lastname" / "Takeaway by Firstname Lastname"
+        const byMatch = tx.match(/^(?:Giveaway|Takeaway) by (.+)/i);
+        if (byMatch) {
+          const nameParts = byMatch[1].trim().split(/\s+/);
+          const full = nameParts.slice(0, 2).join(' ').toLowerCase();
+          const last = nameParts[nameParts.length - 1].toLowerCase();
+          if (playerTeamMap[full]) return playerTeamMap[full];
+          if (playerTeamMap[last]) return playerTeamMap[last];
+        }
+
+        // NHL play text usually starts with "Firstname Lastname action..."
         if (words.length >= 2) {
           const fullName = `${words[0]} ${words[1]}`.toLowerCase();
           if (playerTeamMap[fullName]) return playerTeamMap[fullName];
