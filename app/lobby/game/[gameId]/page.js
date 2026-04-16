@@ -800,8 +800,8 @@ export default function GameRoom() {
       const { logo, color } = getTeam(play);
       const pt = getPlayType(play, sport);
       let bc = 'transparent', bg = 'transparent', op = 1;
-      if (pt === 'scoring') { bc = color || awayColor; bg = `${bc}15`; }
-      else if (pt === 'hit') { bc = color ? `${color}88` : 'rgba(255,255,255,0.1)'; bg = color ? `${color}08` : 'transparent'; }
+      if (pt === 'scoring') { bc = color || awayColor; bg = `${bc}30`; }
+      else if (pt === 'hit') { bc = color ? `${color}88` : 'rgba(255,255,255,0.1)'; bg = color ? `${color}15` : 'transparent'; }
       else if (pt === 'dim') { op = 0.45; }
       else if (pt === 'period') { bc = 'rgba(255,255,255,0.15)'; bg = 'rgba(255,255,255,0.03)'; }
       return (
@@ -843,8 +843,8 @@ export default function GameRoom() {
       const isOut = /struck out|grounded|flied|lined|popped|fouled out|fielder.s choice/.test(tx);
       const isPH = /hit for|pinch.hit|pinch hit/.test(tx);
       let bc = tc ? `${tc}55` : 'rgba(255,255,255,0.08)', bg = 'transparent';
-      if (isScoring) { bc = tc ? `${tc}99` : awayColor; bg = tc ? `${tc}15` : `${awayColor}15`; }
-      else if (isHit) { bc = tc ? `${tc}99` : '#10B981'; bg = tc ? `${tc}12` : 'rgba(16,185,129,0.06)'; }
+      if (isScoring) { bc = tc ? `${tc}99` : awayColor; bg = tc ? `${tc}30` : `${awayColor}30`; }
+      else if (isHit) { bc = tc ? `${tc}99` : '#10B981'; bg = tc ? `${tc}18` : 'rgba(16,185,129,0.08)'; }
       else if (isWalk) { bc = 'rgba(16,185,129,0.6)'; bg = 'rgba(16,185,129,0.06)'; }
       else if (isOut) { bc = 'rgba(239,68,68,0.4)'; bg = 'rgba(239,68,68,0.04)'; }
       const bColor = isScoring ? (tc || awayColor) : isPH ? '#A78BFA' : isHit ? (tc || '#10B981') : isWalk ? '#60A5FA' : '#6B7A9E';
