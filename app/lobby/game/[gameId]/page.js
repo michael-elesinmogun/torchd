@@ -323,8 +323,13 @@ function getPlayType(play, sport) {
   }
   if (sport === 'nhl') {
     if (text.match(/goal|scores/)) return 'scoring';
-    if (text.match(/shot|save/)) return 'hit';
-    if (text.match(/penalty|miss/)) return 'dim';
+    if (text.match(/shot on goal|on goal/)) return 'hit';
+    if (text.match(/saved by|save/)) return 'save';
+    if (text.match(/penalty|penalized|minor|major|misconduct/)) return 'penalty';
+    if (text.match(/\bhit\b|check|blocked/)) return 'physical';
+    if (text.match(/giveaway|takeaway/)) return 'turnover';
+    if (text.match(/faceoff|face-off|won against|lost to/)) return 'dim';
+    if (text.match(/wrist shot|slap shot|snap shot|backhand|high and wide|wide of|missed shot/)) return 'shot_miss';
   }
   if (sport === 'nfl' || sport === 'ncaafb') {
     if (text.match(/touchdown|field goal/)) return 'scoring';
@@ -842,14 +847,35 @@ export default function GameRoom() {
       let bc = 'transparent', bg = 'transparent', op = 1;
       if (pt === 'scoring') { bc = color || awayColor; bg = `${bc}30`; }
       else if (pt === 'hit') { bc = color ? `${color}88` : 'rgba(255,255,255,0.1)'; bg = color ? `${color}15` : 'transparent'; }
-      else if (pt === 'dim') { op = 0.45; }
+      else if (pt === 'save') { bc = 'rgba(99,102,241,0.5)'; bg = 'rgba(99,102,241,0.06)'; }
+      else if (pt === 'penalty') { bc = 'rgba(245,158,11,0.6)'; bg = 'rgba(245,158,11,0.08)'; }
+      else if (pt === 'physical') { bc = 'rgba(239,68,68,0.35)'; bg = 'rgba(239,68,68,0.05)'; }
+      else if (pt === 'turnover') { bc = 'rgba(167,139,250,0.4)'; bg = 'rgba(167,139,250,0.05)'; }
+      else if (pt === 'shot_miss') { op = 0.55; }
+      else if (pt === 'dim') { op = 0.35; }
       else if (pt === 'period') { bc = 'rgba(255,255,255,0.15)'; bg = 'rgba(255,255,255,0.03)'; }
+      const playTextColor = pt === 'scoring' ? '#EEF2FF' : pt === 'dim' || pt === 'shot_miss' ? '#6B7A9E' : '#C4CCDF';
+      const playFontWeight = pt === 'scoring' ? 600 : 400;
+
+      // Badge for NHL special play types
+      const nhlBadge = sport === 'nhl' ? (
+        pt === 'save' ? { label: 'Save', bg: 'rgba(99,102,241,0.15)', border: 'rgba(99,102,241,0.4)', text: '#818CF8' }
+        : pt === 'penalty' ? { label: '⚠️ Penalty', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.4)', text: '#F59E0B' }
+        : pt === 'physical' ? { label: 'Hit', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.3)', text: '#F87171' }
+        : pt === 'turnover' ? { label: 'TO', bg: 'rgba(167,139,250,0.12)', border: 'rgba(167,139,250,0.3)', text: '#A78BFA' }
+        : pt === 'hit' ? { label: 'Shot', bg: color ? `${color}18` : 'rgba(255,255,255,0.06)', border: color ? `${color}44` : 'rgba(255,255,255,0.12)', text: color || '#C4CCDF' }
+        : null
+      ) : null;
+
       return (
         <div key={key} style={{ padding: '0.625rem 1.25rem 0.625rem calc(1.25rem - 3px)', borderBottom: '1px solid rgba(255,255,255,0.04)', borderLeft: `3px solid ${bc}`, background: bg, opacity: op, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          <div className={styles.playClock}>{play.clock} {play.periodText}</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div className={styles.playClock}>{play.clock} {play.periodText}</div>
+            {nhlBadge && <div style={{ fontSize: '10px', fontWeight: 700, fontFamily: 'Syne,sans-serif', padding: '2px 7px', borderRadius: '100px', background: nhlBadge.bg, color: nhlBadge.text, border: `1px solid ${nhlBadge.border}` }}>{nhlBadge.label}</div>}
+          </div>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '7px' }}>
             {logo && <img src={logo} alt="" style={{ width: '16px', height: '16px', objectFit: 'contain', flexShrink: 0, marginTop: '2px' }} />}
-            <div className={styles.playText} style={{ color: pt === 'scoring' ? '#EEF2FF' : pt === 'dim' ? '#6B7A9E' : '#C4CCDF', fontWeight: pt === 'scoring' ? 600 : 400 }}>{play.text}</div>
+            <div className={styles.playText} style={{ color: playTextColor, fontWeight: playFontWeight }}>{play.text}</div>
           </div>
           {play.scoringPlay && game && (
             <div className={styles.playScore}>
