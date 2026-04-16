@@ -821,6 +821,26 @@ export default function GameRoom() {
     const awayBorder = awayRaw;
     const homeBorder = homeRaw;
 
+    // Build player name → team lookup from roster data (used for NHL logo inference)
+    const playerTeamMap = {};
+    if (sport === 'nhl' && players?.length) {
+      players.forEach(teamPlayers => {
+        const isAway = teamPlayers.team === game?.away?.abbr;
+        const logo = isAway ? game?.away?.logo : game?.home?.logo;
+        const color = isAway ? awayColor : homeColor;
+        teamPlayers.statistics?.[0]?.athletes?.forEach(athlete => {
+          if (athlete.shortName) {
+            // Index by last name and full shortName for flexible matching
+            const parts = athlete.shortName.split(' ');
+            const lastName = parts[parts.length - 1].toLowerCase();
+            const fullName = athlete.shortName.toLowerCase();
+            playerTeamMap[lastName] = { logo, color };
+            playerTeamMap[fullName] = { logo, color };
+          }
+        });
+      });
+    }
+
     const playHalfMap = {};
     let half = null;
     for (let i = filtered.length - 1; i >= 0; i--) {
@@ -854,19 +874,33 @@ export default function GameRoom() {
         if (scoringTeamMap[play.id] === 'away') return { logo: game?.away?.logo, color: awayColor };
         if (scoringTeamMap[play.id] === 'home') return { logo: game?.home?.logo, color: homeColor };
       }
-      // NHL: infer team from play text using teamLogo field or text patterns
-      if (sport === 'nhl') {
+      // NHL: infer team from player name in play text using roster lookup
+      if (sport === 'nhl' && Object.keys(playerTeamMap).length) {
+        const tx = play.text || '';
+        // Play text usually starts with the primary player name
+        // Try to match first word(s) of text as a player last name
+        const words = tx.split(' ');
+        // Try last name (first word usually for NHL)
+        for (let w = 0; w < Math.min(3, words.length); w++) {
+          const key = words[w].toLowerCase().replace(/[^a-z]/g, '');
+          if (playerTeamMap[key]) return playerTeamMap[key];
+        }
+        // Try "saved by [Goalie]" — goalie is home/away, shooter is opposite
+        const savedByMatch = tx.match(/saved by ([A-Z][a-z]+ [A-Z][a-z]+)/);
+        if (savedByMatch) {
+          const goalieName = savedByMatch[1].toLowerCase();
+          const goalieLastName = goalieName.split(' ').pop();
+          if (playerTeamMap[goalieLastName]) {
+            // Goalie's team didn't score — return opposite team
+            const gt = playerTeamMap[goalieLastName];
+            return gt.logo === game?.away?.logo
+              ? { logo: game?.home?.logo, color: homeColor }
+              : { logo: game?.away?.logo, color: awayColor };
+          }
+        }
         if (play.teamLogo) {
           if (play.teamLogo === game?.away?.logo) return { logo: game.away.logo, color: awayColor };
           if (play.teamLogo === game?.home?.logo) return { logo: game.home.logo, color: homeColor };
-        }
-        // "saved by [goalie]" → shot was by the OTHER team
-        // "[player] shot" / "[player] goal" → need player roster which we don't have
-        // Best we can do: use teamColor field if present
-        if (play.teamColor) {
-          const tc = play.teamColor.replace('#','').toLowerCase();
-          if (tc === (game?.away?.color || '').toLowerCase()) return { logo: game.away.logo, color: awayColor };
-          if (tc === (game?.home?.color || '').toLowerCase()) return { logo: game.home.logo, color: homeColor };
         }
         return { logo: null, color: null };
       }
