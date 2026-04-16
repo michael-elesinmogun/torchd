@@ -170,7 +170,24 @@ function hueDistance(hex1, hex2) {
   return Math.min(diff, 360 - diff);
 }
 
-// Pick the best color pair — if too similar, swap one to alt color
+function isBlueHue(hex) {
+  function getHue(h) {
+    h = h.replace('#','');
+    const r = parseInt(h.slice(0,2),16)/255, g = parseInt(h.slice(2,4),16)/255, b = parseInt(h.slice(4,6),16)/255;
+    const mx = Math.max(r,g,b), mn = Math.min(r,g,b);
+    if (mx===mn) return 0;
+    const d = mx-mn;
+    let hue = 0;
+    if (mx===r) hue=((g-b)/d+(g<b?6:0))/6;
+    else if (mx===g) hue=((b-r)/d+2)/6;
+    else hue=((r-g)/d+4)/6;
+    return hue*360;
+  }
+  const hue = getHue(hex);
+  return hue >= 190 && hue <= 260; // blue range
+}
+
+// Pick the best color pair — if blue, use alt; if too similar, swap one to alt
 function resolveTeamColors(sport, awayAbbr, homeAbbr, rawAway, rawHome) {
   const sportColors = TEAM_COLORS[sport] || TEAM_COLORS.nba;
   const sportAlts = TEAM_ALT_COLORS[sport] || {};
@@ -186,16 +203,19 @@ function resolveTeamColors(sport, awayAbbr, homeAbbr, rawAway, rawHome) {
   let awayRaw = getBest(awayAbbr, rawAway) || '#3B82F6';
   let homeRaw = getBest(homeAbbr, rawHome) || '#10B981';
 
-  // Check if colors are too similar (within 40 hue degrees)
+  // Always swap blue teams to their alt color
+  if (isBlueHue(awayRaw) && sportAlts[awayAbbr]) awayRaw = `#${sportAlts[awayAbbr]}`;
+  if (isBlueHue(homeRaw) && sportAlts[homeAbbr]) homeRaw = `#${sportAlts[homeAbbr]}`;
+
+  // Also check if colors are still too similar after alt swap
   const dist = hueDistance(awayRaw, homeRaw);
   if (dist < 40) {
-    // Try swapping home to its alt color first
     const homeAlt = sportAlts[homeAbbr];
     const awayAlt = sportAlts[awayAbbr];
     if (homeAlt) {
       const altDist = hueDistance(awayRaw, `#${homeAlt}`);
-      if (altDist >= 40) { homeRaw = `#${homeAlt}`; }
-      else if (awayAlt) { awayRaw = `#${awayAlt}`; }
+      if (altDist >= 40) homeRaw = `#${homeAlt}`;
+      else if (awayAlt) awayRaw = `#${awayAlt}`;
     } else if (awayAlt) {
       awayRaw = `#${awayAlt}`;
     }
@@ -944,6 +964,8 @@ export default function GameRoom() {
                 if (!group.play?.text?.trim()) return null;
                 const et = (group.play.text || '').toLowerCase();
                 if (/^pitch \d|^ball \d|^strike \d|ball in play|foul ball|foul tip|swinging strike/i.test(et)) return null;
+                // Filter baserunner state updates
+                if (/\bat (first|second|third) base\b/i.test(et)) return null;
                 return renderPlay(group.play, group.play.id || gi);
               }
               return renderAB(group, gi);
