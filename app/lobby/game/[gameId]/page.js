@@ -936,6 +936,7 @@ export default function GameRoom() {
             groupMLBAtBats(filtered).map((group, gi) => {
               if (group.type === 'inning') {
                 if (!group.play?.text?.trim()) return null;
+                if (/middle of/i.test(group.play.text)) return null;
                 return <div key={group.play.id || gi} style={{ padding: '6px 1.25rem', background: 'rgba(255,255,255,0.025)', borderBottom: '1px solid rgba(255,255,255,0.06)', borderLeft: '3px solid rgba(255,255,255,0.12)', fontSize: '11px', fontWeight: 700, color: '#6B7A9E', fontFamily: 'Syne,sans-serif', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{group.play.text}</div>;
               }
               if (group.type === 'event') {
