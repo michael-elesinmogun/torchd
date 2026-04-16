@@ -116,6 +116,7 @@ function darkenForBorder(hexColor) {
   return `#${nr.toString(16).padStart(2,'0')}${ng.toString(16).padStart(2,'0')}${nb.toString(16).padStart(2,'0')}`;
 }
 
+// FIX: Improved color function that ensures visibility on dark #060912 background
 function getVisibleTeamColor(hexColor) {
   if (!hexColor) return '#EEF2FF';
   const hex = hexColor.replace('#', '');
@@ -134,12 +135,28 @@ function getVisibleTeamColor(hexColor) {
     else h = ((r - g) / d + 4) / 6;
   }
 
+  // Near-black, near-white, or near-gray — return neutral readable color
   if (s < 0.08) return '#C4CCDF';
 
-  s = Math.min(1, s * 1.3);
-  if (l < 0.45) l = Math.max(0.55, l * 1.4);
-  else if (l > 0.55) l = 0.52;
-  l = Math.max(0.45, Math.min(0.60, l));
+  // Max out saturation for vivid rendering on dark background
+  s = Math.min(1, s * 1.5);
+
+  // Force lightness into a range that pops on #060912
+  // Blues/dark colors need to go much lighter — floor at 0.62
+  // Bright colors (gold, orange) get pulled down slightly to avoid washing out
+  if (l < 0.35) {
+    // Very dark colors (navy blue, forest green, etc) — push way up
+    l = 0.65;
+  } else if (l < 0.55) {
+    // Medium dark — boost significantly
+    l = Math.max(0.62, l * 1.5);
+  } else if (l > 0.75) {
+    // Very bright — pull down a touch
+    l = 0.68;
+  }
+
+  // Final clamp: always between 0.58 and 0.72 for consistent readability
+  l = Math.max(0.58, Math.min(0.72, l));
 
   const hue = (p, q, t) => {
     const tt = ((t % 1) + 1) % 1;
@@ -260,7 +277,6 @@ export default function GameRoom() {
   const liveKitRoomObjectRef = useRef(null);
   const isCamEnabledRef = useRef(true);
 
-  // Track mobile state for responsive inline styles
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth <= 768);
     check();
@@ -399,7 +415,16 @@ export default function GameRoom() {
     try {
       const res = await fetch(`/api/gamecast?gameId=${espnId}&sport=${sport}`);
       const data = await res.json();
-      if (data.plays) setPlays(data.plays);
+      if (data.plays) {
+        // FIX: Sort plays by sequence number if available, otherwise by id numerically
+        // ESPN sends plays newest-first; we want newest-first for display (most recent at top)
+        const sorted = [...data.plays].sort((a, b) => {
+          if (a.sequenceNumber && b.sequenceNumber) return Number(b.sequenceNumber) - Number(a.sequenceNumber);
+          if (a.id && b.id) return Number(b.id) - Number(a.id);
+          return 0;
+        });
+        setPlays(sorted);
+      }
       if (data.teamStats) setTeamStats(data.teamStats);
       if (data.players) setPlayers(data.players);
     } catch (e) {}
@@ -445,7 +470,7 @@ export default function GameRoom() {
             if (currentUser) supabase.from('profiles').select('username, full_name').eq('id', currentUser.id).single().then(({ data }) => setProfile(data));
           });
         }
-      }, 1000);
+      }, 0);
       await fetchGame();
       const { data: existingMessages } = await supabase.from('game_chats').select('*').eq('game_id', gameId).order('created_at', { ascending: true }).limit(100);
       setMessages(existingMessages || []);
@@ -482,7 +507,6 @@ export default function GameRoom() {
 
   const live = game && isLive(game.status);
 
-  // FIX: chatPanel width is only split-based on desktop; full width on mobile
   const chatPanel = (
     <div className={styles.chatWrap} style={isMobile ? { width: '100%' } : { width: `${100 - splitPct}%` }}>
       <div className={styles.chatHeader}>
@@ -619,6 +643,7 @@ export default function GameRoom() {
         return true;
       }).filter(p => activePeriod === 'all' || Number(p.period) === Number(activePeriod));
     })();
+
     const wrapClass = scrollable ? styles.mobileScrollPane : styles.gamecastWrap;
     const toHex = (c) => !c ? null : c.startsWith('#') ? c : `#${c}`;
     const sportColors = TEAM_COLORS[sport] || TEAM_COLORS.mlb;
