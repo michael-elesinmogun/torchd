@@ -11,6 +11,7 @@ export default function Settings() {
   const [profileSlug, setProfileSlug] = useState('');
   const [activeSection, setActiveSection] = useState('account');
   const [loading, setLoading] = useState(true);
+  const [theme, setTheme] = useState('dark');
 
   // Account fields
   const [displayName, setDisplayName] = useState('');
@@ -47,6 +48,17 @@ export default function Settings() {
   const [deleteInput, setDeleteInput] = useState('');
 
   useEffect(() => {
+    const saved = localStorage.getItem('torchd-theme') || 'dark';
+    setTheme(saved);
+  }, []);
+
+  function toggleTheme(newTheme) {
+    setTheme(newTheme);
+    localStorage.setItem('torchd-theme', newTheme);
+    document.documentElement.setAttribute('data-theme', newTheme);
+  }
+
+  useEffect(() => {
     async function fetchUser() {
       const { data: { session } } = await supabase.auth.getSession();
       const currentUser = session?.user;
@@ -81,9 +93,7 @@ export default function Settings() {
     setSavingName(true);
     setNameError(''); setNameSuccess('');
     const { error } = await supabase.auth.updateUser({ data: { full_name: displayName } });
-    if (!error) {
-      await supabase.from('profiles').update({ full_name: displayName }).eq('id', user.id);
-    }
+    if (!error) await supabase.from('profiles').update({ full_name: displayName }).eq('id', user.id);
     setSavingName(false);
     if (error) setNameError(error.message);
     else setNameSuccess('Display name updated!');
@@ -101,46 +111,29 @@ export default function Settings() {
   async function savePassword() {
     setSavingPassword(true);
     setPasswordError(''); setPasswordSuccess('');
-    if (newPassword !== confirmPassword) {
-      setPasswordError('Passwords do not match');
-      setSavingPassword(false); return;
-    }
-    if (newPassword.length < 8) {
-      setPasswordError('Password must be at least 8 characters');
-      setSavingPassword(false); return;
-    }
+    if (newPassword !== confirmPassword) { setPasswordError('Passwords do not match'); setSavingPassword(false); return; }
+    if (newPassword.length < 8) { setPasswordError('Password must be at least 8 characters'); setSavingPassword(false); return; }
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     setSavingPassword(false);
     if (error) setPasswordError(error.message);
-    else {
-      setPasswordSuccess('Password updated successfully!');
-      setNewPassword(''); setConfirmPassword('');
-    }
+    else { setPasswordSuccess('Password updated successfully!'); setNewPassword(''); setConfirmPassword(''); }
   }
 
   async function savePrivacy() {
-    setSavingPrivacy(true);
-    setPrivacySuccess('');
-    const { error } = await supabase
-      .from('profiles')
-      .update({ is_public: isPublic, show_on_leaderboard: showOnLeaderboard })
-      .eq('id', user.id);
+    setSavingPrivacy(true); setPrivacySuccess('');
+    const { error } = await supabase.from('profiles').update({ is_public: isPublic, show_on_leaderboard: showOnLeaderboard }).eq('id', user.id);
     setSavingPrivacy(false);
     if (!error) setPrivacySuccess('Privacy settings saved!');
   }
 
   async function saveNotifications() {
-    setSavingNotifs(true);
-    setNotifsSuccess('');
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        notif_battle_requests: notifBattleRequests,
-        notif_new_followers: notifNewFollowers,
-        notif_battle_results: notifBattleResults,
-        notif_weekly_digest: notifWeeklyDigest,
-      })
-      .eq('id', user.id);
+    setSavingNotifs(true); setNotifsSuccess('');
+    const { error } = await supabase.from('profiles').update({
+      notif_battle_requests: notifBattleRequests,
+      notif_new_followers: notifNewFollowers,
+      notif_battle_results: notifBattleResults,
+      notif_weekly_digest: notifWeeklyDigest,
+    }).eq('id', user.id);
     setSavingNotifs(false);
     if (!error) setNotifsSuccess('Notification preferences saved!');
   }
@@ -154,17 +147,14 @@ export default function Settings() {
   const sections = [
     { id: 'account', label: '👤 Account' },
     { id: 'password', label: '🔒 Password' },
+    { id: 'appearance', label: '🎨 Appearance' },
     { id: 'privacy', label: '🔐 Privacy' },
     { id: 'notifications', label: '🔔 Notifications' },
     { id: 'danger', label: '⚠️ Danger Zone' },
   ];
 
   if (loading) {
-    return (
-      <main className={styles.main}>
-        <div className={styles.loadingWrap}>Loading settings...</div>
-      </main>
-    );
+    return <main className={styles.main}><div className={styles.loadingWrap}>Loading settings...</div></main>;
   }
 
   return (
@@ -176,22 +166,16 @@ export default function Settings() {
             <h1 className={styles.pageTitle}>Settings</h1>
             <p className={styles.pageSub}>Manage your account and preferences</p>
           </div>
-          {profileSlug && (
-            <Link href={`/profile/${profileSlug}`} className={styles.backBtn}>← Back to profile</Link>
-          )}
+          {profileSlug && <Link href={`/profile/${profileSlug}`} className={styles.backBtn}>← Back to profile</Link>}
         </div>
 
         <div className={styles.layout}>
-
           <div className={styles.sidebar}>
             {sections.map(s => (
-              <button
-                key={s.id}
+              <button key={s.id}
                 className={`${styles.sidebarBtn} ${activeSection === s.id ? styles.sidebarBtnActive : ''} ${s.id === 'danger' ? styles.sidebarBtnDanger : ''}`}
                 onClick={() => setActiveSection(s.id)}
-              >
-                {s.label}
-              </button>
+              >{s.label}</button>
             ))}
           </div>
 
@@ -201,7 +185,6 @@ export default function Settings() {
               <div className={styles.section}>
                 <div className={styles.sectionTitle}>Account Information</div>
                 <div className={styles.sectionSub}>Update your display name and email address</div>
-
                 <div className={styles.formBlock}>
                   <div className={styles.formBlockTitle}>Display Name</div>
                   <div className={styles.formRow}>
@@ -211,9 +194,7 @@ export default function Settings() {
                   {nameSuccess && <div className={styles.successMsg}>{nameSuccess}</div>}
                   {nameError && <div className={styles.errorMsg}>{nameError}</div>}
                 </div>
-
                 <div className={styles.divider}></div>
-
                 <div className={styles.formBlock}>
                   <div className={styles.formBlockTitle}>Email Address</div>
                   <div className={styles.formBlockSub}>We'll send a confirmation to your new email before changing it</div>
@@ -245,6 +226,49 @@ export default function Settings() {
                   <button className={styles.saveBtnFull} onClick={savePassword} disabled={savingPassword || !newPassword || !confirmPassword}>
                     {savingPassword ? 'Updating...' : 'Update Password'}
                   </button>
+                </div>
+              </div>
+            )}
+
+            {activeSection === 'appearance' && (
+              <div className={styles.section}>
+                <div className={styles.sectionTitle}>Appearance</div>
+                <div className={styles.sectionSub}>Choose how Torchd looks for you</div>
+                <div className={styles.formBlock}>
+                  <div className={styles.themeGrid}>
+                    <button
+                      onClick={() => toggleTheme('dark')}
+                      className={`${styles.themeOption} ${theme === 'dark' ? styles.themeOptionActive : ''}`}
+                    >
+                      <div className={styles.themePreview} style={{ background: '#060912', border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <div style={{ width: '100%', height: '12px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', marginBottom: '6px' }} />
+                        <div style={{ width: '70%', height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', marginBottom: '4px' }} />
+                        <div style={{ width: '85%', height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px' }} />
+                      </div>
+                      <div className={styles.themeLabel}>
+                        <span>🌙 Dark</span>
+                        {theme === 'dark' && <span className={styles.themeCheck}>✓</span>}
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => toggleTheme('light')}
+                      className={`${styles.themeOption} ${theme === 'light' ? styles.themeOptionActive : ''}`}
+                    >
+                      <div className={styles.themePreview} style={{ background: '#F4F6FB', border: '1px solid rgba(0,0,0,0.08)' }}>
+                        <div style={{ width: '100%', height: '12px', background: 'rgba(0,0,0,0.08)', borderRadius: '4px', marginBottom: '6px' }} />
+                        <div style={{ width: '70%', height: '8px', background: 'rgba(0,0,0,0.05)', borderRadius: '4px', marginBottom: '4px' }} />
+                        <div style={{ width: '85%', height: '8px', background: 'rgba(0,0,0,0.05)', borderRadius: '4px' }} />
+                      </div>
+                      <div className={styles.themeLabel}>
+                        <span>☀️ Light</span>
+                        {theme === 'light' && <span className={styles.themeCheck}>✓</span>}
+                      </div>
+                    </button>
+                  </div>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '0.75rem' }}>
+                    Your preference is saved automatically and synced across all pages.
+                  </p>
                 </div>
               </div>
             )}
@@ -319,9 +343,7 @@ export default function Settings() {
                 <div className={styles.sectionSub}>These actions are permanent and cannot be undone</div>
                 <div className={`${styles.formBlock} ${styles.dangerBlock}`}>
                   <div className={styles.dangerTitle}>Delete Account</div>
-                  <p className={styles.dangerBody}>
-                    Permanently delete your account and all associated data — your profile, battle history, followers and stats. This cannot be reversed.
-                  </p>
+                  <p className={styles.dangerBody}>Permanently delete your account and all associated data — your profile, battle history, followers and stats. This cannot be reversed.</p>
                   {!showDeleteConfirm ? (
                     <button className={styles.deleteBtn} onClick={() => setShowDeleteConfirm(true)}>Delete my account</button>
                   ) : (

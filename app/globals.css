@@ -119,6 +119,179 @@ html[data-theme="light"] {
   --scrollbar-thumb:  #CBD5E1;
 }
 
-@media(max-width: 768px) {
-  nav ul { display: none !important; }
+/* ══════════════════════════════════════════════
+   LIGHT MODE — global overrides for all pages
+   ══════════════════════════════════════════════ */
+[data-theme="light"] {
+  color-scheme: light;
 }
+
+/* Base backgrounds */
+[data-theme="light"] body { background: #F4F6FB; color: #0D1117; }
+
+/* Any element using the dark backgrounds */
+[data-theme="light"] [class*="main"] { background: #F4F6FB !important; color: #0D1117 !important; }
+[data-theme="light"] [class*="page"] { color: #0D1117; }
+
+/* Cards and surfaces — anything using #0f1623 or #151e2e */
+[data-theme="light"] [class*="Card"],
+[data-theme="light"] [class*="card"],
+[data-theme="light"] [class*="section"]:not([class*="Section"]),
+[data-theme="light"] [class*="Section"],
+[data-theme="light"] [class*="block"],
+[data-theme="light"] [class*="Block"],
+[data-theme="light"] [class*="Row"]:not([class*="formRow"]):not([class*="teamRow"]):not([class*="chatRow"]):not([class*="boxScore"]),
+[data-theme="light"] [class*="row"]:not([class*="formRow"]):not([class*="inputRow"]):not([class*="toggleRow"]) { 
+  background: #FFFFFF !important; 
+  border-color: rgba(0,0,0,0.08) !important; 
+}
+
+/* Ticker / band backgrounds */
+[data-theme="light"] [class*="tickerWrap"],
+[data-theme="light"] [class*="statsBand"],
+[data-theme="light"] [class*="Band"] { background: #EEF2FF !important; border-color: rgba(0,0,0,0.08) !important; }
+
+[data-theme="light"] [class*="tickerItem"] { background: #FFFFFF !important; border-color: rgba(0,0,0,0.08) !important; color: #64748B !important; }
+
+/* Nav */
+[data-theme="light"] [class*="nav"]:not([class*="navLink"]):not([class*="navActions"]):not([class*="navLinks"]) { 
+  background: rgba(255,255,255,0.95) !important; 
+  border-color: rgba(0,0,0,0.08) !important; 
+}
+
+/* Text colors */
+[data-theme="light"] [class*="Title"],
+[data-theme="light"] [class*="title"],
+[data-theme="light"] [class*="Name"],
+[data-theme="light"] [class*="name"],
+[data-theme="light"] [class*="heroH1"],
+[data-theme="light"] [class*="pageTitle"],
+[data-theme="light"] [class*="h2"],
+[data-theme="light"] [class*="modeTitle"],
+[data-theme="light"] [class*="featTitle"] { color: #0D1117 !important; }
+
+[data-theme="light"] [class*="Sub"],
+[data-theme="light"] [class*="sub"],
+[data-theme="light"] [class*="Body"],
+[data-theme="light"] [class*="body"],
+[data-theme="light"] [class*="muted"],
+[data-theme="light"] [class*="label"],
+[data-theme="light"] [class*="Label"],
+[data-theme="light"] [class*="meta"],
+[data-theme="light"] [class*="desc"],
+[data-theme="light"] [class*="heroSub"],
+[data-theme="light"] [class*="pageSub"],
+[data-theme="light"] [class*="footerDesc"] { color: #64748B !important; }
+
+/* Links */
+[data-theme="light"] [class*="navLinks"] a { color: #64748B !important; }
+[data-theme="light"] [class*="navLinks"] a:hover { color: #0D1117 !important; background: #F1F5F9 !important; }
+[data-theme="light"] [class*="footerCol"] a { color: #64748B !important; }
+[data-theme="light"] [class*="footerCol"] a:hover { color: #0D1117 !important; }
+[data-theme="light"] [class*="footerCol"] h4 { color: #0D1117 !important; }
+[data-theme="light"] [class*="footerBottom"] { color: #94A3B8 !important; border-color: rgba(0,0,0,0.06) !important; }
+
+/* Inputs */
+[data-theme="light"] [class*="input"],
+[data-theme="light"] [class*="Input"] { 
+  background: #FFFFFF !important; 
+  border-color: rgba(0,0,0,0.12) !important; 
+  color: #0D1117 !important; 
+}
+[data-theme="light"] [class*="input"]::placeholder { color: #94A3B8 !important; }
+
+/* Sidebar */
+[data-theme="light"] [class*="sidebar"],
+[data-theme="light"] [class*="Sidebar"] { background: transparent !important; }
+[data-theme="light"] [class*="sidebarBtn"] { color: #64748B !important; }
+[data-theme="light"] [class*="sidebarBtn"]:hover,
+[data-theme="light"] [class*="sidebarBtnActive"] { color: #0D1117 !important; background: #E8ECF5 !important; }
+
+/* Borders */
+[data-theme="light"] [class*="divider"],
+[data-theme="light"] [class*="Divider"] { background: rgba(0,0,0,0.08) !important; }
+
+/* Ghost buttons */
+[data-theme="light"] [class*="btnGhost"],
+[data-theme="light"] [class*="signupBtn"],
+[data-theme="light"] [class*="heroBtnSecondary"],
+[data-theme="light"] [class*="deleteCancelBtn"] { 
+  color: #64748B !important; 
+  border-color: rgba(0,0,0,0.12) !important; 
+}
+[data-theme="light"] [class*="btnGhost"]:hover,
+[data-theme="light"] [class*="signupBtn"]:hover,
+[data-theme="light"] [class*="heroBtnSecondary"]:hover { 
+  color: #0D1117 !important; 
+  border-color: rgba(37,99,235,0.3) !important; 
+}
+
+/* Toggle off state */
+[data-theme="light"] [class*="toggleOff"] { background: #CBD5E1 !important; }
+
+/* Leaderboard preview hover */
+[data-theme="light"] [class*="lbPreviewRow"]:hover { background: #F1F5F9 !important; }
+
+/* Challenge / battle cards */
+[data-theme="light"] [class*="ownChallengeBadge"] { 
+  color: #64748B !important; 
+  background: rgba(0,0,0,0.04) !important; 
+  border-color: rgba(0,0,0,0.08) !important; 
+}
+
+/* Score header */
+[data-theme="light"] [class*="scoreHeader"],
+[data-theme="light"] [class*="cameraBar"],
+[data-theme="light"] [class*="mainStatsTabs"],
+[data-theme="light"] [class*="periodTabs"],
+[data-theme="light"] [class*="chatHeader"],
+[data-theme="light"] [class*="inputRow"],
+[data-theme="light"] [class*="chatWrap"] { 
+  background: #FFFFFF !important; 
+  border-color: rgba(0,0,0,0.08) !important; 
+}
+
+/* Plays list */
+[data-theme="light"] [class*="gamecastWrap"],
+[data-theme="light"] [class*="mobileScrollPane"] { background: #F4F6FB !important; }
+
+/* Period label in plays */
+[data-theme="light"] [class*="playClock"] { color: #94A3B8 !important; }
+[data-theme="light"] [class*="playText"] { color: #2D3748 !important; }
+
+/* Message bubbles */
+[data-theme="light"] [class*="messageBubble"] { color: #0D1117 !important; }
+[data-theme="light"] [class*="messages"] { background: #F4F6FB !important; }
+[data-theme="light"] [class*="msgReaction"] { background: #F1F5F9 !important; border-color: rgba(0,0,0,0.08) !important; }
+
+/* Divider handle */
+[data-theme="light"] [class*="dividerHandle"] { background: #CBD5E1 !important; }
+[data-theme="light"] [class*="divider"] { background: #E8ECF5 !important; }
+
+/* Box score */
+[data-theme="light"] [class*="boxScoreRow"] { border-color: rgba(0,0,0,0.06) !important; }
+[data-theme="light"] [class*="boxScoreStat"] { color: #2D3748 !important; }
+[data-theme="light"] [class*="boxScoreHeader"] { color: #64748B !important; }
+[data-theme="light"] [class*="boxScoreJersey"] { color: #94A3B8 !important; }
+[data-theme="light"] [class*="boxScoreName"] { color: #0D1117 !important; }
+
+/* Team stats */
+[data-theme="light"] [class*="teamStatLabel"] { color: #64748B !important; }
+[data-theme="light"] [class*="teamStatsName"] { color: #0D1117 !important; }
+[data-theme="light"] [class*="teamStatsBlock"],
+[data-theme="light"] [class*="boxScoreBlock"] { border-color: rgba(0,0,0,0.06) !important; }
+
+/* Hero grid background — hide in light mode */
+[data-theme="light"] [class*="heroGrid"] { opacity: 0.3 !important; }
+[data-theme="light"] [class*="heroBgGlow"],
+[data-theme="light"] [class*="ctaGlow"],
+[data-theme="light"] [class*="heroBg"] { opacity: 0.4 !important; }
+
+/* Mode cards top border */
+[data-theme="light"] [class*="modeCard"] { background: #FFFFFF !important; border-color: rgba(0,0,0,0.08) !important; }
+
+/* Footer */
+[data-theme="light"] [class*="footer"] { border-color: rgba(0,0,0,0.08) !important; }
+
+/* Back button */
+[data-theme="light"] [class*="backBtn"] { color: #2563EB !important; border-color: rgba(37,99,235,0.2) !important; }
