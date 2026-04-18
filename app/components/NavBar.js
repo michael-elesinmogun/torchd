@@ -139,11 +139,6 @@ export default function NavBar() {
         </ul>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0, minWidth: 0 }}>
-          {/* Theme toggle */}
-          <button onClick={toggleTheme} title={isDark ? 'Switch to light mode' : 'Switch to dark mode'} style={{ background: 'none', border: '1px solid var(--border-subtle)', borderRadius: '8px', padding: '6px 10px', cursor: 'pointer', fontSize: '16px', lineHeight: 1, display: 'flex', alignItems: 'center', transition: 'all 0.2s' }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--border-hover)'; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border-subtle)'; }}
-          >{isDark ? '☀️' : '🌙'}</button>
 
           {loading ? <div style={{ width: '80px', height: '32px' }}></div> : user ? (
             <>
