@@ -3,6 +3,14 @@
 html, body {
   overflow-x: hidden;
   max-width: 100vw;
+  background: #060912;
+  color: #EEF2FF;
+}
+
+/* Immediately apply theme from localStorage before React hydrates */
+html[data-theme="light"] {
+  background: #F4F6FB;
+  color: #0D1117;
 }
 
 /* ── DARK MODE (default) ── */
