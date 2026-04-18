@@ -1,543 +1,158 @@
 .main {
-  background: #060912;
-  color: #EEF2FF;
+  background: var(--bg-primary);
+  color: var(--text-primary);
   font-family: 'DM Sans', sans-serif;
-  height: 100vh;
-  padding-top: 62px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  max-width: 100vw;
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 
-/* SCORE HEADER */
 .scoreHeader {
-  background: #0a0f1e;
-  border-bottom: 1px solid rgba(255,255,255,0.065);
-  padding: 0.875rem clamp(1rem, 4vw, 2rem);
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-  flex-wrap: wrap;
-  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 clamp(1rem, 3vw, 2rem); height: 64px;
+  background: var(--bg-secondary); border-bottom: 1px solid var(--border-subtle);
+  gap: 1rem; position: sticky; top: 62px; z-index: 100;
 }
 
 .backBtn {
-  font-size: 13px; color: #6B7A9E; text-decoration: none;
+  font-size: 13px; color: var(--text-muted); text-decoration: none;
   white-space: nowrap; transition: color 0.2s; flex-shrink: 0;
 }
-.backBtn:hover { color: #EEF2FF; }
+.backBtn:hover { color: var(--text-primary); }
 
-.scoreBoard {
-  display: flex; align-items: center; gap: 1.5rem;
-  flex: 1; justify-content: center;
-}
+.scoreBoard { display: flex; align-items: center; gap: 12px; flex: 1; justify-content: center; min-width: 0; }
+.scoreBoardLoading { flex: 1; text-align: center; color: var(--text-muted); font-size: 14px; }
 
-.scoreBoardLoading { flex: 1; text-align: center; font-size: 14px; color: #6B7A9E; }
+.teamBlock { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 50px; }
+.teamLogo { width: 28px; height: 28px; object-fit: contain; }
+.teamAbbr { font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 800; color: var(--text-muted); letter-spacing: 0.05em; }
+.score { font-family: 'Syne', sans-serif; font-size: 26px; font-weight: 800; color: var(--text-muted); line-height: 1; }
+.scoreLeading { color: var(--text-primary); }
 
-.teamBlock {
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-}
-
-.teamLogo { width: 36px; height: 36px; object-fit: contain; }
-
-.teamAbbr {
-  font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 800; color: #6B7A9E;
-}
-
-.score {
-  font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800;
-  color: #6B7A9E; line-height: 1;
-}
-.scoreLeading {
-  color: #EEF2FF;
-  text-shadow: 0 0 20px rgba(255,255,255,0.15);
-}
-
-.gameInfo { text-align: center; }
-
-.gameStatus {
-  display: inline-flex; align-items: center; gap: 5px;
-  font-size: 12px; font-weight: 700; color: #6B7A9E;
-  margin-bottom: 2px;
-}
-
+.gameInfo { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 110px; text-align: center; }
+.gameStatus { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: var(--text-muted); font-family: 'Syne', sans-serif; }
 .gameStatusLive { color: #EF4444; }
-
-.liveDot {
-  width: 6px; height: 6px; border-radius: 50%; background: #EF4444;
-  animation: livepulse 1.4s ease infinite;
-}
-
+.liveDot { width: 6px; height: 6px; border-radius: 50%; background: #EF4444; animation: livepulse 1.4s ease infinite; flex-shrink: 0; }
 @keyframes livepulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+.gameName { font-size: 11px; color: var(--text-muted); font-family: 'DM Sans', sans-serif; }
+.gameBroadcast { font-size: 10px; color: var(--text-faint); }
 
-.gameName {
-  font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; color: #EEF2FF;
-}
+.debateBtn { font-family: 'Syne', sans-serif; font-weight: 700; color: #EEF2FF; background: var(--accent-blue); border-radius: 8px; text-decoration: none; transition: background 0.2s; white-space: nowrap; flex-shrink: 0; border: none; cursor: pointer; }
+.debateBtn:hover { background: var(--accent-blue-hover); }
+.debateBtnFull { display: inline; font-size: 13px; padding: 8px 16px; }
+.debateBtnShort { display: none; font-size: 13px; padding: 8px 12px; }
 
-.gameBroadcast { font-size: 11px; color: #3D4A66; margin-top: 2px; }
-
-.debateBtn {
-  font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700;
-  color: #EEF2FF; background: #3B82F6; border-radius: 8px;
-  padding: 8px 14px; text-decoration: none; transition: all 0.2s;
-  white-space: nowrap; flex-shrink: 0;
-}
-.debateBtn:hover { background: #60A5FA; }
-
-.debateBtnFull { display: inline; }
-.debateBtnShort { display: none; }
-
-/* MOBILE layout */
-.mobileLayout { display: none; }
-
-/* DESKTOP layout */
-.mainContent {
-  flex: 1; display: flex;
-  min-height: 0;
-  overflow: hidden;
-  border-top: 1px solid rgba(255,255,255,0.065);
-  user-select: none;
-}
-
-.gamecastCol {
-  display: flex; flex-direction: column;
-  min-height: 0; flex-shrink: 0;
-}
-
-.colHeader {
-  font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
-  color: #EEF2FF; padding: 0.875rem 1.25rem;
-  border-bottom: 1px solid rgba(255,255,255,0.065);
-  flex-shrink: 0;
-}
-
-/* CHAT */
-.chatWrap {
-  display: flex; flex-direction: column;
-  min-height: 0; flex-shrink: 0;
-  padding: 0 clamp(1rem, 2vw, 1.5rem);
-}
-
-.chatHeader {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 1rem 0; border-bottom: 1px solid rgba(255,255,255,0.065);
-  flex-shrink: 0;
-}
-
-.chatOnline {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 12px; color: #6B7A9E;
-}
-
-.onlineDot {
-  width: 6px; height: 6px; border-radius: 50%; background: #10B981;
-  animation: livepulse 2s ease infinite;
-}
-
-.messages {
-  flex: 1; overflow-y: auto; padding: 0.5rem 0;
-  display: flex; flex-direction: column; gap: 0;
-  height: 0;
-  scrollbar-width: thin; scrollbar-color: #1c2840 transparent;
-}
-
-.chatLoading { font-size: 14px; color: #6B7A9E; padding: 2rem; text-align: center; }
-
-.chatEmpty { text-align: center; padding: 3rem 1rem; }
-.chatEmptyIcon { font-size: 40px; margin-bottom: 0.75rem; }
-.chatEmptyTitle { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 800; color: #EEF2FF; margin-bottom: 0.5rem; }
-.chatEmptySub { font-size: 13px; color: #6B7A9E; }
-
-.chatRow {
-  display: flex; gap: 10px; align-items: flex-start;
-  padding: 0.5rem 1rem;
-  animation: msgIn 0.25s ease both;
-  position: relative;
-}
-.chatRow:hover { background: rgba(255,255,255,0.02); }
-.chatRow:hover .msgReactBtn { opacity: 1; }
-
-@keyframes msgIn {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-.messageAvatar {
-  width: 28px; height: 28px; border-radius: 50%;
-  background: #3B82F6; display: flex; align-items: center; justify-content: center;
-  font-family: 'Syne', sans-serif; font-size: 10px; font-weight: 800;
-  color: white; flex-shrink: 0; margin-top: 2px;
-}
-
-.messageBody { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
-.messageUsername { font-size: 11px; color: #6B7A9E; padding: 0 4px; }
-
-.messageBubble {
-  display: inline-block;
-  background: #151e2e; border-radius: 4px 12px 12px 12px;
-  padding: 7px 11px; font-size: 13px; color: #EEF2FF;
-  line-height: 1.5; word-break: break-word; max-width: 100%;
-}
-
-.messageTime { font-size: 10px; color: #3D4A66; padding: 0 4px; }
-
-.inputRow {
-  display: flex; gap: 8px; padding: 1rem 0;
-  border-top: 1px solid rgba(255,255,255,0.065);
-  flex-shrink: 0;
-}
-
-.input {
-  flex: 1; background: #0f1623; border: 1px solid rgba(255,255,255,0.065);
-  border-radius: 10px; padding: 10px 14px; font-size: 14px; color: #EEF2FF;
-  font-family: 'DM Sans', sans-serif; outline: none; transition: border-color 0.2s;
-}
-.input:focus { border-color: rgba(59,130,246,0.3); }
-.input::placeholder { color: #3D4A66; }
-
-.sendBtn {
-  background: #3B82F6; border: none; border-radius: 10px;
-  width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
-  cursor: pointer; color: white; font-size: 16px; flex-shrink: 0;
-  transition: background 0.2s;
-}
-.sendBtn:hover { background: #60A5FA; }
-.sendBtn:disabled { opacity: 0.4; cursor: not-allowed; }
-
-.loginPrompt {
-  flex: 1; text-align: center; font-size: 14px; color: #6B7A9E; padding: 10px;
-}
-.loginLink { color: #60A5FA; text-decoration: none; font-weight: 600; }
-.loginLink:hover { text-decoration: underline; }
-
-/* CAMERA */
-.cameraBar {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 1rem;
-  background: rgba(59,130,246,0.06); border-bottom: 1px solid rgba(59,130,246,0.15);
-  padding: 0.75rem clamp(1rem, 4vw, 2rem);
-  flex-shrink: 0;
-}
-
-.cameraBarText { font-size: 13px; color: #6B7A9E; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-.joinCameraBtn {
-  font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
-  color: #EEF2FF; background: #3B82F6; border: none; border-radius: 8px;
-  padding: 8px 16px; cursor: pointer; transition: all 0.2s;
-  text-decoration: none; white-space: nowrap; flex-shrink: 0;
-}
-.joinCameraBtn:hover { background: #60A5FA; }
+.cameraBar { display: flex; align-items: center; justify-content: space-between; padding: 8px clamp(1rem, 3vw, 2rem); background: var(--bg-secondary); border-bottom: 1px solid var(--border-subtle); gap: 10px; flex-wrap: wrap; }
+.cameraBarText { font-size: 13px; color: var(--text-muted); flex: 1; }
+.joinCameraBtn { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700; color: #EEF2FF; background: var(--accent-blue); border-radius: 8px; padding: 8px 16px; border: none; cursor: pointer; text-decoration: none; transition: background 0.2s; white-space: nowrap; }
+.joinCameraBtn:hover { background: var(--accent-blue-hover); }
 .joinCameraBtn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-/* GAMECAST */
-.gamecastWrap {
-  flex: 1; overflow-y: auto; padding: 0;
-  display: flex; flex-direction: column; gap: 0;
-  height: 0;
-  scrollbar-width: thin; scrollbar-color: #1c2840 transparent;
-}
+.mobileLayout { display: none; }
+.mainContent { display: flex; height: calc(100vh - 130px); overflow: hidden; }
+.gamecastCol { display: flex; flex-direction: column; border-right: none; overflow: hidden; min-width: 0; }
 
-.play {
-  padding: 0.75rem 1.25rem;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
-  display: flex; flex-direction: column; gap: 4px;
-  transition: background 0.15s;
-  animation: playSlideIn 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
-}
+.mainStatsTabs { display: flex; border-bottom: 1px solid var(--border-subtle); background: var(--bg-secondary); flex-shrink: 0; }
+.mainStatsTab { flex: 1; padding: 12px 8px; font-size: 13px; font-weight: 600; color: var(--text-muted); background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+.mainStatsTab:hover { color: var(--text-primary); }
+.mainStatsTabActive { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
 
-@keyframes playSlideIn {
-  from { opacity: 0; transform: translateX(-8px); }
-  to { opacity: 1; transform: translateX(0); }
-}
-.play:hover { background: rgba(255,255,255,0.02); }
+.periodTabs { display: flex; gap: 4px; padding: 8px 12px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-subtle); flex-wrap: wrap; flex-shrink: 0; }
+.periodTab { font-size: 11px; font-weight: 700; font-family: 'Syne', sans-serif; padding: 4px 10px; border-radius: 100px; border: 1px solid var(--border-subtle); background: var(--tab-bg); color: var(--text-muted); cursor: pointer; transition: all 0.15s; }
+.periodTab:hover { color: var(--text-primary); border-color: var(--border-hover); }
+.periodTabActive { background: var(--tab-active-bg); color: var(--tab-active-color); border-color: var(--border-active); }
 
-.playScoring {
-  background: rgba(59,130,246,0.05) !important;
-  border-left: 3px solid #3B82F6;
-  padding-left: calc(1.25rem - 3px);
-}
-.playScoringAway {
-  background: color-mix(in srgb, var(--away-color, #3B82F6) 8%, transparent) !important;
-  border-left: 3px solid color-mix(in srgb, var(--away-color, #3B82F6) 70%, white);
-  padding-left: calc(1.25rem - 3px);
-}
-.playScoringHome {
-  background: color-mix(in srgb, var(--home-color, #10B981) 8%, transparent) !important;
-  border-left: 3px solid color-mix(in srgb, var(--home-color, #10B981) 70%, white);
-  padding-left: calc(1.25rem - 3px);
-}
+.gamecastWrap { flex: 1; overflow-y: auto; }
 
-.playClock { font-size: 10px; font-weight: 700; color: #3D4A66; text-transform: uppercase; letter-spacing: 0.06em; }
-.playText { font-size: 13px; color: #C4CCDF; line-height: 1.55; }
-.playScoring .playText { color: #EEF2FF; font-weight: 500; }
+.playClock { font-size: 11px; color: var(--text-faint); font-family: 'Syne', sans-serif; font-weight: 600; }
+.playText { font-size: 13px; line-height: 1.5; color: var(--text-secondary); }
+.playScore { display: flex; align-items: center; gap: 4px; margin-top: 2px; }
+.scoreTeamPill { font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 100px; letter-spacing: 0.04em; }
 
-.playScore {
-  font-family: 'Syne', sans-serif; font-size: 13px;
-  font-weight: 800; color: #3B82F6;
-  display: flex; align-items: center;
-}
+.divider { width: 6px; cursor: col-resize; flex-shrink: 0; background: var(--divider-bg); display: flex; align-items: center; justify-content: center; transition: background 0.15s; user-select: none; }
+.divider:hover { background: var(--border-hover); }
+.dividerHandle { width: 3px; height: 32px; border-radius: 3px; background: var(--divider-handle); }
 
-.scoreTeamPill {
-  font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 800;
-  padding: 2px 8px; border-radius: 100px;
-  letter-spacing: 0.02em;
-  text-shadow: 0 1px 4px rgba(0,0,0,0.5);
-}
+.chatWrap { display: flex; flex-direction: column; overflow: hidden; background: var(--bg-secondary); border-left: 1px solid var(--border-subtle); }
+.chatHeader { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-secondary); flex-shrink: 0; }
+.colHeader { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 800; color: var(--text-primary); }
+.chatOnline { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-muted); }
+.onlineDot { width: 6px; height: 6px; border-radius: 50%; background: #10B981; }
 
-/* DRAG DIVIDER */
-.divider {
-  width: 6px; flex-shrink: 0;
-  background: rgba(255,255,255,0.04);
-  border-left: 1px solid rgba(255,255,255,0.065);
-  border-right: 1px solid rgba(255,255,255,0.065);
-  cursor: col-resize;
-  display: flex; align-items: center; justify-content: center;
-  transition: background 0.2s; z-index: 10;
-}
-.divider:hover { background: rgba(59,130,246,0.15); }
-.dividerHandle { width: 2px; height: 40px; border-radius: 2px; background: rgba(255,255,255,0.15); }
-.divider:hover .dividerHandle { background: #3B82F6; }
+.messages { flex: 1; overflow-y: auto; padding: 0.75rem; display: flex; flex-direction: column; gap: 4px; }
+.chatLoading { padding: 2rem; text-align: center; font-size: 13px; color: var(--text-muted); }
+.chatEmpty { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; padding: 2rem; text-align: center; gap: 0.75rem; }
+.chatEmptyLogos { display: flex; align-items: center; gap: 12px; }
+.chatEmptyLogo { width: 48px; height: 48px; object-fit: contain; }
+.chatEmptyVs { font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 800; color: var(--text-faint); }
+.chatEmptyIcon { font-size: 36px; }
+.chatEmptyTitle { font-family: 'Syne', sans-serif; font-size: 16px; font-weight: 800; color: var(--text-primary); }
+.chatEmptySub { font-size: 13px; color: var(--text-muted); }
 
-/* REACTIONS */
-.reactionsBar {
-  display: flex; gap: 4px; padding: 6px 0;
-  border-top: 1px solid rgba(255,255,255,0.065);
-  flex-wrap: wrap; flex-shrink: 0;
-}
+.chatRow { display: flex; gap: 8px; padding: 6px 4px; align-items: flex-start; position: relative; }
+.chatRow:hover .msgReactBtn { opacity: 1; }
+.messageAvatar { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; color: white; font-family: 'Syne', sans-serif; flex-shrink: 0; }
+.messageBody { flex: 1; min-width: 0; }
+.messageUsername { font-size: 11px; font-weight: 700; font-family: 'Syne', sans-serif; margin-bottom: 2px; }
+.messageBubble { font-size: 13px; color: var(--text-primary); line-height: 1.5; word-break: break-word; }
+.messageTime { font-size: 10px; color: var(--text-faint); margin-top: 3px; }
 
-.reactionBtn {
-  background: #151e2e; border: 1px solid rgba(255,255,255,0.065);
-  border-radius: 8px; padding: 5px 8px; font-size: 16px;
-  cursor: pointer; transition: all 0.15s; line-height: 1;
-}
-.reactionBtn:hover { background: #1c2840; border-color: rgba(59,130,246,0.22); transform: scale(1.15); }
+.msgReactions { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 4px; }
+.msgReaction { display: flex; align-items: center; gap: 3px; background: var(--bg-tertiary); border: 1px solid var(--border-subtle); border-radius: 100px; padding: 2px 7px; font-size: 12px; cursor: pointer; transition: all 0.15s; }
+.msgReaction:hover { border-color: var(--border-hover); }
+.msgReactionCount { font-size: 11px; color: var(--text-muted); }
+.msgReactBtn { background: none; border: none; cursor: pointer; font-size: 14px; padding: 4px; opacity: 0; transition: opacity 0.15s; flex-shrink: 0; }
 
-/* MESSAGE REACTIONS */
-.msgReactBtn {
-  opacity: 0; position: absolute; right: 0.75rem; top: 50%; transform: translateY(-50%);
-  background: #1c2840; border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 6px; padding: 3px 7px; cursor: pointer;
-  font-size: 14px; transition: all 0.15s; color: #6B7A9E;
-}
-.msgReactBtn:hover { background: #253452; color: #EEF2FF; }
+.reactionsBar { display: flex; gap: 4px; padding: 6px 12px; border-top: 1px solid var(--border-subtle); flex-wrap: wrap; }
+.reactionBtn { background: none; border: none; cursor: pointer; font-size: 18px; padding: 4px; line-height: 1; border-radius: 6px; transition: background 0.15s; }
+.reactionBtn:hover { background: var(--bg-tertiary); }
 
-.msgReactions { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
+.inputRow { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--border-subtle); background: var(--bg-secondary); flex-shrink: 0; }
+.input { flex: 1; background: var(--input-bg); border: 1px solid var(--input-border); color: var(--input-text); border-radius: 10px; padding: 9px 14px; font-size: 13px; font-family: 'DM Sans', sans-serif; outline: none; transition: border-color 0.2s; min-width: 0; }
+.input::placeholder { color: var(--input-placeholder); }
+.input:focus { border-color: var(--border-active); }
+.sendBtn { width: 36px; height: 36px; border-radius: 50%; background: var(--accent-blue); color: white; border: none; cursor: pointer; font-size: 16px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background 0.2s; }
+.sendBtn:hover { background: var(--accent-blue-hover); }
+.sendBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+.loginPrompt { flex: 1; text-align: center; font-size: 13px; color: var(--text-muted); }
+.loginLink { color: var(--accent-blue); text-decoration: none; font-weight: 600; }
 
-.msgReaction {
-  display: inline-flex; align-items: center; gap: 3px;
-  background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.2);
-  border-radius: 100px; padding: 2px 8px;
-  font-size: 12px; cursor: pointer; transition: all 0.15s; color: #EEF2FF;
-}
-.msgReaction:hover { background: rgba(59,130,246,0.2); }
-.msgReactionCount { font-size: 11px; color: #6B7A9E; }
+.teamStatsBlock { border-bottom: 1px solid var(--border-subtle); padding-bottom: 1.5rem; }
+.teamStatsHeader { display: flex; align-items: center; gap: 10px; padding: 0 1.25rem 0.75rem; margin-bottom: 0; }
+.teamStatsName { font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 800; color: var(--text-primary); }
+.teamStatsGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 0; padding: 0 1.25rem; }
+.teamStatItem { display: flex; flex-direction: column; align-items: center; padding: 10px 4px; border-right: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }
+.teamStatValue { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; }
+.teamStatLabel { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
 
-/* PLAY TEAM LOGO */
-.playHeader { display: flex; align-items: center; gap: 6px; }
-.playTeamLogo { width: 18px; height: 18px; object-fit: contain; flex-shrink: 0; }
-
-/* CHAT EMPTY LOGOS */
-.chatEmptyLogos {
-  display: flex; align-items: center; justify-content: center;
-  gap: 1rem; margin-bottom: 0.75rem;
-}
-.chatEmptyLogo {
-  width: 56px; height: 56px; object-fit: contain;
-  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.4));
-}
-.chatEmptyVs {
-  font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 800;
-  color: #3D4A66; background: #151e2e; border-radius: 6px; padding: 4px 8px;
-}
-
-/* PERIOD TABS */
-.periodTabs {
-  display: flex; gap: 4px; padding: 0.5rem 1rem;
-  border-bottom: 1px solid rgba(255,255,255,0.065);
-  flex-shrink: 0; overflow-x: auto; flex-wrap: nowrap;
-  scrollbar-width: none;
-}
-.periodTabs::-webkit-scrollbar { display: none; }
-
-.periodTab {
-  font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 700;
-  color: #6B7A9E; background: none;
-  border: 1px solid rgba(255,255,255,0.065);
-  border-radius: 6px; padding: 4px 10px;
-  cursor: pointer; transition: all 0.15s; flex-shrink: 0;
-}
-.periodTab:hover { color: #EEF2FF; border-color: rgba(59,130,246,0.3); }
-.periodTabActive { color: #EEF2FF; background: #3B82F6; border-color: #3B82F6; }
-
-/* MAIN STATS TABS */
-.mainStatsTabs {
-  display: flex; border-bottom: 1px solid rgba(255,255,255,0.065);
-  flex-shrink: 0;
-}
-
-.mainStatsTab {
-  flex: 1; font-size: 12px; font-weight: 700; color: #6B7A9E;
-  background: none; border: none; border-bottom: 2px solid transparent;
-  padding: 0.75rem 0.5rem; cursor: pointer; transition: all 0.2s;
-  font-family: 'DM Sans', sans-serif; white-space: nowrap;
-}
-.mainStatsTab:hover { color: #EEF2FF; }
-.mainStatsTabActive { color: #EEF2FF; border-bottom-color: #3B82F6; }
-
-/* TEAM STATS BLOCK */
-.teamStatsBlock {
-  padding: 0 0 1.25rem;
-  border-bottom: 1px solid rgba(255,255,255,0.065);
-  overflow: hidden;
-}
-
-.teamStatsHeader {
-  display: flex; align-items: center; gap: 10px;
-  padding: 0 1.25rem;
-  margin-bottom: 1rem;
-}
-
-.teamStatsName {
-  font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 800; color: #EEF2FF;
-}
-
-/* Stat grid — 5 columns with inner borders */
-.teamStatsGrid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  margin: 0 1.25rem;
-  border-radius: 10px;
-  overflow: hidden;
-  border: 1px solid rgba(255,255,255,0.07);
-}
-
-.teamStatItem {
-  text-align: center;
-  padding: 0.875rem 0.25rem;
-  background: #0a0f1e;
-  border-right: 1px solid rgba(255,255,255,0.06);
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-}
-.teamStatItem:nth-child(5n) { border-right: none; }
-.teamStatItem:nth-last-child(-n+5) { border-bottom: none; }
-
-.teamStatValue {
-  font-family: 'Syne', sans-serif;
-  font-size: 20px;
-  font-weight: 800;
-  line-height: 1;
-  margin-bottom: 5px;
-}
-.teamStatLabel {
-  font-size: 9px;
-  color: #6B7A9E;
-  text-transform: uppercase;
-  letter-spacing: 0.07em;
-  font-weight: 700;
-}
-
-/* BOX SCORE */
-.boxScoreBlock { padding: 0.5rem 0 1rem; border-bottom: 1px solid rgba(255,255,255,0.065); }
-.boxScoreTable { width: 100%; margin-top: 0.75rem; }
-.boxScoreRow {
-  display: flex; align-items: center;
-  padding: 5px 1.25rem; gap: 4px;
-  border-bottom: 1px solid rgba(255,255,255,0.03);
-}
-.boxScoreRow:hover { background: rgba(255,255,255,0.02); }
-.boxScoreHeader {
-  background: #0a0f1e !important;
-  border-bottom: 1px solid rgba(255,255,255,0.065) !important;
-  position: sticky; top: 0; z-index: 2;
-}
-.boxScorePlayer { flex: 2; display: flex; align-items: center; gap: 5px; min-width: 0; }
-.boxScoreJersey { font-size: 10px; color: #3D4A66; width: 16px; flex-shrink: 0; }
-.boxScoreName { font-size: 12px; color: #EEF2FF; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.boxScorePos { font-size: 10px; color: #3D4A66; flex-shrink: 0; }
-.boxScoreHeader .boxScorePlayer { font-size: 10px; color: #6B7A9E; font-weight: 700; }
-.boxScoreStat { flex: 1; text-align: center; font-size: 12px; color: #C4CCDF; min-width: 28px; }
-.boxScoreHeader .boxScoreStat { font-size: 10px; color: #6B7A9E; font-weight: 700; }
+.boxScoreBlock { margin-bottom: 1rem; }
+.boxScoreTable { padding: 0 1.25rem; overflow-x: auto; }
+.boxScoreRow { display: flex; align-items: center; border-bottom: 1px solid var(--border-subtle); min-height: 36px; }
+.boxScoreHeader { font-size: 10px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.06em; font-family: 'Syne', sans-serif; }
+.boxScorePlayer { flex: 3; display: flex; align-items: center; gap: 4px; font-size: 12px; padding: 4px 0; min-width: 0; }
+.boxScoreStat { flex: 1; text-align: center; font-size: 12px; color: var(--text-secondary); padding: 4px 2px; min-width: 28px; }
+.boxScoreJersey { font-size: 10px; color: var(--text-faint); width: 18px; flex-shrink: 0; }
+.boxScoreName { color: var(--text-primary); font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.boxScorePos { font-size: 10px; color: var(--text-muted); flex-shrink: 0; }
+.boxScoreStarter .boxScoreName { color: var(--text-primary); }
 .boxScoreDNP { opacity: 0.45; }
-.boxScoreDNPLabel { font-size: 11px; color: #3D4A66; font-style: italic; }
+.boxScoreDNPLabel { font-size: 11px; color: var(--text-muted); font-style: italic; }
 
-/* ============================================================
-   MOBILE
-   ============================================================ */
+.mobileScrollPane { flex: 1; overflow-y: auto; }
+.mobileChatPane { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
 @media (max-width: 768px) {
-
-  .main {
-    height: auto; min-height: 100vh;
-    overflow-x: hidden; overflow-y: auto;
-    max-width: 100vw;
-  }
-
-  .scoreHeader {
-    padding: 0.625rem 1rem; gap: 0.5rem;
-    flex-wrap: wrap; align-items: center;
-    overflow: hidden;
-  }
-
-  .backBtn { font-size: 12px; }
-  .scoreBoard { gap: 0.75rem; flex: 1; min-width: 0; }
-  .teamLogo { width: 26px; height: 26px; }
-  .teamAbbr { font-size: 12px; }
-  .score { font-size: 20px; }
-  .gameInfo { flex: 1; min-width: 0; }
-  .gameStatus { font-size: 11px; }
-  .gameName { font-size: 11px; }
-  .gameBroadcast { display: none; }
-
-  .debateBtn { padding: 8px 10px; font-size: 13px; }
+  .mobileLayout { display: flex; flex-direction: column; flex: 1; overflow: hidden; height: calc(100vh - 130px); }
+  .mainContent { display: none; }
+  .scoreHeader { height: auto; padding: 8px clamp(0.75rem, 3vw, 1.5rem); flex-wrap: wrap; gap: 8px; top: 62px; }
+  .teamLogo { width: 22px; height: 22px; }
+  .score { font-size: 22px; }
+  .gameInfo { min-width: 80px; }
   .debateBtnFull { display: none; }
   .debateBtnShort { display: inline; }
+  .cameraBar { padding: 8px 1rem; }
+}
 
-  .cameraBar { flex-wrap: nowrap; padding: 0.625rem 1rem; gap: 0.75rem; }
-  .cameraBarText { font-size: 12px; }
-  .joinCameraBtn { font-size: 12px; padding: 7px 12px; }
-
-  .mobileLayout {
-    display: flex; flex-direction: column; flex: 1; min-height: 0;
-    width: 100%; max-width: 100vw; overflow-x: hidden;
-  }
-
-  .mainContent { display: none !important; }
-
-  .mobileScrollPane {
-    flex: 1; overflow-y: auto; overflow-x: hidden;
-    height: calc(100vh - 280px);
-    scrollbar-width: thin; scrollbar-color: #1c2840 transparent;
-  }
-
-  .mobileChatPane {
-    flex: 1; display: flex; flex-direction: column;
-    min-height: 0; height: calc(100vh - 220px);
-  }
-
-  .mobileChatPane .chatWrap {
-    width: 100% !important; max-width: 100vw !important; flex: 1;
-    padding: 0 1rem;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
-
-  .play { padding: 0.625rem 1rem; }
-
-  /* Team stats — 3 columns on mobile */
-  .teamStatsGrid {
-    grid-template-columns: repeat(3, 1fr);
-    margin: 0 1rem;
-  }
-  .teamStatItem:nth-child(5n) { border-right: 1px solid rgba(255,255,255,0.06); }
-  .teamStatItem:nth-child(3n) { border-right: none; }
-  .teamStatItem:nth-last-child(-n+5) { border-bottom: 1px solid rgba(255,255,255,0.06); }
-  .teamStatItem:nth-last-child(-n+3) { border-bottom: none; }
-  .teamStatValue { font-size: 17px; }
-
-  /* Box score — scrollable horizontally within its container, no page overflow */
-  .boxScoreTable { overflow-x: auto; display: block; max-width: 100%; }
-  .boxScoreRow { padding: 5px 1rem; min-width: 0; }
-
-  .reactionBtn { padding: 4px 7px; font-size: 15px; }
-  .divider { display: none !important; }
+@media (max-width: 480px) {
+  .scoreTeamPill { font-size: 10px; padding: 1px 6px; }
+  .playText { font-size: 12px; }
 }

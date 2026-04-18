@@ -56,7 +56,7 @@ const TEAM_COLORS = {
     'MIL': '12294A', 'MIN': '002B5C', 'CLE': 'E31937', 'DET': '0C2340',
     'TOR': '134A8E', 'BAL': 'DF4601', 'CWS': '27251F', 'KC': '004687',
     'TEX': 'C0111F', 'SEA': '0C2C56', 'LAA': 'BA0021', 'OAK': '003831',
-    'TB': '092C5C', 'COL': '33006F', 'ARI': 'A71930', 'MIA': '00A3E0',
+    'TB': '092C5C', 'COL': '33006F', 'ARI': 'A71930', 'MIA': '00685E',
     'WSH': 'AB0003', 'CIN': 'C6011F',
   },
   nba: {
@@ -64,7 +64,7 @@ const TEAM_COLORS = {
     'TOR': 'CE1141', 'CHI': 'CE1141', 'CLE': '860038', 'DET': 'C8102E',
     'IND': '002D62', 'MIL': '00471B', 'ATL': 'E03A3E', 'CHA': '1D1160',
     'MIA': '98002E', 'ORL': '0077C0', 'WAS': '002B5C', 'DEN': '0E2240',
-    'MIN': '0C2340', 'OKC': '007AC1', 'POR': 'E03A3E', 'UTA': '002B5C',
+    'MIN': '0C2340', 'OKC': '007AC1', 'POR': 'E03A3E', 'UTA': '6B4FBB',
     'GSW': '1D428A', 'LAC': 'C8102E', 'LAL': '552583', 'PHX': '1D1160',
     'SAC': '5A2D81', 'DAL': '00538C', 'HOU': 'CE1141', 'MEM': '5D76A9',
     'NOP': '0C2340', 'SAS': 'C4CED4',
@@ -104,7 +104,7 @@ const TEAM_ALT_COLORS = {
     'NOP': 'B4975A', // gold
     'OKC': 'EF3B24', // orange
     'DAL': 'B8C4CA', // silver
-    'UTA': '00471B', // green
+    'UTA': '86C1E8', // light blue
     'MIN': '236192', // blue
     'DEN': 'FEC524', // gold
     'NYK': '006BB6', // blue
@@ -120,10 +120,14 @@ const TEAM_ALT_COLORS = {
     'NE': 'C60C30', // red
     'BUF': 'C60C30', // red
     'NYG': 'A71930', // red
-    'NYJ': 'FFFFFF', // white
+    'NYJ': '1A5C3A', // deeper green
     'IND': 'FFFFFF', // white
-    'TEN': '4B92DB', // light blue
-    'BAL': 'EFB21E', // gold
+    'TEN': '6AAEE8', // lighter blue
+    'BAL': '241773', // dark purple
+    'CHI': 'C83803', // orange
+    'HOU': 'BF0D3E', // red
+    'MIA': '2ECCC2', // lighter teal
+    'GB': '0A5C4A', // dark forest green (same as OAK)
   },
   nhl: {
     'NYR': 'CE1126', // red
@@ -139,15 +143,21 @@ const TEAM_ALT_COLORS = {
   },
   mlb: {
     'NYY': 'FFFFFF', // white
-    'LAD': 'EF3E42', // red
-    'CHC': 'CC3433', // red
+    'LAD': '1E90FF', // bright Dodger blue — keep as blue, just vivid
+    'CHC': '2B6CC4', // bright Cubs blue — keep as blue
     'NYM': 'FF5910', // orange
-    'TOR': 'E8291C', // red
+    'TOR': '1D9CE0', // light blue
     'MIN': 'D31145', // red
-    'SEA': '005C5C', // teal
+    'SEA': '005C5C', // teal green
     'TB': 'F5D130', // gold
     'COL': 'C4CED3', // silver
-    'MIA': 'FF6600', // orange
+    'MIA': '00B2A9', // Marlins teal
+    'MIL': 'FFC52F', // gold
+    'DET': 'FA4616', // orange
+    'KC': 'BD9B60', // gold
+    'CWS': 'C4CED4', // silver
+    'SF': 'A2AAAD', // gray
+    'ARI': 'A9792D', // copper gold
   },
 };
 
@@ -200,12 +210,16 @@ function resolveTeamColors(sport, awayAbbr, homeAbbr, rawAway, rawHome) {
     return null;
   };
 
+  // Teams that always use their alt regardless of color (too similar to others, or primary is too generic)
+  const forceAlt = { mlb: ['SF', 'ARI'], nba: [], nfl: ['CHI', 'HOU', 'MIA', 'NYJ', 'PHI', 'TEN', 'BAL', 'GB'], nhl: [] };
+  const sportForceAlt = forceAlt[sport] || [];
+
   let awayRaw = getBest(awayAbbr, rawAway) || '#3B82F6';
   let homeRaw = getBest(homeAbbr, rawHome) || '#10B981';
 
-  // Always swap blue teams to their alt color
-  if (isBlueHue(awayRaw) && sportAlts[awayAbbr]) awayRaw = `#${sportAlts[awayAbbr]}`;
-  if (isBlueHue(homeRaw) && sportAlts[homeAbbr]) homeRaw = `#${sportAlts[homeAbbr]}`;
+  // Always swap blue teams to their alt color, and force-alt teams
+  if ((isBlueHue(awayRaw) || sportForceAlt.includes(awayAbbr)) && sportAlts[awayAbbr]) awayRaw = `#${sportAlts[awayAbbr]}`;
+  if ((isBlueHue(homeRaw) || sportForceAlt.includes(homeAbbr)) && sportAlts[homeAbbr]) homeRaw = `#${sportAlts[homeAbbr]}`;
 
   // Also check if colors are still too similar after alt swap
   const dist = hueDistance(awayRaw, homeRaw);
@@ -249,11 +263,17 @@ function darkenForBorder(hexColor) {
   return `#${nr.toString(16).padStart(2,'0')}${ng.toString(16).padStart(2,'0')}${nb.toString(16).padStart(2,'0')}`;
 }
 
-// FIX: Improved color function that ensures visibility on dark #060912 background
+// Only boost blues for visibility — everything else stays close to original
 function getVisibleTeamColor(hexColor) {
   if (!hexColor) return '#EEF2FF';
-  const hex = hexColor.replace('#', '');
+  const hex = hexColor.replace('#', '').toLowerCase();
   if (hex.length !== 6) return '#EEF2FF';
+
+  // Exact colors that should never be processed — return as-is (slightly brightened for visibility)
+  const exactColors = {
+    '003831': '#0A5C4A', // OAK forest green — just barely lifted
+  };
+  if (exactColors[hex]) return exactColors[hex];
   const r = parseInt(hex.slice(0, 2), 16) / 255;
   const g = parseInt(hex.slice(2, 4), 16) / 255;
   const b = parseInt(hex.slice(4, 6), 16) / 255;
@@ -268,28 +288,28 @@ function getVisibleTeamColor(hexColor) {
     else h = ((r - g) / d + 4) / 6;
   }
 
-  // Near-black, near-white, or near-gray — return neutral readable color
+  // Near-gray or black — return neutral
   if (s < 0.08) return '#C4CCDF';
 
-  // Boost saturation
-  s = Math.min(1, s * 1.4);
-
-  // Warm hues (red 0-30°, orange 30-60°, yellow 45-65°) — these are naturally
-  // bright and saturated; don't push lightness too high or they wash to white
   const hueDeg = h * 360;
-  const isWarm = hueDeg < 65 || hueDeg > 330;
+  const isBlue = hueDeg >= 190 && hueDeg <= 260;
+  const isDarkGreen = (hueDeg >= 90 && hueDeg <= 165) && l < 0.2;
 
-  if (isWarm) {
-    // Warm colors: keep vivid, moderate lightness boost
-    if (l < 0.35) l = 0.58;
-    else if (l < 0.5) l = Math.max(0.55, l * 1.2);
-    l = Math.max(0.52, Math.min(0.65, l));
-  } else {
-    // Cool colors (blues, greens, purples) — push lightness up more aggressively
+  if (isBlue) {
+    // Blues are invisible on dark background — push lightness up significantly
+    s = Math.min(1, s * 1.4);
     if (l < 0.35) l = 0.65;
     else if (l < 0.55) l = Math.max(0.62, l * 1.5);
-    else if (l > 0.75) l = 0.68;
     l = Math.max(0.58, Math.min(0.72, l));
+  } else if (isDarkGreen) {
+    // Very dark greens (OAK forest green, etc) — lift just enough, keep dark feel
+    s = Math.min(1, s * 1.2);
+    l = Math.max(l * 2.2, 0.30);
+  } else {
+    // All other colors — just boost saturation slightly, minimal lightness change
+    s = Math.min(1, s * 1.15);
+    if (l < 0.25) l = Math.max(l * 1.4, 0.35);
+    if (l > 0.80) l = 0.75;
   }
 
   const hue = (p, q, t) => {
