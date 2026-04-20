@@ -128,8 +128,7 @@ html[data-theme="light"] {
 
 /* ── Base ── */
 [data-theme="light"] body { background: #F4F6FB !important; color: #0D1117 !important; }
-[data-theme="light"] main,
-[data-theme="light"] [class*="main"] { background: #F4F6FB !important; color: #0D1117 !important; }
+[data-theme="light"] main { background: #F4F6FB !important; color: #0D1117 !important; }
 
 /* ── Inline style overrides for hardcoded dark colors ── */
 [data-theme="light"] [style*="background: #060912"],
