@@ -969,21 +969,39 @@ export default function GameRoom() {
 
     const periods = ['all', ...new Set(plays.map(p => p.period).filter(Boolean).sort((a,b) => a-b))];
 
+    const isLight = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'light';
+
     const renderPlay = (play, key) => {
       const { logo, color } = getTeam(play);
       const pt = getPlayType(play, sport);
       let bc = 'transparent', bg = 'transparent', op = 1;
-      if (pt === 'scoring') { bc = color || awayColor; bg = `${bc}30`; }
-      else if (pt === 'hit') { bc = color ? `${color}88` : 'rgba(255,255,255,0.1)'; bg = color ? `${color}15` : 'transparent'; }
-      else if (pt === 'save') { bc = 'rgba(99,102,241,0.5)'; bg = 'rgba(99,102,241,0.06)'; }
-      else if (pt === 'penalty') { bc = 'rgba(245,158,11,0.6)'; bg = 'rgba(245,158,11,0.08)'; }
-      else if (pt === 'physical') { bc = 'rgba(239,68,68,0.35)'; bg = 'rgba(239,68,68,0.05)'; }
-      else if (pt === 'turnover') { bc = 'rgba(167,139,250,0.4)'; bg = 'rgba(167,139,250,0.05)'; }
-      else if (pt === 'shot_miss') { op = 0.55; }
-      else if (pt === 'dim') { op = 0.35; }
-      else if (pt === 'period') { bc = 'rgba(255,255,255,0.15)'; bg = 'rgba(255,255,255,0.03)'; }
-      const playTextColor = pt === 'scoring' ? '#EEF2FF' : pt === 'dim' || pt === 'shot_miss' ? '#6B7A9E' : '#C4CCDF';
+      if (isLight) {
+        // Light mode — only left border, no background tints
+        if (pt === 'scoring') { bc = color || awayColor; bg = `${bc}08`; }
+        else if (pt === 'hit') { bc = color ? `${color}66` : 'rgba(0,0,0,0.12)'; bg = 'transparent'; }
+        else if (pt === 'save') { bc = 'rgba(99,102,241,0.5)'; bg = 'transparent'; }
+        else if (pt === 'penalty') { bc = 'rgba(245,158,11,0.6)'; bg = 'transparent'; }
+        else if (pt === 'physical') { bc = 'rgba(239,68,68,0.35)'; bg = 'transparent'; }
+        else if (pt === 'turnover') { bc = 'rgba(167,139,250,0.4)'; bg = 'transparent'; }
+        else if (pt === 'shot_miss') { op = 0.5; }
+        else if (pt === 'dim') { op = 0.4; }
+        else if (pt === 'period') { bc = 'rgba(0,0,0,0.12)'; bg = 'rgba(0,0,0,0.02)'; }
+      } else {
+        if (pt === 'scoring') { bc = color || awayColor; bg = `${bc}30`; }
+        else if (pt === 'hit') { bc = color ? `${color}88` : 'rgba(255,255,255,0.1)'; bg = color ? `${color}15` : 'transparent'; }
+        else if (pt === 'save') { bc = 'rgba(99,102,241,0.5)'; bg = 'rgba(99,102,241,0.06)'; }
+        else if (pt === 'penalty') { bc = 'rgba(245,158,11,0.6)'; bg = 'rgba(245,158,11,0.08)'; }
+        else if (pt === 'physical') { bc = 'rgba(239,68,68,0.35)'; bg = 'rgba(239,68,68,0.05)'; }
+        else if (pt === 'turnover') { bc = 'rgba(167,139,250,0.4)'; bg = 'rgba(167,139,250,0.05)'; }
+        else if (pt === 'shot_miss') { op = 0.55; }
+        else if (pt === 'dim') { op = 0.35; }
+        else if (pt === 'period') { bc = 'rgba(255,255,255,0.15)'; bg = 'rgba(255,255,255,0.03)'; }
+      }
+      const playTextColor = isLight
+        ? (pt === 'scoring' ? '#0D1117' : pt === 'dim' || pt === 'shot_miss' ? '#94A3B8' : '#2D3748')
+        : (pt === 'scoring' ? '#EEF2FF' : pt === 'dim' || pt === 'shot_miss' ? '#6B7A9E' : '#C4CCDF');
       const playFontWeight = pt === 'scoring' ? 600 : 400;
+      const rowBorderBottom = isLight ? '1px solid rgba(0,0,0,0.05)' : '1px solid rgba(255,255,255,0.04)';
 
       // Badge for NHL special play types
       const nhlBadge = sport === 'nhl' ? (
@@ -996,7 +1014,7 @@ export default function GameRoom() {
       ) : null;
 
       return (
-        <div key={key} style={{ padding: '0.625rem 1.25rem 0.625rem calc(1.25rem - 3px)', borderBottom: '1px solid rgba(255,255,255,0.04)', borderLeft: `3px solid ${bc}`, background: bg, opacity: op, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+        <div key={key} style={{ padding: '0.625rem 1.25rem 0.625rem calc(1.25rem - 3px)', borderBottom: rowBorderBottom, borderLeft: `3px solid ${bc}`, background: bg, opacity: op, display: 'flex', flexDirection: 'column', gap: '4px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div className={styles.playClock}>{play.clock} {play.periodText}</div>
             {nhlBadge && <div style={{ fontSize: '10px', fontWeight: 700, fontFamily: 'Syne,sans-serif', padding: '2px 7px', borderRadius: '100px', background: nhlBadge.bg, color: nhlBadge.text, border: `1px solid ${nhlBadge.border}` }}>{nhlBadge.label}</div>}
@@ -1036,33 +1054,41 @@ export default function GameRoom() {
       const isWalk = /\bwalked\b|\bwalk\b/.test(tx);
       const isOut = /struck out|grounded|flied|lined|popped|fouled out|fielder.s choice/.test(tx);
       const isPH = /hit for|pinch.hit|pinch hit/.test(tx);
-      let bc = tc ? `${tc}55` : 'rgba(255,255,255,0.08)', bg = 'transparent';
-      if (isScoring) { bc = tc ? `${tc}99` : awayColor; bg = tc ? `${tc}30` : `${awayColor}30`; }
-      else if (isHit) { bc = tc ? `${tc}99` : '#10B981'; bg = tc ? `${tc}18` : 'rgba(16,185,129,0.08)'; }
-      else if (isWalk) { bc = 'rgba(245,158,11,0.6)'; bg = 'rgba(245,158,11,0.06)'; }
-      else if (isOut) { bc = 'rgba(239,68,68,0.4)'; bg = 'rgba(239,68,68,0.04)'; }
+      let bc = tc ? `${tc}55` : (isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.08)'), bg = 'transparent';
+      if (isLight) {
+        if (isScoring) { bc = tc ? `${tc}99` : awayColor; bg = tc ? `${tc}08` : `${awayColor}08`; }
+        else if (isHit) { bc = tc ? `${tc}99` : '#10B981'; bg = 'transparent'; }
+        else if (isWalk) { bc = 'rgba(245,158,11,0.6)'; bg = 'transparent'; }
+        else if (isOut) { bc = 'rgba(239,68,68,0.4)'; bg = 'transparent'; }
+      } else {
+        if (isScoring) { bc = tc ? `${tc}99` : awayColor; bg = tc ? `${tc}30` : `${awayColor}30`; }
+        else if (isHit) { bc = tc ? `${tc}99` : '#10B981'; bg = tc ? `${tc}18` : 'rgba(16,185,129,0.08)'; }
+        else if (isWalk) { bc = 'rgba(245,158,11,0.6)'; bg = 'rgba(245,158,11,0.06)'; }
+        else if (isOut) { bc = 'rgba(239,68,68,0.4)'; bg = 'rgba(239,68,68,0.04)'; }
+      }
       const bColor = isScoring ? (tc || awayColor) : isPH ? '#A78BFA' : isHit ? (tc || '#10B981') : isWalk ? '#F59E0B' : '#6B7A9E';
       const badgeLabel = isScoring ? '⚾ Scores' : isPH ? 'PH' : isHit ? 'Hit' : isWalk ? 'Walk' : isOut ? 'Out' : '';
+      const abTextColor = isLight ? (isScoring || isHit ? '#0D1117' : '#2D3748') : (isScoring || isHit ? '#EEF2FF' : '#C4CCDF');
       const badgeStyle = isScoring
         ? { bg: `${bColor}22`, border: `${bColor}55`, text: bColor }
         : isOut
-        ? { bg: 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.5)', text: '#F87171' }
+        ? { bg: isLight ? 'rgba(239,68,68,0.1)' : 'rgba(239,68,68,0.15)', border: 'rgba(239,68,68,0.5)', text: '#EF4444' }
         : isWalk
-        ? { bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.4)', text: '#F59E0B' }
+        ? { bg: isLight ? 'rgba(245,158,11,0.1)' : 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.4)', text: '#F59E0B' }
         : isHit
         ? { bg: `${bColor}18`, border: `${bColor}44`, text: bColor }
         : isPH
         ? { bg: 'rgba(167,139,250,0.15)', border: 'rgba(167,139,250,0.35)', text: '#A78BFA' }
-        : { bg: 'rgba(255,255,255,0.05)', border: 'rgba(255,255,255,0.08)', text: '#6B7A9E' };
+        : { bg: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)', border: isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)', text: '#6B7A9E' };
       return (
-        <div key={key} style={{ padding: '0.75rem 1.25rem 0.75rem calc(1.25rem - 3px)', borderBottom: '1px solid rgba(255,255,255,0.04)', borderLeft: `3px solid ${bc}`, background: bg, display: 'flex', flexDirection: 'column', gap: '5px' }}>
+        <div key={key} style={{ padding: '0.75rem 1.25rem 0.75rem calc(1.25rem - 3px)', borderBottom: isLight ? '1px solid rgba(0,0,0,0.05)' : '1px solid rgba(255,255,255,0.04)', borderLeft: `3px solid ${bc}`, background: bg, display: 'flex', flexDirection: 'column', gap: '5px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div className={styles.playClock}>{displayPlay.periodText}</div>
             {badgeLabel ? <div style={{ fontSize: '10px', fontWeight: 700, fontFamily: 'Syne,sans-serif', padding: '2px 7px', borderRadius: '100px', background: badgeStyle.bg, color: badgeStyle.text, border: `1px solid ${badgeStyle.border}` }}>{badgeLabel}</div> : null}
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '7px' }}>
             {logo && <img src={logo} alt="" style={{ width: '18px', height: '18px', objectFit: 'contain', flexShrink: 0, marginTop: '1px' }} />}
-            <div style={{ fontSize: '13px', color: isScoring || isHit ? '#EEF2FF' : '#C4CCDF', fontWeight: isScoring || isHit ? 600 : 400, lineHeight: 1.5 }}>{displayPlay.text}</div>
+            <div style={{ fontSize: '13px', color: abTextColor, fontWeight: isScoring || isHit ? 600 : 400, lineHeight: 1.5 }}>{displayPlay.text}</div>
           </div>
           {pitches.length > 0 && (
             <div style={{ display: 'flex', gap: '3px', flexWrap: 'wrap', marginTop: '2px' }}>
@@ -1112,7 +1138,7 @@ export default function GameRoom() {
               if (group.type === 'inning') {
                 if (!group.play?.text?.trim()) return null;
                 if (/middle of/i.test(group.play.text)) return null;
-                return <div key={group.play.id || gi} style={{ padding: '6px 1.25rem', background: 'rgba(255,255,255,0.025)', borderBottom: '1px solid rgba(255,255,255,0.06)', borderLeft: '3px solid rgba(255,255,255,0.12)', fontSize: '11px', fontWeight: 700, color: '#6B7A9E', fontFamily: 'Syne,sans-serif', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{group.play.text}</div>;
+                return <div key={group.play.id || gi} style={{ padding: '6px 1.25rem', background: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.025)', borderBottom: `1px solid ${isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.06)'}`, borderLeft: `3px solid ${isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.12)'}`, fontSize: '11px', fontWeight: 700, color: isLight ? '#64748B' : '#6B7A9E', fontFamily: 'Syne,sans-serif', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{group.play.text}</div>;
               }
               if (group.type === 'event') {
                 if (!group.play?.text?.trim()) return null;

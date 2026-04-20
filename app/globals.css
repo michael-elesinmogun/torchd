@@ -350,37 +350,8 @@ html[data-theme="light"] {
 [data-theme="light"] [class*="logoText"] { color: #0D1117 !important; }
 
 @media(max-width: 768px) {
-  nav ul { display: none !important; }
-}
 
-/* ── Game room play rows — reduce opacity on light mode ── */
-[data-theme="light"] [class*="gamecastWrap"] > div,
-[data-theme="light"] [class*="mobileScrollPane"] > div > div {
-  border-bottom-color: rgba(0,0,0,0.05) !important;
-}
-
-/* Neutralize all colored play row backgrounds on light mode */
-[data-theme="light"] [class*="gamecastWrap"] [style*="background: rgba(239,68,68"],
-[data-theme="light"] [class*="gamecastWrap"] [style*="background: rgba(16,185,129"],
-[data-theme="light"] [class*="gamecastWrap"] [style*="background: rgba(245,158,11"],
-[data-theme="light"] [class*="gamecastWrap"] [style*="background: rgba(99,102,241"],
-[data-theme="light"] [class*="gamecastWrap"] [style*="background: rgba(167,139,250"],
-[data-theme="light"] [class*="mobileScrollPane"] [style*="background: rgba(239,68,68"],
-[data-theme="light"] [class*="mobileScrollPane"] [style*="background: rgba(16,185,129"],
-[data-theme="light"] [class*="mobileScrollPane"] [style*="background: rgba(245,158,11"],
-[data-theme="light"] [class*="mobileScrollPane"] [style*="background: rgba(99,102,241"],
-[data-theme="light"] [class*="mobileScrollPane"] [style*="background: rgba(167,139,250"] {
-  background: transparent !important;
-}
-
-/* Scoring play rows — keep a very subtle tint */
-[data-theme="light"] [class*="gamecastWrap"] [style*="background: rgba"][style*="0.30)"],
-[data-theme="light"] [class*="gamecastWrap"] [style*="background: rgba"][style*="0.30"],
-[data-theme="light"] [class*="mobileScrollPane"] [style*="background: rgba"][style*="0.30)"] {
-  background: rgba(0,0,0,0.02) !important;
-}
-
-/* Fix how-it-works card titles (stepTitle etc.) */
+/* ── How-it-works card titles ── */
 [data-theme="light"] [class*="stepTitle"],
 [data-theme="light"] [class*="stepNum"],
 [data-theme="light"] [class*="howTitle"],
@@ -388,47 +359,6 @@ html[data-theme="light"] {
 [data-theme="light"] [class*="stepBody"],
 [data-theme="light"] [class*="howBody"] { color: #64748B !important; }
 
-/* Fix "Ready to prove" dark CTA section */
-[data-theme="light"] [class*="ctaWrap"],
-[data-theme="light"] [class*="ctaBox"],
-[data-theme="light"] [class*="ctaBottom"] { background: #1E293B !important; }
-
-/* Inning headers */
-[data-theme="light"] [class*="gamecastWrap"] [style*="background: rgba(255,255,255,0.025)"],
-[data-theme="light"] [class*="mobileScrollPane"] [style*="background: rgba(255,255,255,0.025)"] {
-  background: rgba(0,0,0,0.03) !important;
-  border-color: rgba(0,0,0,0.06) !important;
-}
-[data-theme="light"] [class*="gamecastWrap"] [style*="color: #6B7A9E"],
-[data-theme="light"] [class*="mobileScrollPane"] [style*="color: #6B7A9E"] { color: #64748B !important; }
-
-/* Period/inning label text */
-[data-theme="light"] [class*="gamecastWrap"] [style*="color: #EEF2FF"],
-[data-theme="light"] [class*="mobileScrollPane"] [style*="color: #EEF2FF"] { color: #0D1117 !important; }
-[data-theme="light"] [class*="gamecastWrap"] [style*="color: #C4CCDF"],
-[data-theme="light"] [class*="mobileScrollPane"] [style*="color: #C4CCDF"] { color: #2D3748 !important; }
-
-/* Left border lines on plays — keep them but slightly more transparent */
-[data-theme="light"] [class*="gamecastWrap"] [style*="border-left"],
-[data-theme="light"] [class*="mobileScrollPane"] [style*="border-left"] {
-  border-left-color: rgba(var(--team-color-rgb, 59,130,246), 0.4) !important;
-}
-
-/* ── Fix play row backgrounds on light mode — reset all then re-add subtle tints ── */
-[data-theme="light"] [class*="gamecastWrap"] > div,
-[data-theme="light"] [class*="mobileScrollPane"] > div > div {
-  background: transparent !important;
-  border-bottom: 1px solid rgba(0,0,0,0.05) !important;
-}
-
-/* Keep the left border color indicators but make backgrounds clean */
-[data-theme="light"] [class*="gamecastWrap"] [style],
-[data-theme="light"] [class*="mobileScrollPane"] [style] {
-  background-color: transparent !important;
-}
-
-/* Scoring plays get a very subtle blue tint */
-[data-theme="light"] [class*="gamecastWrap"] [style*="border-left: 3px"],
-[data-theme="light"] [class*="mobileScrollPane"] [style*="border-left: 3px"] {
-  background-color: rgba(0,0,0,0.015) !important;
+@media(max-width: 768px) {
+  nav ul { display: none !important; }
 }
