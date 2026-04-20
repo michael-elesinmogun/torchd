@@ -1165,8 +1165,8 @@ export default function GameRoom() {
             <div className={styles.teamBlock}>
               {game.away.logo && <img src={game.away.logo} alt={game.away.abbr} className={styles.teamLogo} />}
               <div className={styles.teamAbbr}>{game.away.abbr}</div>
+              {showScore(game.status) && <div className={`${styles.score} ${game.away.score > game.home.score ? styles.scoreLeading : ''}`}>{game.away.score ?? 0}</div>}
             </div>
-            {showScore(game.status) && <div className={`${styles.score} ${game.away.score > game.home.score ? styles.scoreLeading : ''}`}>{game.away.score ?? 0}</div>}
             <div className={styles.gameInfo}>
               <div className={`${styles.gameStatus} ${live ? styles.gameStatusLive : ''}`}>
                 {live && <span className={styles.liveDot}></span>}
@@ -1175,17 +1175,14 @@ export default function GameRoom() {
               <div className={styles.gameName}>{game.away.abbr} vs {game.home.abbr}</div>
               {game.broadcast && <div className={styles.gameBroadcast}>{game.broadcast}</div>}
             </div>
-            {showScore(game.status) && <div className={`${styles.score} ${game.home.score > game.away.score ? styles.scoreLeading : ''}`}>{game.home.score ?? 0}</div>}
             <div className={styles.teamBlock}>
               {game.home.logo && <img src={game.home.logo} alt={game.home.abbr} className={styles.teamLogo} />}
               <div className={styles.teamAbbr}>{game.home.abbr}</div>
+              {showScore(game.status) && <div className={`${styles.score} ${game.home.score > game.away.score ? styles.scoreLeading : ''}`}>{game.home.score ?? 0}</div>}
             </div>
           </div>
         ) : <div className={styles.scoreBoardLoading}>Loading game...</div>}
-        <Link href="/battle/start" className={styles.debateBtn}>
-          <span className={styles.debateBtnFull}>⚔️ Start a debate</span>
-          <span className={styles.debateBtnShort}>Debate</span>
-        </Link>
+        <div style={{width: '120px'}}></div>
       </div>
 
       {cameraOn ? (
