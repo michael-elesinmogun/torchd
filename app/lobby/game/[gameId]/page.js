@@ -703,6 +703,10 @@ export default function GameRoom() {
     return getVisibleTeamColor(homeRaw);
   })();
 
+  // For score pill backgrounds, use CSS hex with fixed alpha that looks good on both themes
+  const awayPillBg = `${awayScoreColor}28`;
+  const homePillBg = `${homeScoreColor}28`;
+
   const chatPanel = (
     <div className={styles.chatWrap} style={isMobile ? { width: '100%' } : { width: `${100 - splitPct}%` }}>
       <div className={styles.chatHeader}>
@@ -1183,7 +1187,7 @@ export default function GameRoom() {
             <div className={styles.teamBlock}>
               {game.away.logo && <img src={game.away.logo} alt={game.away.abbr} className={styles.teamLogo} />}
               <div className={styles.teamAbbr}>{game.away.abbr}</div>
-              {showScore(game.status) && <div className={`${styles.score} ${game.away.score > game.home.score ? styles.scoreLeading : ''}`} style={{background: `${awayScoreColor}18`, padding: '2px 10px', borderRadius: '8px'}}>{game.away.score ?? 0}</div>}
+              {showScore(game.status) && <div className={`${styles.score} ${game.away.score > game.home.score ? styles.scoreLeading : ''}`} style={{background: awayPillBg, padding: '4px 10px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>{game.away.score ?? 0}</div>}
             </div>
             <div className={styles.gameInfo}>
               <div className={`${styles.gameStatus} ${live ? styles.gameStatusLive : ''}`}>
@@ -1196,7 +1200,7 @@ export default function GameRoom() {
             <div className={styles.teamBlock}>
               {game.home.logo && <img src={game.home.logo} alt={game.home.abbr} className={styles.teamLogo} />}
               <div className={styles.teamAbbr}>{game.home.abbr}</div>
-              {showScore(game.status) && <div className={`${styles.score} ${game.home.score > game.away.score ? styles.scoreLeading : ''}`} style={{background: `${homeScoreColor}18`, padding: '2px 10px', borderRadius: '8px'}}>{game.home.score ?? 0}</div>}
+              {showScore(game.status) && <div className={`${styles.score} ${game.home.score > game.away.score ? styles.scoreLeading : ''}`} style={{background: homePillBg, padding: '4px 10px', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>{game.home.score ?? 0}</div>}
             </div>
           </div>
         ) : <div className={styles.scoreBoardLoading}>Loading game...</div>}
