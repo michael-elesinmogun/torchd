@@ -122,111 +122,173 @@ html[data-theme="light"] {
 /* ══════════════════════════════════════════════
    LIGHT MODE — global overrides for all pages
    ══════════════════════════════════════════════ */
-[data-theme="light"] {
-  color-scheme: light;
-}
+[data-theme="light"] { color-scheme: light; }
 
 /* ── Base ── */
-[data-theme="light"] body { background: #F4F6FB; color: #0D1117; }
-[data-theme="light"] main { background: #F4F6FB !important; color: #0D1117 !important; }
 
-/* ── Surfaces / cards ── */
-[data-theme="light"] [class*="gameCard"],
-[data-theme="light"] [class*="battleCard"],
-[data-theme="light"] [class*="challengeCard"],
-[data-theme="light"] [class*="howCard"],
-[data-theme="light"] [class*="modeCard"],
-[data-theme="light"] [class*="featCard"],
-[data-theme="light"] [class*="lbPreviewList"],
-[data-theme="light"] [class*="cta"]:not([class*="ctaSection"]):not([class*="ctaPrimary"]):not([class*="ctaSecondary"]):not([class*="ctaTitle"]):not([class*="ctaSub"]):not([class*="ctaFine"]):not([class*="ctaGlow"]):not([class*="ctaInner"]):not([class*="ctaNote"]):not([class*="ctaBody"]),
-[data-theme="light"] [class*="section"]:not([class*="sectionDark"]):not([class*="sectionEyebrow"]):not([class*="sectionInner"]):not([class*="sectionTitle"]):not([class*="sectionSub"]):not([class*="sectionHeader"]):not([class*="sectionLink"]) {
-  background: #FFFFFF !important;
-  border-color: rgba(0,0,0,0.08) !important;
-}
+/* ── Base ── */
+[data-theme="light"] body { background: #F4F6FB !important; color: #0D1117 !important; }
+[data-theme="light"] main,
+[data-theme="light"] [class*="main"] { background: #F4F6FB !important; color: #0D1117 !important; }
+
+/* ── Inline style overrides for hardcoded dark colors ── */
+[data-theme="light"] [style*="background: #060912"],
+[data-theme="light"] [style*="background:#060912"],
+[data-theme="light"] [style*="background: #0f1623"],
+[data-theme="light"] [style*="background:#0f1623"],
+[data-theme="light"] [style*="background: #151e2e"],
+[data-theme="light"] [style*="background:#151e2e"],
+[data-theme="light"] [style*="background: #1c2840"],
+[data-theme="light"] [style*="background:#1c2840"] { background: #FFFFFF !important; }
+
+[data-theme="light"] [style*="color: #EEF2FF"],
+[data-theme="light"] [style*="color:#EEF2FF"] { color: #0D1117 !important; }
+[data-theme="light"] [style*="color: #C4CCDF"],
+[data-theme="light"] [style*="color:#C4CCDF"] { color: #2D3748 !important; }
+[data-theme="light"] [style*="color: #6B7A9E"],
+[data-theme="light"] [style*="color:#6B7A9E"] { color: #64748B !important; }
+[data-theme="light"] [style*="color: #3D4A66"],
+[data-theme="light"] [style*="color:#3D4A66"] { color: #94A3B8 !important; }
 
 /* ── Nav ── */
 [data-theme="light"] nav { background: rgba(255,255,255,0.95) !important; border-color: rgba(0,0,0,0.08) !important; }
 
-/* ── Sport tabs (lobby) ── */
-[data-theme="light"] [class*="sportTab"] { background: #FFFFFF !important; border-color: rgba(0,0,0,0.08) !important; color: #64748B !important; }
-[data-theme="light"] [class*="sportTabActive"] { background: #2563EB !important; color: #FFFFFF !important; border-color: #2563EB !important; }
+/* ── All card/surface classes ── */
+[data-theme="light"] [class*="gameCard"],
+[data-theme="light"] [class*="battleCard"],
+[data-theme="light"] [class*="challengeCard"],
+[data-theme="light"] [class*="battleRow"],
+[data-theme="light"] [class*="battleItem"],
+[data-theme="light"] [class*="howCard"],
+[data-theme="light"] [class*="modeCard"],
+[data-theme="light"] [class*="featCard"],
+[data-theme="light"] [class*="topCard"],
+[data-theme="light"] [class*="podiumCard"],
+[data-theme="light"] [class*="tableWrap"],
+[data-theme="light"] [class*="statsCard"],
+[data-theme="light"] [class*="sideCard"],
+[data-theme="light"] [class*="profileCard"],
+[data-theme="light"] [class*="statBox"],
+[data-theme="light"] [class*="lbPreviewList"],
+[data-theme="light"] [class*="lbTable"],
+[data-theme="light"] [class*="emptyState"],
+[data-theme="light"] [class*="section"]:not([class*="sectionDark"]):not([class*="sectionEyebrow"]):not([class*="sectionInner"]):not([class*="sectionTitle"]):not([class*="sectionSub"]):not([class*="sectionHeader"]):not([class*="sectionLink"]):not([class*="sectionNote"]) {
+  background: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.08) !important;
+}
 
-/* ── Broadcast badge ── */
-[data-theme="light"] [class*="gameBroadcast"] { background: #F1F5F9 !important; color: #64748B !important; }
+/* ── Sport/filter tabs ── */
+[data-theme="light"] [class*="sportTab"],
+[data-theme="light"] [class*="filterTab"],
+[data-theme="light"] [class*="filterBtn"]:not([class*="Active"]):not([class*="active"]) {
+  background: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.1) !important;
+  color: #64748B !important;
+}
+[data-theme="light"] [class*="sportTabActive"],
+[data-theme="light"] [class*="filterTabActive"],
+[data-theme="light"] [class*="filterBtnActive"] {
+  background: #2563EB !important;
+  color: #FFFFFF !important;
+  border-color: #2563EB !important;
+}
 
-/* ── Game card top/bottom ── */
+/* ── Broadcast/venue badges ── */
+[data-theme="light"] [class*="gameBroadcast"],
+[data-theme="light"] [class*="broadcast"] { background: #F1F5F9 !important; color: #64748B !important; }
+
+/* ── Team info ── */
+[data-theme="light"] [class*="teamAbbr"] { color: #64748B !important; }
+[data-theme="light"] [class*="teamName"],
+[data-theme="light"] [class*="teamFullName"] { color: #0D1117 !important; }
+[data-theme="light"] [class*="teamRecord"],
+[data-theme="light"] [class*="teamInfo"] { color: #94A3B8 !important; }
+[data-theme="light"] [class*="teamScore"] { color: #64748B !important; }
+[data-theme="light"] [class*="scoreLeading"] { color: #0D1117 !important; }
 [data-theme="light"] [class*="gameCardBottom"] { border-color: rgba(0,0,0,0.06) !important; }
 [data-theme="light"] [class*="gameVenue"] { color: #94A3B8 !important; }
 [data-theme="light"] [class*="gameStatus"] { color: #64748B !important; }
-
-/* ── Team names & scores ── */
-[data-theme="light"] [class*="teamAbbr"] { color: #0D1117 !important; }
-[data-theme="light"] [class*="teamRecord"] { color: #94A3B8 !important; }
-[data-theme="light"] [class*="teamScore"],
-[data-theme="light"] [class*="teamInfo"] { color: #64748B !important; }
-[data-theme="light"] [class*="scoreLeading"] { color: #0D1117 !important; }
-[data-theme="light"] [class*="teamName"] { color: #0D1117 !important; }
-
-/* ── Group labels ── */
-[data-theme="light"] [class*="groupLabel"],
-[data-theme="light"] [class*="groupLabel"] * { color: #64748B !important; }
-[data-theme="light"] [class*="gamesWrap"],
-[data-theme="light"] [class*="gameGrid"] { background: transparent !important; }
+[data-theme="light"] [class*="gameName"] { color: #64748B !important; }
 
 /* ── Page headers ── */
 [data-theme="light"] [class*="pageTitle"],
-[data-theme="light"] [class*="eyebrow"]:not([class*="heroEyebrow"]) { color: #0D1117 !important; }
+[data-theme="light"] [class*="sectionTitle"],
+[data-theme="light"] [class*="heading"],
+[data-theme="light"] [class*="displayName"],
+[data-theme="light"] [class*="heroTitle"] { color: #0D1117 !important; }
+[data-theme="light"] [class*="pageSub"],
+[data-theme="light"] [class*="sectionSub"],
+[data-theme="light"] [class*="eyebrow"]:not([class*="heroEyebrow"]),
 [data-theme="light"] [class*="updatedAt"],
-[data-theme="light"] [class*="pageSub"] { color: #64748B !important; }
-
-/* ── Buttons (ghost/outline) ── */
-[data-theme="light"] [class*="retryBtn"],
-[data-theme="light"] [class*="signupBtn"],
-[data-theme="light"] [class*="heroBtnSecondary"],
-[data-theme="light"] [class*="deleteCancelBtn"] {
-  color: #64748B !important;
-  border-color: rgba(0,0,0,0.12) !important;
-}
+[data-theme="light"] [class*="groupLabel"],
+[data-theme="light"] [class*="handle"],
+[data-theme="light"] [class*="heroSub"] { color: #64748B !important; }
 
 /* ── Battle cards ── */
 [data-theme="light"] [class*="battleTopic"],
-[data-theme="light"] [class*="battleTitle"] { color: #0D1117 !important; }
+[data-theme="light"] [class*="battleTitle"],
+[data-theme="light"] [class*="battleItemTopic"] { color: #0D1117 !important; }
 [data-theme="light"] [class*="battlePlayers"],
-[data-theme="light"] [class*="battleMeta"] { color: #64748B !important; }
-[data-theme="light"] [class*="battleVs"] { color: #94A3B8 !important; }
+[data-theme="light"] [class*="battleMeta"],
+[data-theme="light"] [class*="battleItemMeta"],
+[data-theme="light"] [class*="battleItemDate"],
+[data-theme="light"] [class*="battleVs"] { color: #64748B !important; }
+[data-theme="light"] [class*="battlePlayer"] { color: #2563EB !important; }
 [data-theme="light"] [class*="ownChallengeBadge"] { color: #64748B !important; background: #F1F5F9 !important; border-color: rgba(0,0,0,0.08) !important; }
 
-/* ── Empty / loading states ── */
-[data-theme="light"] [class*="emptyTitle"],
-[data-theme="light"] [class*="emptyState"] [class*="title"] { color: #0D1117 !important; }
-[data-theme="light"] [class*="emptySub"],
-[data-theme="light"] [class*="emptyBody"],
-[data-theme="light"] [class*="loadingState"] { color: #64748B !important; }
-[data-theme="light"] [class*="emptyState"] { background: #FFFFFF !important; border-color: rgba(0,0,0,0.08) !important; }
+/* ── Leaderboard ── */
+[data-theme="light"] [class*="lbPreviewRow"],
+[data-theme="light"] [class*="lbRow"],
+[data-theme="light"] [class*="tableRow"] { border-color: rgba(0,0,0,0.06) !important; }
+[data-theme="light"] [class*="lbPreviewRow"]:hover,
+[data-theme="light"] [class*="lbRow"]:hover,
+[data-theme="light"] [class*="tableRow"]:hover { background: #F1F5F9 !important; }
+[data-theme="light"] [class*="lbPreviewName"],
+[data-theme="light"] [class*="playerName"],
+[data-theme="light"] [class*="rankNum"],
+[data-theme="light"] [class*="lbPreviewRank"],
+[data-theme="light"] [class*="debaterName"] { color: #0D1117 !important; }
+[data-theme="light"] [class*="lbPreviewSport"],
+[data-theme="light"] [class*="playerHandle"],
+[data-theme="light"] [class*="rankLabel"],
+[data-theme="light"] [class*="debaterHandle"],
+[data-theme="light"] [class*="debaterSport"] { color: #64748B !important; }
+[data-theme="light"] [class*="rank"]:not([class*="rankNum"]):not([class*="rankLabel"]) { color: #0D1117 !important; }
+[data-theme="light"] [class*="colHeader"],
+[data-theme="light"] [class*="tableHeader"],
+[data-theme="light"] [class*="tableCell"] { color: #64748B !important; border-color: rgba(0,0,0,0.06) !important; }
+
+/* ── Profile page ── */
+[data-theme="light"] [class*="statValue"] { color: #0D1117 !important; }
+[data-theme="light"] [class*="statLabel"],
+[data-theme="light"] [class*="favTag"] { color: #64748B !important; }
+[data-theme="light"] [class*="favTag"] { background: #F1F5F9 !important; border-color: rgba(0,0,0,0.08) !important; }
+[data-theme="light"] [class*="tabsWrap"] { border-color: rgba(0,0,0,0.08) !important; }
+[data-theme="light"] [class*="activeTab"],
+[data-theme="light"] [class*="tabActive"] { color: #2563EB !important; border-color: #2563EB !important; }
+[data-theme="light"] [class*="inactiveTab"] { color: #64748B !important; }
 
 /* ── Settings ── */
-[data-theme="light"] [class*="sidebarBtn"] { color: #64748B !important; }
+[data-theme="light"] [class*="sidebarBtn"] { color: #64748B !important; background: transparent !important; }
 [data-theme="light"] [class*="sidebarBtnActive"] { color: #0D1117 !important; background: #E8ECF5 !important; }
 [data-theme="light"] [class*="sidebarBtnDanger"] { color: #DC2626 !important; }
 [data-theme="light"] [class*="formBlockTitle"],
-[data-theme="light"] [class*="toggleTitle"] { color: #0D1117 !important; }
+[data-theme="light"] [class*="toggleTitle"],
+[data-theme="light"] [class*="label"] { color: #0D1117 !important; }
 [data-theme="light"] [class*="toggleSub"],
-[data-theme="light"] [class*="label"],
 [data-theme="light"] [class*="formBlockSub"] { color: #64748B !important; }
 [data-theme="light"] [class*="toggleOff"] { background: #CBD5E1 !important; }
-[data-theme="light"] [class*="input"] { background: #FFFFFF !important; border-color: rgba(0,0,0,0.12) !important; color: #0D1117 !important; }
-[data-theme="light"] [class*="input"]::placeholder { color: #94A3B8 !important; }
-[data-theme="light"] [class*="divider"] { background: rgba(0,0,0,0.07) !important; }
+[data-theme="light"] [class*="input"],
+[data-theme="light"] input:not([type="submit"]):not([type="button"]) {
+  background: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.12) !important;
+  color: #0D1117 !important;
+}
+[data-theme="light"] [class*="input"]::placeholder,
+[data-theme="light"] input::placeholder { color: #94A3B8 !important; }
+[data-theme="light"] [class*="divider"]:not(nav) { background: rgba(0,0,0,0.07) !important; }
 
-/* ── Leaderboard ── */
-[data-theme="light"] [class*="lbPreviewRow"]:hover { background: #F1F5F9 !important; }
-[data-theme="light"] [class*="lbPreviewName"] { color: #0D1117 !important; }
-[data-theme="light"] [class*="lbPreviewSport"] { color: #64748B !important; }
-[data-theme="light"] [class*="lbPreviewRank"] { color: #0D1117 !important; }
-[data-theme="light"] [class*="lbPreviewRow"] { border-color: rgba(0,0,0,0.06) !important; }
-[data-theme="light"] [class*="lbPreviewFooter"] { color: #94A3B8 !important; }
-
-/* ── Plays / game room ── */
+/* ── Game room ── */
 [data-theme="light"] [class*="scoreHeader"],
 [data-theme="light"] [class*="cameraBar"],
 [data-theme="light"] [class*="mainStatsTabs"],
@@ -245,224 +307,48 @@ html[data-theme="light"] {
 [data-theme="light"] [class*="mainStatsTabActive"] { color: #2563EB !important; border-color: #2563EB !important; }
 [data-theme="light"] [class*="teamStatsName"] { color: #0D1117 !important; }
 [data-theme="light"] [class*="teamStatLabel"] { color: #64748B !important; }
-[data-theme="light"] [class*="teamStatsBlock"],
-[data-theme="light"] [class*="boxScoreBlock"] { border-color: rgba(0,0,0,0.06) !important; }
 [data-theme="light"] [class*="boxScoreHeader"] { color: #64748B !important; }
 [data-theme="light"] [class*="boxScoreStat"] { color: #2D3748 !important; }
 [data-theme="light"] [class*="boxScoreName"] { color: #0D1117 !important; }
 [data-theme="light"] [class*="boxScoreRow"] { border-color: rgba(0,0,0,0.06) !important; }
 [data-theme="light"] [class*="boxScoreJersey"] { color: #94A3B8 !important; }
 [data-theme="light"] [class*="dividerHandle"] { background: #CBD5E1 !important; }
-[data-theme="light"] [class*="divider"]:not([class*="Divider"]) { background: #E8ECF5 !important; }
 [data-theme="light"] [class*="cameraBarText"] { color: #64748B !important; }
 [data-theme="light"] [class*="backBtn"] { color: #2563EB !important; }
-[data-theme="light"] [class*="gameName"],
-[data-theme="light"] [class*="score"] { color: #64748B !important; }
-[data-theme="light"] [class*="scoreLeading"] { color: #0D1117 !important; }
-[data-theme="light"] [class*="teamAbbr"] { color: #64748B !important; }
+[data-theme="light"] [class*="score"]:not([class*="scoreLeading"]) { color: #64748B !important; }
 
 /* ── Chat ── */
 [data-theme="light"] [class*="messageBubble"] { color: #0D1117 !important; }
 [data-theme="light"] [class*="msgReaction"] { background: #F1F5F9 !important; border-color: rgba(0,0,0,0.08) !important; }
-[data-theme="light"] [class*="msgReactionCount"] { color: #64748B !important; }
-[data-theme="light"] [class*="chatEmpty"] { background: transparent !important; }
-[data-theme="light"] [class*="chatEmptyTitle"] { color: #0D1117 !important; }
+[data-theme="light"] [class*="msgReactionCount"],
+[data-theme="light"] [class*="chatOnline"],
 [data-theme="light"] [class*="chatEmptySub"] { color: #64748B !important; }
-[data-theme="light"] [class*="chatOnline"] { color: #64748B !important; }
+[data-theme="light"] [class*="chatEmptyTitle"] { color: #0D1117 !important; }
 
-/* ── Landing page dark section ── */
+/* ── Empty/loading ── */
+[data-theme="light"] [class*="emptyTitle"] { color: #0D1117 !important; }
+[data-theme="light"] [class*="emptySub"],
+[data-theme="light"] [class*="emptyBody"],
+[data-theme="light"] [class*="loadingState"],
+[data-theme="light"] [class*="loadingWrap"] { color: #64748B !important; }
+
+/* ── Landing dark section stays dark ── */
 [data-theme="light"] [class*="sectionDark"] { background: #1E293B !important; }
+[data-theme="light"] [class*="sectionDark"] * { color: inherit !important; }
 [data-theme="light"] [class*="tickerWrap"] { background: #E8ECF5 !important; border-color: rgba(0,0,0,0.08) !important; }
 [data-theme="light"] [class*="tickerItem"] { background: #FFFFFF !important; color: #64748B !important; border-color: rgba(0,0,0,0.08) !important; }
 [data-theme="light"] [class*="statsBand"] { background: #FFFFFF !important; border-color: rgba(0,0,0,0.08) !important; }
 [data-theme="light"] [class*="statBlock"] { border-color: rgba(0,0,0,0.08) !important; }
-[data-theme="light"] [class*="statLabel"] { color: #64748B !important; }
-[data-theme="light"] [class*="heroGrid"] { opacity: 0.15 !important; }
+[data-theme="light"] [class*="heroGrid"] { opacity: 0.1 !important; }
 
 /* ── Footer ── */
 [data-theme="light"] [class*="footer"] { border-color: rgba(0,0,0,0.08) !important; }
 [data-theme="light"] [class*="footerDesc"],
 [data-theme="light"] [class*="footerLink"],
 [data-theme="light"] [class*="footerCopy"] { color: #64748B !important; }
-[data-theme="light"] [class*="footerLink"]:hover { color: #0D1117 !important; }
+[data-theme="light"] [class*="footerLink"]:hover,
 [data-theme="light"] [class*="logoText"] { color: #0D1117 !important; }
-
-/* ── Profile / leaderboard pages ── */
-[data-theme="light"] [class*="page"] { background: transparent !important; color: #0D1117 !important; }
 
 @media(max-width: 768px) {
   nav ul { display: none !important; }
 }
-[data-theme="light"] {
-  color-scheme: light;
-}
-
-/* Base backgrounds */
-[data-theme="light"] body { background: #F4F6FB; color: #0D1117; }
-
-/* Any element using the dark backgrounds */
-[data-theme="light"] [class*="main"] { background: #F4F6FB !important; color: #0D1117 !important; }
-[data-theme="light"] [class*="page"] { color: #0D1117; }
-
-/* Cards and surfaces — anything using #0f1623 or #151e2e */
-[data-theme="light"] [class*="Card"],
-[data-theme="light"] [class*="card"],
-[data-theme="light"] [class*="section"]:not([class*="Section"]),
-[data-theme="light"] [class*="Section"],
-[data-theme="light"] [class*="block"],
-[data-theme="light"] [class*="Block"],
-[data-theme="light"] [class*="Row"]:not([class*="formRow"]):not([class*="teamRow"]):not([class*="chatRow"]):not([class*="boxScore"]),
-[data-theme="light"] [class*="row"]:not([class*="formRow"]):not([class*="inputRow"]):not([class*="toggleRow"]) { 
-  background: #FFFFFF !important; 
-  border-color: rgba(0,0,0,0.08) !important; 
-}
-
-/* Ticker / band backgrounds */
-[data-theme="light"] [class*="tickerWrap"],
-[data-theme="light"] [class*="statsBand"],
-[data-theme="light"] [class*="Band"] { background: #EEF2FF !important; border-color: rgba(0,0,0,0.08) !important; }
-
-[data-theme="light"] [class*="tickerItem"] { background: #FFFFFF !important; border-color: rgba(0,0,0,0.08) !important; color: #64748B !important; }
-
-/* Nav */
-[data-theme="light"] [class*="nav"]:not([class*="navLink"]):not([class*="navActions"]):not([class*="navLinks"]) { 
-  background: rgba(255,255,255,0.95) !important; 
-  border-color: rgba(0,0,0,0.08) !important; 
-}
-
-/* Text colors */
-[data-theme="light"] [class*="Title"],
-[data-theme="light"] [class*="title"],
-[data-theme="light"] [class*="Name"],
-[data-theme="light"] [class*="name"],
-[data-theme="light"] [class*="heroH1"],
-[data-theme="light"] [class*="pageTitle"],
-[data-theme="light"] [class*="h2"],
-[data-theme="light"] [class*="modeTitle"],
-[data-theme="light"] [class*="featTitle"] { color: #0D1117 !important; }
-
-[data-theme="light"] [class*="Sub"],
-[data-theme="light"] [class*="sub"],
-[data-theme="light"] [class*="Body"],
-[data-theme="light"] [class*="body"],
-[data-theme="light"] [class*="muted"],
-[data-theme="light"] [class*="label"],
-[data-theme="light"] [class*="Label"],
-[data-theme="light"] [class*="meta"],
-[data-theme="light"] [class*="desc"],
-[data-theme="light"] [class*="heroSub"],
-[data-theme="light"] [class*="pageSub"],
-[data-theme="light"] [class*="footerDesc"] { color: #64748B !important; }
-
-/* Links */
-[data-theme="light"] [class*="navLinks"] a { color: #64748B !important; }
-[data-theme="light"] [class*="navLinks"] a:hover { color: #0D1117 !important; background: #F1F5F9 !important; }
-[data-theme="light"] [class*="footerCol"] a { color: #64748B !important; }
-[data-theme="light"] [class*="footerCol"] a:hover { color: #0D1117 !important; }
-[data-theme="light"] [class*="footerCol"] h4 { color: #0D1117 !important; }
-[data-theme="light"] [class*="footerBottom"] { color: #94A3B8 !important; border-color: rgba(0,0,0,0.06) !important; }
-
-/* Inputs */
-[data-theme="light"] [class*="input"],
-[data-theme="light"] [class*="Input"] { 
-  background: #FFFFFF !important; 
-  border-color: rgba(0,0,0,0.12) !important; 
-  color: #0D1117 !important; 
-}
-[data-theme="light"] [class*="input"]::placeholder { color: #94A3B8 !important; }
-
-/* Sidebar */
-[data-theme="light"] [class*="sidebar"],
-[data-theme="light"] [class*="Sidebar"] { background: transparent !important; }
-[data-theme="light"] [class*="sidebarBtn"] { color: #64748B !important; }
-[data-theme="light"] [class*="sidebarBtn"]:hover,
-[data-theme="light"] [class*="sidebarBtnActive"] { color: #0D1117 !important; background: #E8ECF5 !important; }
-
-/* Borders */
-[data-theme="light"] [class*="divider"],
-[data-theme="light"] [class*="Divider"] { background: rgba(0,0,0,0.08) !important; }
-
-/* Ghost buttons */
-[data-theme="light"] [class*="btnGhost"],
-[data-theme="light"] [class*="signupBtn"],
-[data-theme="light"] [class*="heroBtnSecondary"],
-[data-theme="light"] [class*="deleteCancelBtn"] { 
-  color: #64748B !important; 
-  border-color: rgba(0,0,0,0.12) !important; 
-}
-[data-theme="light"] [class*="btnGhost"]:hover,
-[data-theme="light"] [class*="signupBtn"]:hover,
-[data-theme="light"] [class*="heroBtnSecondary"]:hover { 
-  color: #0D1117 !important; 
-  border-color: rgba(37,99,235,0.3) !important; 
-}
-
-/* Toggle off state */
-[data-theme="light"] [class*="toggleOff"] { background: #CBD5E1 !important; }
-
-/* Leaderboard preview hover */
-[data-theme="light"] [class*="lbPreviewRow"]:hover { background: #F1F5F9 !important; }
-
-/* Challenge / battle cards */
-[data-theme="light"] [class*="ownChallengeBadge"] { 
-  color: #64748B !important; 
-  background: rgba(0,0,0,0.04) !important; 
-  border-color: rgba(0,0,0,0.08) !important; 
-}
-
-/* Score header */
-[data-theme="light"] [class*="scoreHeader"],
-[data-theme="light"] [class*="cameraBar"],
-[data-theme="light"] [class*="mainStatsTabs"],
-[data-theme="light"] [class*="periodTabs"],
-[data-theme="light"] [class*="chatHeader"],
-[data-theme="light"] [class*="inputRow"],
-[data-theme="light"] [class*="chatWrap"] { 
-  background: #FFFFFF !important; 
-  border-color: rgba(0,0,0,0.08) !important; 
-}
-
-/* Plays list */
-[data-theme="light"] [class*="gamecastWrap"],
-[data-theme="light"] [class*="mobileScrollPane"] { background: #F4F6FB !important; }
-
-/* Period label in plays */
-[data-theme="light"] [class*="playClock"] { color: #94A3B8 !important; }
-[data-theme="light"] [class*="playText"] { color: #2D3748 !important; }
-
-/* Message bubbles */
-[data-theme="light"] [class*="messageBubble"] { color: #0D1117 !important; }
-[data-theme="light"] [class*="messages"] { background: #F4F6FB !important; }
-[data-theme="light"] [class*="msgReaction"] { background: #F1F5F9 !important; border-color: rgba(0,0,0,0.08) !important; }
-
-/* Divider handle */
-[data-theme="light"] [class*="dividerHandle"] { background: #CBD5E1 !important; }
-[data-theme="light"] [class*="divider"] { background: #E8ECF5 !important; }
-
-/* Box score */
-[data-theme="light"] [class*="boxScoreRow"] { border-color: rgba(0,0,0,0.06) !important; }
-[data-theme="light"] [class*="boxScoreStat"] { color: #2D3748 !important; }
-[data-theme="light"] [class*="boxScoreHeader"] { color: #64748B !important; }
-[data-theme="light"] [class*="boxScoreJersey"] { color: #94A3B8 !important; }
-[data-theme="light"] [class*="boxScoreName"] { color: #0D1117 !important; }
-
-/* Team stats */
-[data-theme="light"] [class*="teamStatLabel"] { color: #64748B !important; }
-[data-theme="light"] [class*="teamStatsName"] { color: #0D1117 !important; }
-[data-theme="light"] [class*="teamStatsBlock"],
-[data-theme="light"] [class*="boxScoreBlock"] { border-color: rgba(0,0,0,0.06) !important; }
-
-/* Hero grid background — hide in light mode */
-[data-theme="light"] [class*="heroGrid"] { opacity: 0.3 !important; }
-[data-theme="light"] [class*="heroBgGlow"],
-[data-theme="light"] [class*="ctaGlow"],
-[data-theme="light"] [class*="heroBg"] { opacity: 0.4 !important; }
-
-/* Mode cards top border */
-[data-theme="light"] [class*="modeCard"] { background: #FFFFFF !important; border-color: rgba(0,0,0,0.08) !important; }
-
-/* Footer */
-[data-theme="light"] [class*="footer"] { border-color: rgba(0,0,0,0.08) !important; }
-
-/* Back button */
-[data-theme="light"] [class*="backBtn"] { color: #2563EB !important; border-color: rgba(37,99,235,0.2) !important; }
