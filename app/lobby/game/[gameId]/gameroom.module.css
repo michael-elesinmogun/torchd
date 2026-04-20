@@ -38,8 +38,10 @@
 }
 .score {
   font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800;
-  color: var(--text-muted); line-height: 1;
+  color: var(--text-muted);
+  line-height: 1;
   display: flex; align-items: center; justify-content: center;
+  height: 40px;
 }
 .scoreLeading { color: var(--text-primary); }
 
