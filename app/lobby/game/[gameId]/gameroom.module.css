@@ -9,8 +9,8 @@
 
 .scoreHeader {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0 clamp(1rem, 3vw, 2rem);
-  height: 76px;
+  padding: 8px clamp(1rem, 3vw, 2rem);
+  min-height: 64px;
   background: var(--bg-secondary); border-bottom: 1px solid var(--border-subtle);
   gap: 1rem; position: sticky; top: 0; z-index: 100;
 }
