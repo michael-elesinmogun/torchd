@@ -413,3 +413,22 @@ html[data-theme="light"] {
 [data-theme="light"] [class*="mobileScrollPane"] [style*="border-left"] {
   border-left-color: rgba(var(--team-color-rgb, 59,130,246), 0.4) !important;
 }
+
+/* ── Fix play row backgrounds on light mode — reset all then re-add subtle tints ── */
+[data-theme="light"] [class*="gamecastWrap"] > div,
+[data-theme="light"] [class*="mobileScrollPane"] > div > div {
+  background: transparent !important;
+  border-bottom: 1px solid rgba(0,0,0,0.05) !important;
+}
+
+/* Keep the left border color indicators but make backgrounds clean */
+[data-theme="light"] [class*="gamecastWrap"] [style],
+[data-theme="light"] [class*="mobileScrollPane"] [style] {
+  background-color: transparent !important;
+}
+
+/* Scoring plays get a very subtle blue tint */
+[data-theme="light"] [class*="gamecastWrap"] [style*="border-left: 3px"],
+[data-theme="light"] [class*="mobileScrollPane"] [style*="border-left: 3px"] {
+  background-color: rgba(0,0,0,0.015) !important;
+}

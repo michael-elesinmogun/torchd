@@ -4,7 +4,6 @@
   font-family: 'DM Sans', sans-serif;
   min-height: 100vh;
   overflow-x: hidden;
-  padding-top: 62px;
 }
 
 .scoreHeader {
@@ -49,7 +48,7 @@
 .joinCameraBtn:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .mobileLayout { display: none; }
-.mainContent { display: flex; height: calc(100vh - 62px - 64px - 42px - 37px); overflow: hidden; }
+.mainContent { display: flex; height: calc(100vh - 130px); overflow: hidden; }
 .gamecastCol { display: flex; flex-direction: column; border-right: none; overflow: hidden; min-width: 0; }
 
 .mainStatsTabs { display: flex; border-bottom: 1px solid var(--border-subtle); background: var(--bg-secondary); flex-shrink: 0; }
