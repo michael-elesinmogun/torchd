@@ -685,6 +685,24 @@ export default function GameRoom() {
 
   const live = game && isLive(game.status);
 
+  const awayScoreColor = (() => {
+    if (!game) return '#3B82F6';
+    const validColor = (c) => c && c !== '000000' && c !== 'ffffff' && c.length === 6;
+    const rawAway = validColor(game?.away?.color) ? game.away.color : null;
+    const rawHome = validColor(game?.home?.color) ? game.home.color : null;
+    const { awayRaw } = resolveTeamColors(sport, game?.away?.abbr, game?.home?.abbr, rawAway, rawHome);
+    return getVisibleTeamColor(awayRaw);
+  })();
+
+  const homeScoreColor = (() => {
+    if (!game) return '#10B981';
+    const validColor = (c) => c && c !== '000000' && c !== 'ffffff' && c.length === 6;
+    const rawAway = validColor(game?.away?.color) ? game.away.color : null;
+    const rawHome = validColor(game?.home?.color) ? game.home.color : null;
+    const { homeRaw } = resolveTeamColors(sport, game?.away?.abbr, game?.home?.abbr, rawAway, rawHome);
+    return getVisibleTeamColor(homeRaw);
+  })();
+
   const chatPanel = (
     <div className={styles.chatWrap} style={isMobile ? { width: '100%' } : { width: `${100 - splitPct}%` }}>
       <div className={styles.chatHeader}>
@@ -976,9 +994,9 @@ export default function GameRoom() {
       const pt = getPlayType(play, sport);
       let bc = 'transparent', bg = 'transparent', op = 1;
       if (isLight) {
-        // Light mode — only left border, no background tints
-        if (pt === 'scoring') { bc = color || awayColor; bg = `${bc}08`; }
-        else if (pt === 'hit') { bc = color ? `${color}66` : 'rgba(0,0,0,0.12)'; bg = 'transparent'; }
+        // Light mode — stronger tint on scoring, clean on others
+        if (pt === 'scoring') { bc = color || awayColor; bg = `${bc}22`; }
+        else if (pt === 'hit') { bc = color ? `${color}66` : 'rgba(0,0,0,0.12)'; bg = color ? `${color}0e` : 'transparent'; }
         else if (pt === 'save') { bc = 'rgba(99,102,241,0.5)'; bg = 'transparent'; }
         else if (pt === 'penalty') { bc = 'rgba(245,158,11,0.6)'; bg = 'transparent'; }
         else if (pt === 'physical') { bc = 'rgba(239,68,68,0.35)'; bg = 'transparent'; }
@@ -1056,7 +1074,7 @@ export default function GameRoom() {
       const isPH = /hit for|pinch.hit|pinch hit/.test(tx);
       let bc = tc ? `${tc}55` : (isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.08)'), bg = 'transparent';
       if (isLight) {
-        if (isScoring) { bc = tc ? `${tc}99` : awayColor; bg = tc ? `${tc}08` : `${awayColor}08`; }
+        if (isScoring) { bc = tc ? `${tc}99` : awayColor; bg = tc ? `${tc}18` : `${awayColor}18`; }
         else if (isHit) { bc = tc ? `${tc}99` : '#10B981'; bg = 'transparent'; }
         else if (isWalk) { bc = 'rgba(245,158,11,0.6)'; bg = 'transparent'; }
         else if (isOut) { bc = 'rgba(239,68,68,0.4)'; bg = 'transparent'; }
@@ -1165,7 +1183,7 @@ export default function GameRoom() {
             <div className={styles.teamBlock}>
               {game.away.logo && <img src={game.away.logo} alt={game.away.abbr} className={styles.teamLogo} />}
               <div className={styles.teamAbbr}>{game.away.abbr}</div>
-              {showScore(game.status) && <div className={`${styles.score} ${game.away.score > game.home.score ? styles.scoreLeading : ''}`}>{game.away.score ?? 0}</div>}
+              {showScore(game.status) && <div className={`${styles.score} ${game.away.score > game.home.score ? styles.scoreLeading : ''}`} style={{background: `${awayScoreColor}18`, padding: '2px 10px', borderRadius: '8px'}}>{game.away.score ?? 0}</div>}
             </div>
             <div className={styles.gameInfo}>
               <div className={`${styles.gameStatus} ${live ? styles.gameStatusLive : ''}`}>
@@ -1178,7 +1196,7 @@ export default function GameRoom() {
             <div className={styles.teamBlock}>
               {game.home.logo && <img src={game.home.logo} alt={game.home.abbr} className={styles.teamLogo} />}
               <div className={styles.teamAbbr}>{game.home.abbr}</div>
-              {showScore(game.status) && <div className={`${styles.score} ${game.home.score > game.away.score ? styles.scoreLeading : ''}`}>{game.home.score ?? 0}</div>}
+              {showScore(game.status) && <div className={`${styles.score} ${game.home.score > game.away.score ? styles.scoreLeading : ''}`} style={{background: `${homeScoreColor}18`, padding: '2px 10px', borderRadius: '8px'}}>{game.home.score ?? 0}</div>}
             </div>
           </div>
         ) : <div className={styles.scoreBoardLoading}>Loading game...</div>}
