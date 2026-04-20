@@ -9,7 +9,7 @@
 
 .scoreHeader {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 0 clamp(1rem, 3vw, 2rem); height: 64px;
+  padding: 0 clamp(1rem, 3vw, 2rem); height: 72px;
   background: var(--bg-secondary); border-bottom: 1px solid var(--border-subtle);
   gap: 1rem; position: sticky; top: 62px; z-index: 100;
 }
@@ -20,21 +20,21 @@
 }
 .backBtn:hover { color: var(--text-primary); }
 
-.scoreBoard { display: flex; align-items: center; gap: 12px; flex: 1; justify-content: center; min-width: 0; }
+.scoreBoard { display: flex; align-items: center; gap: 20px; flex: 1; justify-content: center; min-width: 0; }
 .scoreBoardLoading { flex: 1; text-align: center; color: var(--text-muted); font-size: 14px; }
 
-.teamBlock { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 50px; }
-.teamLogo { width: 28px; height: 28px; object-fit: contain; }
-.teamAbbr { font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 800; color: var(--text-muted); letter-spacing: 0.05em; }
-.score { font-family: 'Syne', sans-serif; font-size: 26px; font-weight: 800; color: var(--text-muted); line-height: 1; }
+.teamBlock { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 60px; }
+.teamLogo { width: 32px; height: 32px; object-fit: contain; }
+.teamAbbr { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 800; color: var(--text-muted); letter-spacing: 0.05em; }
+.score { font-family: 'Syne', sans-serif; font-size: 30px; font-weight: 800; color: var(--text-muted); line-height: 1; }
 .scoreLeading { color: var(--text-primary); }
 
-.gameInfo { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 110px; text-align: center; }
+.gameInfo { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 130px; text-align: center; }
 .gameStatus { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: var(--text-muted); font-family: 'Syne', sans-serif; }
 .gameStatusLive { color: #EF4444; }
 .liveDot { width: 6px; height: 6px; border-radius: 50%; background: #EF4444; animation: livepulse 1.4s ease infinite; flex-shrink: 0; }
 @keyframes livepulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
-.gameName { font-size: 11px; color: var(--text-muted); font-family: 'DM Sans', sans-serif; }
+.gameName { font-size: 12px; color: var(--text-muted); font-family: 'DM Sans', sans-serif; }
 .gameBroadcast { font-size: 10px; color: var(--text-faint); }
 
 .debateBtn { font-family: 'Syne', sans-serif; font-weight: 700; color: #EEF2FF; background: var(--accent-blue); border-radius: 8px; text-decoration: none; transition: background 0.2s; white-space: nowrap; flex-shrink: 0; border: none; cursor: pointer; }
@@ -74,8 +74,8 @@
 .dividerHandle { width: 3px; height: 32px; border-radius: 3px; background: var(--divider-handle); }
 
 .chatWrap { display: flex; flex-direction: column; overflow: hidden; background: var(--bg-secondary); border-left: 1px solid var(--border-subtle); }
-.chatHeader { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-secondary); flex-shrink: 0; }
-.colHeader { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 800; color: var(--text-primary); }
+.chatHeader { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border-subtle); background: var(--bg-secondary); flex-shrink: 0; }
+.colHeader { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 800; color: var(--text-primary); }
 .chatOnline { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-muted); }
 .onlineDot { width: 6px; height: 6px; border-radius: 50%; background: #10B981; }
 
@@ -144,10 +144,11 @@
 @media (max-width: 768px) {
   .mobileLayout { display: flex; flex-direction: column; flex: 1; overflow: hidden; height: calc(100vh - 130px); }
   .mainContent { display: none; }
-  .scoreHeader { height: auto; padding: 8px clamp(0.75rem, 3vw, 1.5rem); flex-wrap: wrap; gap: 8px; top: 62px; }
-  .teamLogo { width: 22px; height: 22px; }
-  .score { font-size: 22px; }
-  .gameInfo { min-width: 80px; }
+  .scoreHeader { height: auto; min-height: 64px; padding: 10px clamp(0.75rem, 3vw, 1.5rem); flex-wrap: wrap; gap: 8px; top: 62px; }
+  .teamLogo { width: 26px; height: 26px; }
+  .score { font-size: 24px; }
+  .gameInfo { min-width: 90px; }
+  .scoreBoard { gap: 12px; }
   .debateBtnFull { display: none; }
   .debateBtnShort { display: inline; }
   .cameraBar { padding: 8px 1rem; }
