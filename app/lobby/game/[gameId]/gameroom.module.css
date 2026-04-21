@@ -8,7 +8,7 @@
 
 .scoreHeader {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 8px clamp(1rem, 3vw, 2rem);
+  padding: 10px clamp(1rem, 3vw, 2rem);
   min-height: 64px;
   background: var(--bg-secondary); border-bottom: 1px solid var(--border-subtle);
   gap: 1rem; position: sticky; top: 62px; z-index: 100;
@@ -77,8 +77,8 @@
 .mainContent { display: flex; height: calc(100vh - 130px); overflow: hidden; }
 .gamecastCol { display: flex; flex-direction: column; border-right: none; overflow: hidden; min-width: 0; }
 
-.mainStatsTabs { display: flex; border-bottom: 1px solid var(--border-subtle); background: var(--bg-secondary); flex-shrink: 0; }
-.mainStatsTab { flex: 1; padding: 16px 8px; font-size: 13px; font-weight: 600; color: var(--text-muted); background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+.mainStatsTabs { display: flex; border-bottom: 1px solid var(--border-subtle); background: var(--bg-secondary); flex-shrink: 0; padding-top: 4px; }
+.mainStatsTab { flex: 1; padding: 12px 8px; font-size: 13px; font-weight: 600; color: var(--text-muted); background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
 .mainStatsTab:hover { color: var(--text-primary); }
 .mainStatsTabActive { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
 
