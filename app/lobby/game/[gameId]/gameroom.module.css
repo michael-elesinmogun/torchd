@@ -38,8 +38,7 @@
 .score {
   font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800;
   color: var(--text-muted);
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: tabular-nums lining-nums;
   display: flex; align-items: center; justify-content: center;
   height: 40px; min-width: 44px;
 }
@@ -79,11 +78,11 @@
 .gamecastCol { display: flex; flex-direction: column; border-right: none; overflow: hidden; min-width: 0; }
 
 .mainStatsTabs { display: flex; border-bottom: 1px solid var(--border-subtle); background: var(--bg-secondary); flex-shrink: 0; }
-.mainStatsTab { flex: 1; padding: 12px 8px; font-size: 13px; font-weight: 600; color: var(--text-muted); background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+.mainStatsTab { flex: 1; padding: 16px 8px; font-size: 13px; font-weight: 600; color: var(--text-muted); background: none; border: none; cursor: pointer; border-bottom: 2px solid transparent; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
 .mainStatsTab:hover { color: var(--text-primary); }
 .mainStatsTabActive { color: var(--accent-blue); border-bottom-color: var(--accent-blue); }
 
-.periodTabs { display: flex; gap: 4px; padding: 8px 12px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-subtle); flex-wrap: wrap; flex-shrink: 0; }
+.periodTabs { display: flex; gap: 6px; padding: 10px 14px; background: var(--bg-secondary); border-bottom: 1px solid var(--border-subtle); flex-wrap: wrap; flex-shrink: 0; }
 .periodTab { font-size: 11px; font-weight: 700; font-family: 'Syne', sans-serif; padding: 4px 10px; border-radius: 100px; border: 1px solid var(--border-subtle); background: var(--tab-bg); color: var(--text-muted); cursor: pointer; transition: all 0.15s; }
 .periodTab:hover { color: var(--text-primary); border-color: var(--border-hover); }
 .periodTabActive { background: var(--tab-active-bg); color: var(--tab-active-color); border-color: var(--border-active); }
