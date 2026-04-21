@@ -4,7 +4,6 @@
   font-family: 'DM Sans', sans-serif;
   min-height: 100vh;
   overflow-x: hidden;
-  padding-top: 62px;
 }
 
 .scoreHeader {
@@ -12,7 +11,7 @@
   padding: 8px clamp(1rem, 3vw, 2rem);
   min-height: 64px;
   background: var(--bg-secondary); border-bottom: 1px solid var(--border-subtle);
-  gap: 1rem; position: sticky; top: 0; z-index: 100;
+  gap: 1rem; position: sticky; top: 62px; z-index: 100;
 }
 
 .backBtn {
@@ -40,8 +39,9 @@
   font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800;
   color: var(--text-muted);
   line-height: 1;
+  font-variant-numeric: tabular-nums;
   display: flex; align-items: center; justify-content: center;
-  height: 40px;
+  height: 40px; min-width: 44px;
 }
 .scoreLeading { color: var(--text-primary); }
 
@@ -170,7 +170,7 @@
 @media (max-width: 768px) {
   .mobileLayout { display: flex; flex-direction: column; flex: 1; overflow: hidden; height: calc(100vh - 130px); }
   .mainContent { display: none; }
-  .scoreHeader { height: auto; min-height: 64px; padding: 10px clamp(0.75rem, 3vw, 1.5rem); flex-wrap: wrap; gap: 8px; top: 0; }
+  .scoreHeader { height: auto; min-height: 64px; padding: 10px clamp(0.75rem, 3vw, 1.5rem); flex-wrap: wrap; gap: 8px; top: 62px; }
   .teamLogo { width: 26px; height: 26px; }
   .score { font-size: 24px; }
   .gameInfo { min-width: 90px; }
