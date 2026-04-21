@@ -35,7 +35,7 @@ function UserCard({ u, index, styles }) {
       <div className={styles.followListAv} style={{ background: bg }}>{initials}</div>
       <div>
         <div className={styles.followListName}>{u.full_name || u.username}</div>
-        <div style={{ fontSize: '12px', color: '#6B7A9E' }}>@{u.username}</div>
+        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>@{u.username}</div>
       </div>
     </Link>
   );
@@ -55,7 +55,8 @@ export default function Profile({ params }) {
   const [profile, setProfile] = useState(null);
   const [displayName, setDisplayName] = useState('');
   const [initials, setInitials] = useState('?');
-  const [loading, setLoading] = useState(true); // only true until profile loaded
+  const [loading, setLoading] = useState(true);
+  const [isLight, setIsLight] = useState(false);
 
   const [editingHandle, setEditingHandle] = useState(false);
   const [handleInput, setHandleInput] = useState(username);
@@ -98,8 +99,16 @@ export default function Profile({ params }) {
   const [stats, setStats] = useState({ wins: 0, losses: 0, battles_count: 0, rank: null });
 
   useEffect(() => {
+    setIsLight(document.documentElement.getAttribute('data-theme') === 'light');
+    const observer = new MutationObserver(() => {
+      setIsLight(document.documentElement.getAttribute('data-theme') === 'light');
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
     async function fetchProfile() {
-      // PHASE 1: load auth + profile immediately → unblock render
       const { data: { session } } = await supabase.auth.getSession();
       const currentUser = session?.user;
       setUser(currentUser);
@@ -135,17 +144,13 @@ export default function Profile({ params }) {
         const wins = profileData.wins || 0;
         const losses = profileData.losses || 0;
         const battles = profileData.battles_count || 0;
-        // Set stats immediately without rank — rank loads async below
         setStats({ wins, losses, battles_count: battles, rank: null });
 
-        // PHASE 2: fire all remaining queries in parallel, don't block render
         Promise.all([
-          // Rank (expensive COUNT query)
           supabase.from('profiles').select('id', { count: 'exact', head: true })
             .eq('show_on_leaderboard', true).eq('is_public', true).gt('wins', wins)
             .then(({ count }) => setStats(s => ({ ...s, rank: (count ?? 0) + 1 }))),
 
-          // Battles
           Promise.all([
             supabase.from('battles').select('*').eq('player1_username', username).eq('status', 'ended').order('ended_at', { ascending: false }).limit(50),
             supabase.from('battles').select('*').eq('player2_username', username).eq('status', 'ended').order('ended_at', { ascending: false }).limit(50),
@@ -155,7 +160,6 @@ export default function Profile({ params }) {
             setBattlesLoading(false);
           }),
 
-          // Followers
           supabase.from('follows').select('follower_id').eq('following_username', username)
             .then(async ({ data: followersRaw }) => {
               const ids = followersRaw?.map(f => f.follower_id) || [];
@@ -163,12 +167,9 @@ export default function Profile({ params }) {
               if (ids.length > 0) {
                 const { data: fp } = await supabase.from('profiles').select('username, full_name').in('id', ids);
                 setFollowerList(fp || []);
-              } else {
-                setFollowerList([]);
-              }
+              } else setFollowerList([]);
             }),
 
-          // Following
           profileData.id
             ? supabase.from('follows').select('following_username').eq('follower_id', profileData.id)
                 .then(async ({ data: followingRaw }) => {
@@ -177,13 +178,10 @@ export default function Profile({ params }) {
                   if (usernames.length > 0) {
                     const { data: fp } = await supabase.from('profiles').select('username, full_name').in('username', usernames);
                     setFollowingList(fp || []);
-                  } else {
-                    setFollowingList([]);
-                  }
+                  } else setFollowingList([]);
                 })
             : Promise.resolve(),
 
-          // Is following
           currentUser
             ? supabase.from('follows').select('id').eq('follower_id', currentUser.id).eq('following_username', username).maybeSingle()
                 .then(({ data }) => setIsFollowing(!!data))
@@ -197,7 +195,7 @@ export default function Profile({ params }) {
         setListsLoading(false);
       }
 
-      setLoading(false); // profile loaded — show page
+      setLoading(false);
     }
 
     fetchProfile();
@@ -276,11 +274,20 @@ export default function Profile({ params }) {
   const progressPct = Math.round((completedCount / totalCount) * 100);
   const suggestedTopics = favSports.length > 0 ? SUGGESTED_TOPICS[favSports[0]] || [] : SUGGESTED_TOPICS['NBA'];
 
+  // Theme-aware colors
+  const cardBg = isLight ? '#FFFFFF' : '#0f1623';
+  const cardBorder = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.065)';
+  const innerBg = isLight ? '#F8FAFC' : '#151e2e';
+  const textPrimary = isLight ? '#0D1117' : '#EEF2FF';
+  const textMuted = isLight ? '#64748B' : '#6B7A9E';
+  const textFaint = isLight ? '#94A3B8' : '#3D4A66';
+  const borderSubtle = isLight ? 'rgba(0,0,0,0.06)' : 'rgba(255,255,255,0.065)';
+
   if (loading) {
     return (
       <main className={styles.main}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '80vh' }}>
-          <div style={{ fontFamily: 'Syne,sans-serif', fontSize: '18px', color: '#6B7A9E' }}>Loading profile...</div>
+          <div style={{ fontFamily: 'Syne,sans-serif', fontSize: '18px', color: textMuted }}>Loading profile...</div>
         </div>
       </main>
     );
@@ -400,7 +407,7 @@ export default function Profile({ params }) {
                   <div className={styles.sportBadges}>
                     {favSports.length > 0
                       ? favSports.map(sport => <div key={sport} className={styles.sportBadge}>{sport}</div>)
-                      : <div style={{ fontSize: '13px', color: '#3D4A66' }}>No sports selected yet</div>}
+                      : <div style={{ fontSize: '13px', color: textFaint }}>No sports selected yet</div>}
                   </div>
                   <div className={styles.teamBadges}>
                     {favTeams.map(team => <div key={team} className={styles.teamBadge}>🏆 {team}</div>)}
@@ -413,26 +420,26 @@ export default function Profile({ params }) {
               <div className={styles.sideCardTitle}>Stats</div>
               <div className={styles.statsGrid}>
                 <div className={styles.statItem}>
-                  <div className={styles.statNum} style={{ color: stats.battles_count > 0 ? '#EEF2FF' : '#3D4A66' }}>{stats.battles_count}</div>
+                  <div className={styles.statNum} style={{ color: stats.battles_count > 0 ? textPrimary : textFaint }}>{stats.battles_count}</div>
                   <div className={styles.statLabel}>Battles</div>
                 </div>
                 <div className={styles.statItem}>
-                  <div className={styles.statNum} style={{ color: stats.wins > 0 ? '#10B981' : '#3D4A66' }}>{stats.wins > 0 ? `${stats.wins}W` : '—'}</div>
+                  <div className={styles.statNum} style={{ color: stats.wins > 0 ? '#10B981' : textFaint }}>{stats.wins > 0 ? `${stats.wins}W` : '—'}</div>
                   <div className={styles.statLabel}>Wins</div>
                 </div>
                 <div className={styles.statItem}>
-                  <div className={styles.statNum} style={{ color: stats.battles_count > 0 ? '#EEF2FF' : '#3D4A66' }}>{winRate}</div>
+                  <div className={styles.statNum} style={{ color: stats.battles_count > 0 ? textPrimary : textFaint }}>{winRate}</div>
                   <div className={styles.statLabel}>Win Rate</div>
                 </div>
                 <div className={styles.statItem}>
-                  <div className={styles.statNum} style={{ color: stats.rank ? '#F59E0B' : '#3D4A66' }}>
+                  <div className={styles.statNum} style={{ color: stats.rank ? '#F59E0B' : textFaint }}>
                     {stats.rank === null ? '...' : stats.rank && stats.battles_count > 0 ? `#${stats.rank}` : '—'}
                   </div>
                   <div className={styles.statLabel}>Rank</div>
                 </div>
               </div>
               {stats.battles_count > 0 && (
-                <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#6B7A9E' }}>
+                <div style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: `1px solid ${borderSubtle}`, display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: textMuted }}>
                   <span>{stats.wins}W — {stats.losses}L</span>
                   <Link href="/leaderboard" style={{ color: '#3B82F6', textDecoration: 'none' }}>View leaderboard →</Link>
                 </div>
@@ -455,7 +462,7 @@ export default function Profile({ params }) {
 
             {activeTab === 'battles' && (
               battlesLoading ? (
-                <div className={styles.emptyState}><div style={{ color: '#6B7A9E', fontSize: '14px' }}>Loading...</div></div>
+                <div className={styles.emptyState}><div style={{ color: textMuted, fontSize: '14px' }}>Loading...</div></div>
               ) : battleHistory.length === 0 ? (
                 <div className={styles.emptyState}>
                   <div className={styles.emptyIcon}>⚔️</div>
@@ -469,7 +476,7 @@ export default function Profile({ params }) {
                     const isP1 = battle.player1_username === username;
                     const opponent = isP1 ? battle.player2_username : battle.player1_username;
                     const myStance = isP1 ? battle.player1_stance : battle.player2_stance;
-                    let result = 'pending', resultLabel = '—', resultColor = '#6B7A9E';
+                    let result = 'pending', resultLabel = '—', resultColor = textMuted;
                     if (battle.winner) {
                       if (battle.winner === 'tie') { result = 'tie'; resultLabel = 'Tie'; resultColor = '#F59E0B'; }
                       else if (battle.winner === username) { result = 'win'; resultLabel = 'Win'; resultColor = '#10B981'; }
@@ -477,17 +484,27 @@ export default function Profile({ params }) {
                     }
                     return (
                       <Link key={battle.id} href={`/battle/room/${battle.id}`} style={{ textDecoration: 'none' }}>
-                        <div style={{ background: '#0f1623', border: `1px solid ${result === 'win' ? 'rgba(16,185,129,0.2)' : result === 'loss' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.065)'}`, borderRadius: '14px', padding: '1rem 1.25rem', transition: 'border-color 0.2s', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <div style={{
+                          background: cardBg,
+                          border: `1px solid ${result === 'win' ? 'rgba(16,185,129,0.2)' : result === 'loss' ? 'rgba(239,68,68,0.15)' : cardBorder}`,
+                          borderRadius: '14px', padding: '1rem 1.25rem', transition: 'border-color 0.2s',
+                          display: 'flex', flexDirection: 'column', gap: '8px'
+                        }}>
                           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
                             <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', color: '#EEF2FF', lineHeight: 1.4, marginBottom: '4px' }}>"{battle.topic}"</div>
-                              {myStance && <div style={{ fontSize: '12px', color: '#6B7A9E' }}>Your stance: <span style={{ color: '#C4CCDF' }}>{myStance}</span></div>}
+                              <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 700, fontSize: '14px', color: textPrimary, lineHeight: 1.4, marginBottom: '4px' }}>"{battle.topic}"</div>
+                              {myStance && <div style={{ fontSize: '12px', color: textMuted }}>Your stance: <span style={{ color: isLight ? '#2D3748' : '#C4CCDF' }}>{myStance}</span></div>}
                             </div>
-                            <div style={{ fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: '13px', color: resultColor, background: result === 'win' ? 'rgba(16,185,129,0.1)' : result === 'loss' ? 'rgba(239,68,68,0.1)' : result === 'tie' ? 'rgba(245,158,11,0.1)' : 'rgba(255,255,255,0.05)', border: `1px solid ${result === 'win' ? 'rgba(16,185,129,0.25)' : result === 'loss' ? 'rgba(239,68,68,0.2)' : result === 'tie' ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '100px', padding: '3px 12px', flexShrink: 0 }}>
+                            <div style={{
+                              fontFamily: 'Syne,sans-serif', fontWeight: 800, fontSize: '13px', color: resultColor,
+                              background: result === 'win' ? 'rgba(16,185,129,0.1)' : result === 'loss' ? 'rgba(239,68,68,0.1)' : result === 'tie' ? 'rgba(245,158,11,0.1)' : isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)',
+                              border: `1px solid ${result === 'win' ? 'rgba(16,185,129,0.25)' : result === 'loss' ? 'rgba(239,68,68,0.2)' : result === 'tie' ? 'rgba(245,158,11,0.2)' : isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.08)'}`,
+                              borderRadius: '100px', padding: '3px 12px', flexShrink: 0
+                            }}>
                               {result === 'win' ? '🏆 ' : result === 'tie' ? '🤝 ' : ''}{resultLabel}
                             </div>
                           </div>
-                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', color: '#6B7A9E' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '12px', color: textMuted }}>
                             <span>vs <Link href={`/profile/${opponent}`} onClick={e => e.stopPropagation()} style={{ color: '#60A5FA', textDecoration: 'none', fontWeight: 600 }}>@{opponent}</Link></span>
                             <span>{formatDate(battle.ended_at || battle.created_at)}</span>
                           </div>
@@ -500,7 +517,7 @@ export default function Profile({ params }) {
             )}
 
             {activeTab === 'followers' && (
-              listsLoading ? <div className={styles.emptyState}><div style={{ color: '#6B7A9E', fontSize: '14px' }}>Loading...</div></div>
+              listsLoading ? <div className={styles.emptyState}><div style={{ color: textMuted, fontSize: '14px' }}>Loading...</div></div>
               : followerList.length === 0 ? (
                 <div className={styles.emptyState}>
                   <div className={styles.emptyIcon}>👥</div>
@@ -514,7 +531,7 @@ export default function Profile({ params }) {
             )}
 
             {activeTab === 'following' && (
-              listsLoading ? <div className={styles.emptyState}><div style={{ color: '#6B7A9E', fontSize: '14px' }}>Loading...</div></div>
+              listsLoading ? <div className={styles.emptyState}><div style={{ color: textMuted, fontSize: '14px' }}>Loading...</div></div>
               : followingList.length === 0 ? (
                 <div className={styles.emptyState}>
                   <div className={styles.emptyIcon}>👀</div>

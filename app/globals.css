@@ -360,4 +360,109 @@ html[data-theme="light"] {
 
 @media(max-width: 768px) {
   nav ul { display: none !important; }
-}}
+}
+
+/* ══════════════════════════════════════════════
+   PROFILE PAGE — light mode
+   ══════════════════════════════════════════════ */
+[data-theme="light"] .main {
+  background: #F4F6FB !important;
+  color: #0D1117 !important;
+}
+
+/* Profile card & side cards */
+[data-theme="light"] [class*="profileCard"],
+[data-theme="light"] [class*="sideCard"],
+[data-theme="light"] [class*="checklistCard"],
+[data-theme="light"] [class*="firstBattleCard"],
+[data-theme="light"] [class*="suggestedCard"],
+[data-theme="light"] [class*="emptyState"],
+[data-theme="light"] [class*="tabs"],
+[data-theme="light"] [class*="followListItem"] {
+  background: #FFFFFF !important;
+  border-color: rgba(0,0,0,0.08) !important;
+}
+
+/* Text colors */
+[data-theme="light"] [class*="profileName"],
+[data-theme="light"] [class*="followNum"],
+[data-theme="light"] [class*="checklistTitle"],
+[data-theme="light"] [class*="firstBattleTitle"],
+[data-theme="light"] [class*="suggestedTitle"],
+[data-theme="light"] [class*="emptyTitle"],
+[data-theme="light"] [class*="followListName"],
+[data-theme="light"] [class*="tabActive"] { color: #0D1117 !important; }
+
+[data-theme="light"] [class*="profileHandle"],
+[data-theme="light"] [class*="profileLocation"],
+[data-theme="light"] [class*="profileBio"],
+[data-theme="light"] [class*="followLabel"],
+[data-theme="light"] [class*="sideCardTitle"],
+[data-theme="light"] [class*="checklistSub"],
+[data-theme="light"] [class*="firstBattleBody"],
+[data-theme="light"] [class*="suggestedSub"],
+[data-theme="light"] [class*="emptyBody"],
+[data-theme="light"] [class*="statLabel"],
+[data-theme="light"] [class*="avatarHint"],
+[data-theme="light"] [class*="tab"]:not([class*="tabActive"]) { color: #64748B !important; }
+
+/* Stats grid */
+[data-theme="light"] [class*="statsGrid"] { background: rgba(0,0,0,0.06) !important; }
+[data-theme="light"] [class*="statItem"] { background: #FFFFFF !important; }
+
+/* Checklist items */
+[data-theme="light"] [class*="checklistItem"] {
+  background: #F8FAFC !important;
+  border-color: rgba(0,0,0,0.06) !important;
+}
+[data-theme="light"] [class*="checklistDone"] {
+  background: rgba(16,185,129,0.05) !important;
+  border-color: rgba(16,185,129,0.2) !important;
+}
+[data-theme="light"] [class*="checklistItemTitle"] { color: #0D1117 !important; }
+[data-theme="light"] [class*="checklistItemSub"] { color: #64748B !important; }
+[data-theme="light"] [class*="checkmark"] {
+  background: #F1F5F9 !important;
+  border-color: rgba(0,0,0,0.1) !important;
+}
+[data-theme="light"] [class*="progressTrack"] { background: #E8ECF5 !important; }
+
+/* Topic rows */
+[data-theme="light"] [class*="topicRow"] {
+  background: #F8FAFC !important;
+  border-color: rgba(0,0,0,0.06) !important;
+}
+[data-theme="light"] [class*="topicText"] { color: #0D1117 !important; }
+
+/* Buttons */
+[data-theme="light"] [class*="challengeBtn"],
+[data-theme="light"] [class*="shareBtn"],
+[data-theme="light"] [class*="settingsBtn"] {
+  background: #F8FAFC !important;
+  border-color: rgba(0,0,0,0.08) !important;
+  color: #64748B !important;
+}
+[data-theme="light"] [class*="followingBtn"] {
+  background: #EFF6FF !important;
+  border-color: rgba(37,99,235,0.2) !important;
+  color: #2563EB !important;
+}
+
+/* Sport/team badges */
+[data-theme="light"] [class*="sportEditBtn"],
+[data-theme="light"] [class*="teamEditBtn"],
+[data-theme="light"] [class*="teamBadge"] {
+  background: #F1F5F9 !important;
+  border-color: rgba(0,0,0,0.08) !important;
+  color: #64748B !important;
+}
+
+/* Inputs */
+[data-theme="light"] [class*="bioTextarea"],
+[data-theme="light"] [class*="handleInput"],
+[data-theme="light"] [class*="locationInput"] {
+  background: #F8FAFC !important;
+  border-color: rgba(0,0,0,0.12) !important;
+  color: #0D1117 !important;
+}
+[data-theme="light"] [class*="followDivider"] { background: rgba(0,0,0,0.08) !important; }}
