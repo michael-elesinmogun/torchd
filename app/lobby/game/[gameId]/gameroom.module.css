@@ -2,11 +2,10 @@
   background: var(--bg-primary);
   color: var(--text-primary);
   font-family: 'DM Sans', sans-serif;
-  min-height: 100vh;
-  overflow-x: hidden;
+  height: 100vh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  padding-top: 62px;
 }
 
 .scoreHeader {
@@ -14,7 +13,8 @@
   padding: 10px clamp(1rem, 3vw, 2rem);
   min-height: 64px;
   background: var(--bg-secondary); border-bottom: 1px solid var(--border-subtle);
-  gap: 1rem; position: sticky; top: 62px; z-index: 100;
+  gap: 1rem; position: relative; z-index: 100;
+  margin-top: 62px;
   flex-shrink: 0;
 }
 
@@ -173,7 +173,7 @@
 @media (max-width: 768px) {
   .mobileLayout { display: flex; flex-direction: column; flex: 1; overflow: hidden; min-height: 0; }
   .mainContent { display: none; }
-  .scoreHeader { height: auto; min-height: 64px; padding: 10px clamp(0.75rem, 3vw, 1.5rem); flex-wrap: wrap; gap: 8px; top: 62px; }
+  .scoreHeader { height: auto; min-height: 64px; padding: 10px clamp(0.75rem, 3vw, 1.5rem); flex-wrap: wrap; gap: 8px; margin-top: 62px; }
   .teamLogo { width: 26px; height: 26px; }
   .score { font-size: 24px; }
   .gameInfo { min-width: 90px; }
