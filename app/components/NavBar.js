@@ -287,4 +287,5 @@ export default function NavBar() {
       `}</style>
     </>
   );
+  <li><Link href="/communities">Communities</Link></li>
 }

@@ -1,0 +1,134 @@
+.main {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+}
+
+.page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 5rem clamp(1rem, 4vw, 2rem) 5rem;
+}
+
+/* Header */
+.header { margin-bottom: 2rem; }
+
+.eyebrow {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: #60A5FA; margin-bottom: 0.5rem;
+}
+
+.pageTitle {
+  font-family: 'Syne', sans-serif;
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  font-weight: 800; color: var(--text-primary);
+  letter-spacing: -0.02em; margin-bottom: 0.5rem;
+}
+
+.pageSub { font-size: 15px; color: var(--text-muted); max-width: 480px; }
+
+/* League tabs */
+.leagueTabs {
+  display: flex; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 1.5rem;
+}
+
+.leagueTab {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--bg-card); border: 2px solid var(--border-subtle);
+  border-radius: 12px; padding: 10px 20px;
+  font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 800;
+  color: var(--text-muted); cursor: pointer; transition: all 0.2s;
+}
+.leagueTab:hover { color: var(--text-primary); border-color: var(--border-hover); }
+.leagueTabActive { }
+
+.leagueIcon { font-size: 18px; }
+.leagueName { }
+
+/* League hero */
+.leagueHero {
+  display: flex; align-items: center; gap: 1.25rem;
+  border: 1px solid; border-radius: 16px; padding: 1.25rem 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.leagueHeroIcon { font-size: 40px; flex-shrink: 0; }
+.leagueHeroName {
+  font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800;
+  color: var(--text-primary); margin-bottom: 4px;
+}
+.leagueHeroDesc { font-size: 14px; color: var(--text-muted); line-height: 1.5; }
+
+/* Section label */
+.sectionLabel {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--text-muted); margin-bottom: 1rem;
+}
+
+/* Teams grid */
+.teamsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 0.75rem;
+}
+
+.teamCard {
+  text-decoration: none;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  overflow: hidden;
+  transition: all 0.2s;
+  position: relative;
+}
+.teamCard:hover {
+  border-color: var(--team-color, #3B82F6);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+}
+
+.teamCardAccent {
+  height: 3px; width: 100%;
+}
+
+.teamCardInner {
+  display: flex; align-items: center; gap: 12px;
+  padding: 0.875rem 1rem;
+}
+
+.teamLogo {
+  width: 40px; height: 40px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.teamLogoImg {
+  width: 40px; height: 40px; object-fit: contain;
+}
+
+.teamInfo { flex: 1; min-width: 0; }
+
+.teamAbbr {
+  font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 800;
+  letter-spacing: 0.04em; margin-bottom: 2px;
+}
+
+.teamName {
+  font-size: 12px; color: var(--text-muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.teamArrow {
+  font-size: 14px; color: var(--text-faint); flex-shrink: 0;
+  transition: transform 0.2s;
+}
+.teamCard:hover .teamArrow { transform: translateX(3px); color: var(--text-muted); }
+
+@media (max-width: 600px) {
+  .teamsGrid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.5rem; }
+  .leagueTabs { gap: 0.5rem; }
+  .leagueTab { font-size: 13px; padding: 8px 14px; }
+  .leagueHero { padding: 1rem; gap: 1rem; }
+  .leagueHeroIcon { font-size: 32px; }
+  .leagueHeroName { font-size: 16px; }
+}
