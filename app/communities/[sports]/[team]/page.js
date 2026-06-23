@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { supabase } from '../../../../supabase';
+import { supabase } from '../../../supabase';
 import styles from './team.module.css';
 
 const TEAM_DATA = {
