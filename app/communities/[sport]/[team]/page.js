@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { supabase } from '../../../supabase';
@@ -139,6 +139,38 @@ const TEAM_DATA = {
   },
 };
 
+const AVATAR_COLORS = ['#3B82F6','#10B981','#F59E0B','#8B5CF6','#EF4444','#06B6D4','#EC4899'];
+
+function getInitials(fullName, username) {
+  if (fullName) return fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  return (username || '?').slice(0, 2).toUpperCase();
+}
+
+function Avatar({ username, fullName, size = 36, colorIndex = 0 }) {
+  const bg = AVATAR_COLORS[colorIndex % AVATAR_COLORS.length];
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%', background: bg,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: size * 0.33, fontFamily: 'Syne, sans-serif', fontWeight: 800,
+      color: 'white', flexShrink: 0,
+    }}>
+      {getInitials(fullName, username)}
+    </div>
+  );
+}
+
+function timeAgo(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 export default function TeamCommunity() {
   const params = useParams();
   const sport = params?.sport;
@@ -148,45 +180,60 @@ export default function TeamCommunity() {
   const teamColor = teamInfo?.color || '#3B82F6';
   const logoUrl = `https://a.espncdn.com/i/teamlogos/${sport}/500/${teamAbbr?.toLowerCase()}.png`;
 
-  const [activeTab, setActiveTab] = useState('debates');
+  const [activeTab, setActiveTab] = useState('chat');
   const [fans, setFans] = useState([]);
   const [battles, setBattles] = useState([]);
+  const [messages, setMessages] = useState([]);
+  const [msgInput, setMsgInput] = useState('');
+  const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
+  const [userProfile, setUserProfile] = useState(null);
   const [isMember, setIsMember] = useState(false);
   const [memberCount, setMemberCount] = useState(0);
   const [joining, setJoining] = useState(false);
+  const chatBottomRef = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
+    if (!sport || !teamAbbr) return;
+
     async function load() {
       const { data: { session } } = await supabase.auth.getSession();
       const currentUser = session?.user;
       setUser(currentUser);
 
-      // Load fans who follow this team
-      const { data: profiles } = await supabase
-        .from('profiles')
-        .select('username, full_name, wins, battles_count, avatar_url')
-        .ilike('sport', sport === 'nba' ? 'nba' : sport === 'nfl' ? 'nfl' : sport === 'mlb' ? 'mlb' : 'nhl')
-        .order('wins', { ascending: false })
-        .limit(50);
-      setFans(profiles || []);
-      setMemberCount(profiles?.length || 0);
-
-      // Check if current user is a member
+      // Load current user profile for avatar/chat
       if (currentUser) {
         const { data: profile } = await supabase
           .from('profiles')
-          .select('sport, community_teams')
+          .select('username, full_name, avatar_url, community_teams')
           .eq('id', currentUser.id)
           .single();
+        setUserProfile(profile);
         if (profile?.community_teams) {
           const teams = JSON.parse(profile.community_teams || '[]');
           setIsMember(teams.includes(`${sport}-${teamAbbr}`));
         }
       }
 
-      // Load recent battles mentioning this team
+      // Load member count (profiles who joined this team community)
+      const { count } = await supabase
+        .from('profiles')
+        .select('id', { count: 'exact', head: true })
+        .ilike('community_teams', `%${sport}-${teamAbbr}%`);
+      setMemberCount(count || 0);
+
+      // Load fans (top by wins who are members)
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('username, full_name, wins, battles_count, avatar_url')
+        .ilike('community_teams', `%${sport}-${teamAbbr}%`)
+        .order('wins', { ascending: false })
+        .limit(50);
+      setFans(profiles || []);
+
+      // Load recent battles
       const { data: battleData } = await supabase
         .from('battles')
         .select('*')
@@ -195,10 +242,61 @@ export default function TeamCommunity() {
         .limit(20);
       setBattles(battleData || []);
 
+      // Load recent chat messages (newest first)
+      const { data: chatData } = await supabase
+        .from('community_chats')
+        .select('*')
+        .eq('sport', sport)
+        .eq('team_abbr', teamAbbr)
+        .order('created_at', { ascending: false })
+        .limit(60);
+      setMessages(chatData || []);
+
       setLoading(false);
     }
+
     load();
+
+    // Realtime chat subscription
+    const channel = supabase
+      .channel(`community-chat-${sport}-${teamAbbr}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'community_chats',
+        filter: `sport=eq.${sport}`,
+      }, (payload) => {
+        if (payload.new.team_abbr === teamAbbr) {
+          setMessages(prev => [payload.new, ...prev]);
+        }
+      })
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
   }, [sport, teamAbbr]);
+
+  async function sendMessage() {
+    if (!msgInput.trim() || !user || sending) return;
+    setSending(true);
+    const text = msgInput.trim();
+    setMsgInput('');
+    await supabase.from('community_chats').insert({
+      sport,
+      team_abbr: teamAbbr,
+      user_id: user.id,
+      username: userProfile?.username || user.email?.split('@')[0],
+      message: text,
+    });
+    setSending(false);
+    inputRef.current?.focus();
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  }
 
   async function toggleMembership() {
     if (!user) return;
@@ -208,91 +306,188 @@ export default function TeamCommunity() {
     const key = `${sport}-${teamAbbr}`;
     const updated = existing.includes(key) ? existing.filter(t => t !== key) : [...existing, key];
     await supabase.from('profiles').update({ community_teams: JSON.stringify(updated) }).eq('id', user.id);
-    setIsMember(!isMember);
-    setMemberCount(c => isMember ? c - 1 : c + 1);
+    const joined = !isMember;
+    setIsMember(joined);
+    setMemberCount(c => joined ? c + 1 : c - 1);
     setJoining(false);
   }
-
-  const AVATAR_COLORS = ['#3B82F6','#10B981','#F59E0B','#8B5CF6','#EF4444','#06B6D4','#EC4899'];
 
   if (!teamInfo) {
     return (
       <main className={styles.main}>
-        <div className={styles.page}>
-          <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-muted)' }}>
-            Team not found. <Link href="/communities" style={{ color: '#3B82F6' }}>Back to Communities</Link>
-          </div>
+        <div style={{ textAlign: 'center', padding: '6rem 0', color: 'var(--text-muted)' }}>
+          Team not found. <Link href="/communities" style={{ color: '#3B82F6' }}>Back to Communities</Link>
         </div>
       </main>
     );
   }
 
+  const tabs = [
+    { key: 'chat', label: '💬 Chat' },
+    { key: 'debates', label: '⚔️ Debates' },
+    { key: 'fans', label: '👥 Fans' },
+  ];
+
   return (
     <main className={styles.main}>
 
-      {/* Team hero banner */}
-      <div className={styles.heroBanner} style={{ borderBottom: `3px solid ${teamColor}` }}>
+      {/* Hero */}
+      <div className={styles.hero} style={{ '--team-color': teamColor }}>
+        <div className={styles.heroGlow} style={{ background: `radial-gradient(ellipse 60% 100% at 50% 0%, ${teamColor}28 0%, transparent 70%)` }} />
         <div className={styles.heroInner}>
           <div className={styles.heroLeft}>
-            <img src={logoUrl} alt={teamInfo.name} className={styles.heroLogo} onError={e => e.target.style.display='none'} />
+            <div className={styles.logoWrap} style={{ boxShadow: `0 0 0 2px ${teamColor}40, 0 8px 32px ${teamColor}30` }}>
+              <img src={logoUrl} alt={teamInfo.name} className={styles.heroLogo} onError={e => e.target.style.display = 'none'} />
+            </div>
             <div>
               <div className={styles.heroLeague}>{sport.toUpperCase()} Community</div>
               <h1 className={styles.heroName}>{teamInfo.name}</h1>
-              <div className={styles.heroStats}>
-                <span style={{ color: teamColor, fontWeight: 700 }}>{memberCount}</span> fans
+              <div className={styles.heroMeta}>
+                <span className={styles.memberPip} style={{ background: teamColor }} />
+                <span style={{ color: teamColor, fontWeight: 700 }}>{memberCount.toLocaleString()}</span>
+                <span style={{ color: 'var(--text-muted)' }}> members</span>
               </div>
             </div>
           </div>
-          <div className={styles.heroRight}>
+          <div className={styles.heroActions}>
             {user ? (
               <button
                 onClick={toggleMembership}
                 className={styles.joinBtn}
-                style={isMember ? { background: `${teamColor}20`, border: `1px solid ${teamColor}`, color: teamColor } : { background: teamColor }}
+                style={isMember
+                  ? { background: `${teamColor}18`, border: `1.5px solid ${teamColor}`, color: teamColor }
+                  : { background: teamColor, border: `1.5px solid ${teamColor}`, color: '#fff' }
+                }
                 disabled={joining}
               >
-                {joining ? '...' : isMember ? '✓ Joined' : '+ Join Community'}
+                {joining ? '...' : isMember ? '✓ Joined' : '+ Join'}
               </button>
             ) : (
-              <Link href="/login" className={styles.joinBtn} style={{ background: teamColor }}>Sign in to join</Link>
+              <Link href="/login" className={styles.joinBtn} style={{ background: teamColor, color: '#fff', border: `1.5px solid ${teamColor}` }}>
+                Join Community
+              </Link>
             )}
-            <Link href="/communities" className={styles.backLink}>← All Communities</Link>
+            <Link href="/communities" className={styles.backLink}>← Communities</Link>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className={styles.tabRow}>
+          <div className={styles.tabs}>
+            {tabs.map(t => (
+              <button
+                key={t.key}
+                className={`${styles.tab} ${activeTab === t.key ? styles.tabActive : ''}`}
+                style={activeTab === t.key ? { color: teamColor, borderColor: teamColor } : {}}
+                onClick={() => setActiveTab(t.key)}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
 
-      <div className={styles.page}>
-
-        {/* Tabs */}
-        <div className={styles.tabs}>
-          {[
-            { key: 'debates', label: '⚔️ Debates' },
-            { key: 'fans', label: '👥 Fans' },
-          ].map(t => (
-            <button
-              key={t.key}
-              className={`${styles.tab} ${activeTab === t.key ? styles.tabActive : ''}`}
-              style={activeTab === t.key ? { borderColor: teamColor, color: teamColor } : {}}
-              onClick={() => setActiveTab(t.key)}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-
+      {/* Content */}
+      <div className={styles.content}>
         {loading ? (
           <div className={styles.loading}>Loading...</div>
+        ) : activeTab === 'chat' ? (
+
+          /* ── CHAT TAB ── */
+          <div className={styles.chatWrap}>
+            <div className={styles.chatFeed}>
+              {messages.length === 0 ? (
+                <div className={styles.chatEmpty}>
+                  <div style={{ fontSize: 36, marginBottom: 12 }}>💬</div>
+                  <div className={styles.emptyTitle}>No messages yet</div>
+                  <p className={styles.emptySub}>Be the first to say something about the {teamInfo.name}.</p>
+                </div>
+              ) : (
+                messages.map((msg, i) => {
+                  const isOwn = msg.user_id === user?.id;
+                  const colorIdx = msg.username?.charCodeAt(0) % AVATAR_COLORS.length;
+                  return (
+                    <div key={msg.id} className={`${styles.msgRow} ${isOwn ? styles.msgOwn : ''}`}>
+                      {!isOwn && (
+                        <Avatar username={msg.username} size={32} colorIndex={colorIdx} />
+                      )}
+                      <div className={styles.msgBubbleWrap}>
+                        {!isOwn && (
+                          <div className={styles.msgMeta}>
+                            <Link href={`/profile/${msg.username}`} className={styles.msgUsername}>
+                              @{msg.username}
+                            </Link>
+                            <span className={styles.msgTime}>{timeAgo(msg.created_at)}</span>
+                          </div>
+                        )}
+                        <div
+                          className={styles.msgBubble}
+                          style={isOwn ? { background: `${teamColor}CC`, color: '#fff' } : {}}
+                        >
+                          {msg.message}
+                        </div>
+                        {isOwn && (
+                          <div className={styles.msgTime} style={{ textAlign: 'right', marginTop: 3 }}>
+                            {timeAgo(msg.created_at)}
+                          </div>
+                        )}
+                      </div>
+                      {isOwn && (
+                        <Avatar username={userProfile?.username} fullName={userProfile?.full_name} size={32} colorIndex={colorIdx} />
+                      )}
+                    </div>
+                  );
+                })
+              )}
+              <div ref={chatBottomRef} />
+            </div>
+
+            {/* Input */}
+            <div className={styles.chatInputRow} style={{ borderTop: `1px solid ${teamColor}25` }}>
+              {user ? (
+                <>
+                  <Avatar username={userProfile?.username} fullName={userProfile?.full_name} size={32} colorIndex={0} />
+                  <input
+                    ref={inputRef}
+                    className={styles.chatInput}
+                    placeholder={`Message ${teamInfo.name} fans...`}
+                    value={msgInput}
+                    onChange={e => setMsgInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    maxLength={300}
+                  />
+                  <button
+                    className={styles.sendBtn}
+                    style={{ background: msgInput.trim() ? teamColor : 'var(--bg-tertiary)', color: msgInput.trim() ? '#fff' : 'var(--text-faint)' }}
+                    onClick={sendMessage}
+                    disabled={!msgInput.trim() || sending}
+                  >
+                    ↑
+                  </button>
+                </>
+              ) : (
+                <div className={styles.chatSignIn}>
+                  <Link href="/login" style={{ color: teamColor, fontWeight: 700 }}>Sign in</Link>
+                  <span style={{ color: 'var(--text-muted)' }}> to join the conversation</span>
+                </div>
+              )}
+            </div>
+          </div>
+
         ) : activeTab === 'debates' ? (
+
+          /* ── DEBATES TAB ── */
           <div className={styles.section}>
             <div className={styles.sectionHeader}>
               <div className={styles.sectionTitle}>Recent Debates</div>
-              <Link href="/battle" className={styles.newDebateBtn} style={{ background: teamColor }}>+ Start a Debate</Link>
+              <Link href="/battle" className={styles.actionBtn} style={{ background: teamColor }}>+ Start Debate</Link>
             </div>
             {battles.length === 0 ? (
               <div className={styles.emptyState}>
                 <div className={styles.emptyIcon}>⚔️</div>
                 <div className={styles.emptyTitle}>No debates yet</div>
-                <p className={styles.emptySub}>Be the first to start a debate about the {teamInfo.name}.</p>
+                <p className={styles.emptySub}>Be the first to debate about the {teamInfo.name}.</p>
                 <Link href="/battle" className={styles.emptyBtn} style={{ background: teamColor }}>Start a debate →</Link>
               </div>
             ) : (
@@ -313,37 +508,34 @@ export default function TeamCommunity() {
               </div>
             )}
           </div>
+
         ) : (
+
+          /* ── FANS TAB ── */
           <div className={styles.section}>
-            <div className={styles.sectionTitle}>Top Fans</div>
+            <div className={styles.sectionTitle} style={{ marginBottom: '1.25rem' }}>Top Fans</div>
             {fans.length === 0 ? (
               <div className={styles.emptyState}>
                 <div className={styles.emptyIcon}>👥</div>
                 <div className={styles.emptyTitle}>No fans yet</div>
-                <p className={styles.emptySub}>Be the first fan in this community.</p>
+                <p className={styles.emptySub}>Join this community to appear here.</p>
               </div>
             ) : (
               <div className={styles.fanList}>
-                {fans.map((fan, i) => {
-                  const bg = AVATAR_COLORS[i % AVATAR_COLORS.length];
-                  const initials = fan.full_name
-                    ? fan.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2)
-                    : fan.username?.slice(0,2).toUpperCase();
-                  return (
-                    <Link key={fan.username} href={`/profile/${fan.username}`} className={styles.fanCard}>
-                      <div className={styles.fanRank} style={{ color: i < 3 ? teamColor : 'var(--text-faint)' }}>#{i+1}</div>
-                      <div className={styles.fanAvatar} style={{ background: bg }}>{initials}</div>
-                      <div className={styles.fanInfo}>
-                        <div className={styles.fanName}>{fan.full_name || fan.username}</div>
-                        <div className={styles.fanHandle}>@{fan.username}</div>
-                      </div>
-                      <div className={styles.fanStats}>
-                        <span style={{ color: '#10B981', fontWeight: 700 }}>{fan.wins || 0}W</span>
-                        <span style={{ color: 'var(--text-faint)', fontSize: '11px' }}>{fan.battles_count || 0} battles</span>
-                      </div>
-                    </Link>
-                  );
-                })}
+                {fans.map((fan, i) => (
+                  <Link key={fan.username} href={`/profile/${fan.username}`} className={styles.fanCard}>
+                    <div className={styles.fanRank} style={{ color: i < 3 ? teamColor : 'var(--text-faint)' }}>#{i + 1}</div>
+                    <Avatar username={fan.username} fullName={fan.full_name} size={36} colorIndex={i} />
+                    <div className={styles.fanInfo}>
+                      <div className={styles.fanName}>{fan.full_name || fan.username}</div>
+                      <div className={styles.fanHandle}>@{fan.username}</div>
+                    </div>
+                    <div className={styles.fanStats}>
+                      <span style={{ color: '#10B981', fontWeight: 700 }}>{fan.wins || 0}W</span>
+                      <span style={{ color: 'var(--text-faint)', fontSize: '11px' }}>{fan.battles_count || 0} battles</span>
+                    </div>
+                  </Link>
+                ))}
               </div>
             )}
           </div>
