@@ -115,6 +115,7 @@ export default function NavBar() {
     { href: '/battle', label: 'Battle Mode', icon: '⚔️', desc: 'Debate live on camera' },
     { href: '/lobby', label: 'Game Lobby', icon: '🏟️', desc: 'Watch parties & scores' },
     { href: '/leaderboard', label: 'Leaderboard', icon: '🏆', desc: 'Top debaters ranked' },
+    { href: '/communities', label: 'Communities', icon: '👥', desc: 'Find your fanbase' },
     { href: '/search', label: 'Search', icon: '🔍', desc: 'Find users & battles' },
   ];
   const logoHref = user ? '/lobby' : '/';
@@ -128,11 +129,16 @@ export default function NavBar() {
         </Link>
 
         <ul style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', listStyle: 'none', margin: 0, padding: 0 }} className="nav-desktop-links">
-          {[{ href: '/battle', label: 'Battle Mode' }, { href: '/lobby', label: 'Game Lobby' }, { href: '/leaderboard', label: 'Leaderboard' }].map(link => (
+          {[
+            { href: '/battle', label: 'Battle Mode' },
+            { href: '/lobby', label: 'Game Lobby' },
+            { href: '/leaderboard', label: 'Leaderboard' },
+            { href: '/communities', label: 'Communities' },
+          ].map(link => (
             <li key={link.href}>
-              <Link href={link.href} style={{ fontSize: '14px', color: 'var(--text-muted)', textDecoration: 'none', padding: '6px 12px', borderRadius: '8px', transition: 'all 0.2s' }}
-                onMouseEnter={e => { e.target.style.color = 'var(--text-primary)'; e.target.style.background = 'var(--bg-tertiary)'; }}
-                onMouseLeave={e => { e.target.style.color = 'var(--text-muted)'; e.target.style.background = 'transparent'; }}
+              <Link href={link.href} style={{ fontSize: '14px', color: pathname === link.href ? 'var(--text-primary)' : 'var(--text-muted)', textDecoration: 'none', padding: '6px 12px', borderRadius: '8px', transition: 'all 0.2s', fontWeight: pathname === link.href ? 600 : 400 }}
+                onMouseEnter={e => { e.currentTarget.style.color = 'var(--text-primary)'; e.currentTarget.style.background = 'var(--bg-tertiary)'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = pathname === link.href ? 'var(--text-primary)' : 'var(--text-muted)'; e.currentTarget.style.background = 'transparent'; }}
               >{link.label}</Link>
             </li>
           ))}
@@ -233,7 +239,6 @@ export default function NavBar() {
               </Link>
             ))}
           </div>
-          {/* Theme toggle in mobile menu */}
           <div style={{ padding: '0 16px 8px' }}>
             <button onClick={toggleTheme} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '13px 12px', borderRadius: '12px', background: 'none', border: 'none', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
               <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: 'var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px', flexShrink: 0 }}>{isDark ? '☀️' : '🌙'}</div>
@@ -287,5 +292,4 @@ export default function NavBar() {
       `}</style>
     </>
   );
-  <li><Link href="/communities">Communities</Link></li>
 }
