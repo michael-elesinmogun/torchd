@@ -1,0 +1,139 @@
+.main {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
+  min-height: 100vh;
+}
+
+/* Hero */
+.heroBanner {
+  background: var(--bg-secondary);
+  padding: 5rem clamp(1rem, 4vw, 2rem) 1.5rem;
+}
+
+.heroInner {
+  max-width: 1100px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 1.5rem; flex-wrap: wrap;
+}
+
+.heroLeft { display: flex; align-items: center; gap: 1.25rem; }
+
+.heroLogo { width: 72px; height: 72px; object-fit: contain; }
+
+.heroLeague {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--text-muted); margin-bottom: 4px;
+}
+
+.heroName {
+  font-family: 'Syne', sans-serif; font-size: clamp(1.6rem, 4vw, 2.4rem);
+  font-weight: 800; color: var(--text-primary); letter-spacing: -0.02em;
+  margin-bottom: 6px;
+}
+
+.heroStats { font-size: 13px; color: var(--text-muted); }
+
+.heroRight { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+
+.joinBtn {
+  font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700;
+  color: #EEF2FF; border: none; border-radius: 10px;
+  padding: 10px 22px; cursor: pointer; text-decoration: none;
+  transition: all 0.2s; white-space: nowrap; display: inline-block;
+}
+.joinBtn:hover { opacity: 0.88; transform: translateY(-1px); }
+
+.backLink { font-size: 13px; color: var(--text-muted); text-decoration: none; }
+.backLink:hover { color: var(--text-primary); }
+
+/* Page */
+.page {
+  max-width: 1100px; margin: 0 auto;
+  padding: 2rem clamp(1rem, 4vw, 2rem) 5rem;
+}
+
+/* Tabs */
+.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border-subtle); margin-bottom: 2rem; }
+
+.tab {
+  padding: 12px 20px; font-size: 14px; font-weight: 600;
+  color: var(--text-muted); background: none; border: none;
+  border-bottom: 2px solid transparent; cursor: pointer;
+  font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+  margin-bottom: -1px;
+}
+.tab:hover { color: var(--text-primary); }
+.tabActive { }
+
+/* Section */
+.section { }
+.sectionHeader { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.25rem; }
+.sectionTitle { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; color: var(--text-primary); }
+
+.newDebateBtn {
+  font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 700;
+  color: #EEF2FF; border-radius: 8px; padding: 8px 16px;
+  text-decoration: none; transition: opacity 0.2s;
+}
+.newDebateBtn:hover { opacity: 0.85; }
+
+/* Battle list */
+.battleList { display: flex; flex-direction: column; gap: 0.75rem; }
+
+.battleCard {
+  display: block; text-decoration: none;
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+  border-radius: 14px; padding: 1rem 1.25rem;
+  transition: all 0.2s;
+}
+.battleCard:hover { border-color: rgba(59,130,246,0.3); transform: translateY(-1px); }
+
+.battleTopic {
+  font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700;
+  color: var(--text-primary); margin-bottom: 6px; line-height: 1.4;
+}
+.battleMeta { font-size: 13px; margin-bottom: 4px; }
+.battleDate { font-size: 11px; color: var(--text-faint); }
+
+/* Fan list */
+.fanList { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.fanCard {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+  border-radius: 12px; padding: 0.875rem 1.25rem;
+  text-decoration: none; transition: border-color 0.2s;
+}
+.fanCard:hover { border-color: rgba(59,130,246,0.25); }
+
+.fanRank { font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 800; width: 28px; flex-shrink: 0; }
+
+.fanAvatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 800;
+  color: white; flex-shrink: 0;
+}
+
+.fanInfo { flex: 1; min-width: 0; }
+.fanName { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.fanHandle { font-size: 12px; color: var(--text-muted); }
+
+.fanStats { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 13px; }
+
+/* Empty */
+.emptyState { text-align: center; padding: 3rem 0; }
+.emptyIcon { font-size: 40px; margin-bottom: 0.75rem; display: block; }
+.emptyTitle { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 800; color: var(--text-primary); margin-bottom: 0.5rem; }
+.emptySub { font-size: 14px; color: var(--text-muted); margin-bottom: 1.5rem; }
+.emptyBtn { display: inline-flex; align-items: center; border-radius: 10px; padding: 10px 20px; font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; color: #EEF2FF; text-decoration: none; }
+
+.loading { padding: 3rem; text-align: center; color: var(--text-muted); font-size: 14px; }
+
+@media (max-width: 600px) {
+  .heroInner { flex-direction: column; align-items: flex-start; }
+  .heroRight { align-items: flex-start; }
+  .heroLogo { width: 56px; height: 56px; }
+  .heroName { font-size: 1.6rem; }
+}
